@@ -1,0 +1,777 @@
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import {
+    NativeEventEmitter,
+    NativeModules,
+    StyleSheet,
+    SafeAreaView,
+    ScrollView,
+    Button,
+    Image,
+    Text,
+    View,
+    Alert,
+    Platform,
+    PermissionsAndroid,
+    TouchableOpacity
+} from "react-native";
+
+import LinearGradient from 'react-native-linear-gradient';
+// -------------------------------------------
+// RawBT API
+// -------------------------------------------
+import RawbtApi,
+{
+    RawBTPrintJob,
+    AttributesString,
+    AttributesBarcode,
+    AttributesQRcode,
+    AttributesImage,
+    CommandBarcode,
+    FONT_C,
+    FONT_A,
+    FONT_B,
+    FONT_TRUE_TYPE,
+    ALIGNMENT_LEFT,
+    ALIGNMENT_CENTER,
+    ALIGNMENT_RIGHT,
+    HRI_ABOVE,
+    HRI_BELOW,
+    HRI_BOTH,
+    BARCODE_UPC_A,
+    BARCODE_UPC_E,
+    BARCODE_EAN13,
+    BARCODE_JAN13,
+    BARCODE_EAN8,
+    BARCODE_JAN8,
+    BARCODE_CODE39,
+    BARCODE_ITF,
+    BARCODE_CODABAR,
+    BARCODE_CODE93,
+    BARCODE_CODE128,
+    BARCODE_GS1_128,
+    BARCODE_GS1_DATABAR_OMNIDIRECTIONAL,
+    BARCODE_GS1_DATABAR_TRUNCATED,
+    BARCODE_GS1_DATABAR_LIMITED,
+    BARCODE_GS1_DATABAR_EXPANDED,
+} from 'react-native-rawbt-api';
+
+import ViewShot, { captureRef } from 'react-native-view-shot';
+import moment from 'moment-timezone'
+import { realmContext } from '../RealmContext'
+import { Betting, Draws, Users, Combinations } from '../Models';
+import { getConfiguration } from '../utils/helpers'
+import { COLORS, SIZES } from '../constants/theme';
+import { useDispatch, useSelector } from 'react-redux';
+import { SET_LOADING, STOP_LOADING } from '../redux/actions/types';
+import { DocumentDirectoryPath, downloadFile, writeFile, readDir, stat, readFile, unlink } from 'react-native-fs';
+import { BSON } from 'realm';
+import { BarcodeCreatorView, BarcodeFormat } from 'react-native-barcode-creator';
+
+const { useRealm, useQuery } = realmContext;
+const { ReactNativeLoading } = NativeModules;
+
+// --------------------------------
+// RawBT events listener
+// --------------------------------
+let subscription;
+if (subscription === undefined) {
+    const loadingManagerEmitter = new NativeEventEmitter(ReactNativeLoading);
+    subscription = loadingManagerEmitter.addListener("RawBT", ({ status, progress, message }) => {
+        console.log(status + " " + progress + " " + message);
+        // your code if it needs more <PrinterProgress />
+    });
+}
+
+export default function TestScreen({ data, isPrint, onPrint }) {
+    const realm = useRealm()
+    const { collector, user, selectedUser } = useSelector(({ user }) => user);
+    const viewShotRef = useRef();
+    const [total, setTotal] = useState(0)
+    const [referenceNumber, setReferenceNumber] = useState(0)
+    const [printCount, setPrintCount] = useState(0)
+    const [rowValue, setRowValue] = useState([]);
+    const dispatch = useDispatch();
+
+
+
+    console.log(user, "SELEC")
+
+    let users = useQuery(Users, doc => {
+        let userNow = selectedUser ? selectedUser : user?.email;
+
+        console.log(userNow, "userNowuserNowuserNowuserNowuserNow")
+
+        return doc.filtered(
+            'email == $0',
+            userNow
+        );
+    }, [collector, selectedUser, user]);
+
+
+    let winStraight = getConfiguration(users[0], 'winStraight');
+    let withWin200 = getConfiguration(users[0], 'withWin200');
+
+    const showError = (error) => {
+        Alert.alert('Print error', error, [
+            {
+                text: 'Cancel',
+                style: 'cancel',
+            },
+        ]);
+    }
+
+    const generator = async () => {
+        const totalAmount = data?.combinations?.reduce((acc, combination) => acc + combination.amount, 0);
+        const referenceNum = await generateTicketNumber()
+
+        setTotal(totalAmount)
+        setReferenceNumber(referenceNum)
+    }
+
+    function generateTicketNumber() {
+        return Math.floor(10000000 + Math.random() * 90000000).toString();
+    }
+
+    function groupAndPopulate(data) {
+        const groupedCombinations = {};
+
+        data.combinations.forEach(item => {
+            const { combination, amount, rambleAmount, targetAmount, betType, } = item;
+
+            if (!groupedCombinations[combination]) {
+                groupedCombinations[combination] = { combination, straight: 0, ramble: 0 };
+            }
+
+            groupedCombinations[combination].straight += targetAmount;
+            groupedCombinations[combination].ramble += rambleAmount;
+
+
+            /* 	  if (betType == "T") {
+                    groupedCombinations[combination].straight += amount;
+                  } else if (betType == "R") {
+                    groupedCombinations[combination].ramble += amount;
+                  } else if (betType == 'T - R' || betType == 'R - T') {
+                    groupedCombinations[combination].ramble += amount;
+                    groupedCombinations[combination].straight += amount;
+                  } */
+        });
+
+        return Object.values(groupedCombinations);
+    }
+
+    const handlePrint = async () => {
+        setPrintCount(prev => prev += 1)
+        dispatch({ type: SET_LOADING })
+        let printHeader = getConfiguration(users[0], 'printHeader')
+        let item = realm.objectForPrimaryKey(Betting, BSON.ObjectId(data._id));
+        const filePath = `${DocumentDirectoryPath}/bwlogo1.png`;
+        let loadImage = Image.resolveAssetSource({ uri: `https://sharewin.pro/apiv2/assets/bwlogo1.png` }).uri;
+        // setTimeout(() => {
+        viewShotRef.current.capture().then(async (uri) => {
+            let job = new RawBTPrintJob();
+            let base64StringImage = await RawbtApi.getImageBase64String(loadImage);
+            let base64String = await RawbtApi.getImageBase64String(uri);
+            if (printHeader.isCheck && String(users[0]?.receiptTemplate).toLowerCase() != 'samar') {
+                job.image(base64StringImage, new AttributesImage(ALIGNMENT_CENTER, 16));
+            }
+            job.image(base64String);
+            job.cut();
+
+            RawbtApi.printJob(job.GSON())
+                .then(() => {
+                    realm.write(() => {
+                        item.isPrint = true;
+                    });
+                    onPrint();
+                })
+                .catch((err) => {
+                    showError(err.message)
+                }
+                );
+            dispatch({ type: STOP_LOADING })
+
+        })
+            .catch(err => {
+                dispatch({ type: STOP_LOADING })
+                showError(err.message)
+            })
+    }
+
+    const samarPrint = async ({ data, gameTime, collectorDetails }) => {
+        let bets = [];
+        try {
+            // if (isPrint) {
+            // 	Alert.alert('Already Printed a Ticket.');
+            // 	return
+            // }
+            setPrintCount(prev => prev += 1)
+            dispatch({ type: SET_LOADING })
+            const item = realm.objectForPrimaryKey(Betting, BSON.ObjectId(data._id));
+            let winStraight = getConfiguration(user, 'winStraight');
+            let withWin200 = getConfiguration(user, 'withWin200');
+
+            let job = new RawBTPrintJob();
+
+            // Destructure the bets with type Ramble and Target
+            const mapData = data?.combinations.map((item) => {
+                if (item?.rambleAmount && item?.targetAmount) {
+                    let newObj1 = {
+                        combination: item?.combination,
+                        betType: item?.targetAmount ? "T" : "",
+                        amount: item?.targetAmount
+                    }
+
+                    let newObj2 = {
+                        combination: item?.combination,
+                        betType: item?.rambleAmount ? "R" : "",
+                        amount: item?.rambleAmount
+                    }
+
+                    bets.push(newObj1, newObj2);
+                } else {
+
+                    bets.push({
+                        combination: item?.combination,
+                        betType: item?.betType,
+                        amount: item?.amount
+
+                    })
+                }
+
+                // console.log(item, "ITEM")
+                return
+            })
+
+            const attrBold = new AttributesString().setBold(true);
+            const attrCenter = new AttributesString(ALIGNMENT_CENTER);
+            const attrBig = new AttributesString(ALIGNMENT_CENTER, false, false, true);
+            const attrSmall = new AttributesString(ALIGNMENT_CENTER, false, false, false);
+            const attrSmallLeft = new AttributesString(ALIGNMENT_LEFT, false, false, false);
+
+            let total = 0;
+            let agentCode = "";
+            agentCode = `${String(collectorDetails?.firstName).charAt(0).toUpperCase() + String(collectorDetails?.lastName).charAt(0).toUpperCase() + '-' + String(collectorDetails?.mobile).slice(-4)}`
+
+            /* image */
+            const filePath = `${DocumentDirectoryPath}/bwlogo1.png`;
+            // let loadImage = Image.resolveAssetSource({uri: `file://${filePath}`}).uri;
+
+
+            // let base64String = await RawbtApi.getImageBase64String(loadImage);
+            // job.image(base64String, new AttributesImage(ALIGNMENT_CENTER, 8));
+            /* header */
+
+            // job.ln();
+            // job.println("SALES INVOICE", new AttributesString(ALIGNMENT_CENTER, true));
+            // job.ln();
+
+            /* items */
+            // items.forEach((item) => );
+            job.println("FELECITY GAMES & AMUSEMENT CORP.", attrSmall);
+            job.println("Eastern Samar, Ph", attrSmall);
+            job.drawLine('-');
+
+            job.leftRightText(`${"Transaction ID:"}`, `${data?.ticketNo}`)
+            job.leftRightText(`${"Draw Date:"}`, `${moment(moment().toDate()).format('MM/DD/YYYY')}`)
+            job.println(`Agent Code: ${agentCode}`, attrSmallLeft);
+            job.println(`Agent Name: ${data?.collector}`, attrSmallLeft);
+            job.println(`Printed: ${moment(moment().toDate()).format('MM/DD/YYYY h:mm:ss A')}`, attrSmallLeft);
+            job.drawLine('-');
+
+            job.println(`${"CODE" + "	" + "COMB." + "	" + "BET" + "	" + "WIN"}`, attrSmallLeft);
+            bets.forEach((item) => job.println(`${`${String(gameTime).toUpperCase()}` + `${item?.betType == "R" ? "S3r" : "S3"}` + "	" + item?.combination + "	" + item?.amount + "	" + item?.amount * (item?.betType == "R" ? withWin200?.value : winStraight?.value)}`))
+            job.drawLine('-');
+            data?.combinations.map((combi) => {
+                total += combi.amount
+
+                return
+            })
+            job.println(`Total Amount: ${total}`, attrSmallLeft);
+            job.drawLine('-');
+            job.println("Thank you for supporting STL. Wi", attrCenter);
+            job.println("nning tickets must be claim with", attrCenter);
+            job.println("in within one (1) year after the", attrCenter);
+            job.println("betting date, otherwise winning", attrCenter);
+            job.println("prize shall be forfeited", attrCenter);
+            job.println("stlwsmr.v1.02.05.24", attrCenter);
+
+            job.ln(2);
+
+
+            job.cut();
+
+            RawbtApi.printJob(job.GSON())
+                .then(() => {
+                    console.log('NAG PRINT NAG SUCCESS!!!')
+                    realm.write(() => {
+                        item.isPrint = true;
+                        item.printCopy = (item.printCopy ?? 0) + 1;
+                    });
+                    onPrint();
+                })
+                .catch((err) => {
+                    showError(err.message)
+                }
+                );
+
+
+            console.log(item.printCopy, "THE PRINT COPY NOW!")
+
+            dispatch({ type: STOP_LOADING })
+        } catch (err) {
+            // images error
+            showError(err.message);
+        }
+    }
+
+    const result = groupAndPopulate(data);
+    let totalAmount = 0;
+
+
+    useEffect(() => {
+        setRowValue(result)
+        generator()
+    }, [])
+
+    useEffect(() => {
+        RawbtApi.init();
+    }, [])
+
+    return (
+        <>
+            <SafeAreaView style={styles.container}>
+                <View style={{ flex: 1, width: '100%' }}>
+                    {
+
+                        String(user?.receiptTemplate).toLowerCase() == 'samar' ?
+                            <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 0.8 }} style={{ width: 300, flex: 1, position: 'absolute', alignItems: 'center', top: -8999, left: -9999 }}>
+                                <View
+                                    style={{
+                                        flex: 1,
+                                        width: '100%',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        justifyContent: 'flex-start',
+                                    }}
+                                >
+                                    <View
+                                        style={{
+                                            flexDirection: 'column',
+                                            paddingVertical: 10,
+                                            marginVertical: 10,
+                                            width: '100%',
+                                            alignItems: 'center',
+                                            borderBottomWidth: 2,
+                                            borderStyle: 'dashed'
+                                        }}
+                                    >
+                                        <Text style={{...styles.fontStyles2, fontSize: 18, fontWeight: 'normal'}}>FELECITY GAMES & AMUSEMENT CORP.</Text>
+                                        <Text style={{...styles.fontStyles2, fontSize: 18, fontWeight: 'normal'}}>Eastern Samar, Ph</Text>
+                                    </View>
+
+                                    <View
+                                        style={{
+                                            width: '100%',
+                                            flexDirection: 'column',
+                                            marginVertical: 10,
+                                            borderBottomWidth: 2,
+                                            borderStyle: 'dashed',
+                                            paddingBottom: 10,
+                                        }}
+                                    >
+                                        <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between' }}>
+                                            <Text style={{...styles.fontStyles2, fontSize: 18, fontWeight: 'normal'}}>Transaction ID:</Text>
+                                            <Text style={{...styles.fontStyles2, fontSize: 18, fontWeight: 'normal'}}>1231232</Text>
+                                        </View>
+
+
+                                        <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between' }}>
+                                            <Text style={{...styles.fontStyles2, fontSize: 18, fontWeight: 'normal'}}>Draw Date:</Text>
+                                            <Text style={{...styles.fontStyles2, fontSize: 18, fontWeight: 'normal'}}>{moment().format('MM/DD/YYYY')}</Text>
+                                        </View>
+                                        <View style={{ width: '100%'}}>
+                                            <Text style={{...styles.fontStyles2, fontSize: 18, textAlign: 'left', fontWeight: 'normal'}}>Agent Code: RV-0036</Text>
+                                            <Text style={{...styles.fontStyles2, fontSize: 18, textAlign: 'left', fontWeight: 'normal'}}>Agent Name: Revs</Text>
+                                            <Text style={{...styles.fontStyles2, fontSize: 18, textAlign: 'left', fontWeight: 'normal'}}>Printed: {moment().format('MM/DD/YYYY hh:mm:ss A')}</Text>
+                                        </View>
+                                    </View>
+
+                                    <View style={{ maxWidth: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                                        <View style={{ width: '25%' }}>
+                                            <Text style={{ ...styles.fontStyles2, fontSize: 18, textAlign: 'left', fontWeight: 'normal' }}>CODE</Text>
+                                        </View>
+
+                                        <View style={{ width: '25%', justifyContent: 'center' }}>
+                                            <Text style={{...styles.fontStyles2, fontSize: 18, textAlign: 'center', fontWeight: 'normal'}}>COMB.</Text>
+                                        </View>
+
+                                        <View style={{ width: '25%', justifyContent: 'right' }}>
+                                            <Text style={{...styles.fontStyles2, fontSize: 18, textAlign: 'center', fontWeight: 'normal'}}>BET</Text>
+                                        </View>
+
+                                        <View style={{ width: '25%' }}>
+                                            <Text style={{ ...styles.fontStyles2, fontSize: 18, textAlign: 'left', fontWeight: 'normal'}}>WIN</Text>
+                                        </View>
+                                    </View>
+
+                                    <View
+                                        style={{
+                                            paddingBottom: 20,
+                                            borderBottomWidth: 2,
+                                            borderStyle: 'dashed'
+                                        }}
+                                    >
+
+                                        {
+                                            data?.combinations.map((val, index) => {
+
+                                                totalAmount += val.amount;
+
+                                                return (
+                                                    <View
+                                                        key={index}
+                                                        style={{
+                                                            flexDirection: 'row',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            width: '100%',
+                                                        }}
+                                                    >
+
+
+                                                        {
+                                                            val.betType == 'R - T' ?
+                                                                <View style={{ flexDirection: 'column', width: '100%' }}>
+                                                                    <View style={{ flexDirection: 'row', width: '100%' }}>
+                                                                        <View style={{ width: '25%' }}>
+                                                                            <Text style={{ ...styles.fontStyles2, fontSize: 18, fontWeight: 'normal', textAlign: 'left' }}>
+                                                                                {String(data.gameTime).toUpperCase() + String('S3')}
+                                                                                {/* {String(testData?.gameTime).toUpperCase() + " " + String(data.betType).toLowerCase() == 'r' ? 'S3r' : 'S3'} */}
+                                                                            </Text>
+                                                                        </View>
+                                                                        <View style={{ width: '25%' }}>
+                                                                            <Text style={{...styles.fontStyles2, fontSize: 18, fontWeight: 'normal', textAlign: 'right'}}>
+                                                                                {val?.combination}
+                                                                            </Text>
+                                                                        </View>
+
+                                                                        <View style={{ width: '20%' }}>
+                                                                            <Text style={{...styles.fontStyles2, fontSize: 18, fontWeight: 'normal', textAlign: 'right'}}>
+                                                                                {val?.targetAmount}
+                                                                            </Text>
+                                                                        </View>
+                                                                        <View style={{ width: '30%' }}>
+                                                                            <Text style={{ ...styles.fontStyles2, fontSize: 18, fontWeight: 'normal', textAlign: 'center' }}>
+                                                                                {val?.amount * winStraight?.value}
+                                                                            </Text>
+                                                                        </View>
+                                                                    </View>
+
+                                                                    <View style={{ flexDirection: 'row', width: '100%' }}>
+                                                                        <View style={{ width: '25%' }}>
+                                                                            <Text style={{ ...styles.fontStyles2, fontSize: 18, fontWeight: 'normal', textAlign: 'left' }}>
+                                                                                {String(data.gameTime).toUpperCase() + String('S3r')}
+                                                                                {/* {String(testData?.gameTime).toUpperCase() + " " + String(data.betType).toLowerCase() == 'r' ? 'S3r' : 'S3'} */}
+                                                                            </Text>
+                                                                        </View>
+                                                                        <View style={{ width: '25%'}}>
+                                                                            <Text style={{...styles.fontStyles2, fontSize: 18, fontWeight: 'normal', textAlign: 'right'}}>
+                                                                                {val?.combination}
+                                                                            </Text>
+                                                                        </View>
+
+                                                                        <View style={{ width: '20%'}}>
+                                                                            <Text style={{...styles.fontStyles2, fontSize: 18, fontWeight: 'normal', textAlign: 'right'}}>
+                                                                                {val?.rambleAmount}
+                                                                            </Text>
+                                                                        </View>
+                                                                        <View style={{ width: '30%' }}>
+                                                                            <Text style={{ ...styles.fontStyles2, fontSize: 18, fontWeight: 'normal', textAlign: 'center' }}>
+                                                                                {val?.amount * withWin200?.value}
+                                                                            </Text>
+                                                                        </View>
+                                                                    </View>
+                                                                </View>
+
+
+                                                                :
+
+                                                                <>
+                                                                    <View style={{ width: '25%' }}>
+                                                                        <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 18, fontWeight: 'normal' }}>
+                                                                            {String(data.gameTime).toUpperCase() + String(val.betType == 'R' ? 'S3r' : 'S3')}
+                                                                            {/* {String(testData?.gameTime).toUpperCase() + " " + String(data.betType).toLowerCase() == 'r' ? 'S3r' : 'S3'} */}
+                                                                        </Text>
+                                                                    </View>
+                                                                    <View style={{ width: '25%' }}>
+                                                                        <Text style={{...styles.fontStyles2, fontSize: 18, textAlign: 'right', fontWeight: 'normal'}}>
+                                                                            {val?.combination}
+                                                                        </Text>
+                                                                    </View>
+                                                                    <View style={{ width: '20%' }}>
+                                                                        <Text style={{...styles.fontStyles2, fontSize: 18, textAlign: 'right', fontWeight: 'normal'}}>
+                                                                            {val?.amount}
+                                                                        </Text>
+                                                                    </View>
+                                                                    <View style={{ width: '30%' }}>
+                                                                        <Text style={{ ...styles.fontStyles2, textAlign: 'center', fontSize: 18, fontWeight: 'normal'}}>
+                                                                            {val?.amount * (val?.betType == 'R' ? withWin200?.value : winStraight?.value)}
+                                                                        </Text>
+                                                                    </View>
+                                                                </>
+                                                        }
+                                                    </View>
+
+                                                )
+                                            })
+
+                                        }
+                                    </View>
+                                    <View style={{ width: '100%', paddingVertical: 10, marginBottom: 10, borderBottomWidth: 2, borderStyle: 'dashed' }}>
+                                        <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 18, fontWeight: 'normal' }}>
+                                            Total Amount: {totalAmount}
+                                        </Text>
+                                    </View>
+                                    <View style={{ width: '100%', alignItems: 'center' }}>
+                                        <Text style={{ ...styles.fontStyles2, fontSize: 18, fontWeight: 'normal' }}>
+                                            Thank you for supporting STL. Wi
+                                        </Text>
+                                        <Text style={{ ...styles.fontStyles2, fontSize: 18, fontWeight: 'normal' }}>
+                                            nning tickets must be claim with
+                                        </Text>
+                                        <Text style={{ ...styles.fontStyles2, fontSize: 18, fontWeight: 'normal' }}>
+                                            in within one (1) year after the
+                                        </Text>
+                                        <Text style={{ ...styles.fontStyles2, fontSize: 18, fontWeight: 'normal' }}>
+                                            betting date, otherwise winning
+                                        </Text>
+                                        <Text style={{ ...styles.fontStyles2, fontSize: 18, fontWeight: 'normal' }}>
+                                            prize shall be forfeited
+                                        </Text>
+                                        <Text style={{ ...styles.fontStyles2, fontSize: 18, fontWeight: 'normal' }}>
+                                            stlwsmr.v1.02.05.24
+                                        </Text>
+                                    </View>
+
+
+
+                                </View>
+
+                            </ViewShot>
+                            :
+
+                            <ViewShot ref={viewShotRef} options={{ format: 'webm', quality: 0.8, height: 1000 + (15 * data.combinations.length), width: 600 }} style={{ flex: 1, position: 'absolute', alignItems: 'center', top: -8999, left: -9999 }}>
+                                {/* <WebView
+								// ref={webViewRef}
+								originWhitelist={['*']}
+								clearCache={true}
+								source={{ html: htmlContent }}
+								style={{ minHeight: 350 + (50 * data.combinations.length), width: 600}}
+							/> */}
+                                {/* <Barcode value={'123123'} format="PDF417" width={250} height={100} /> */}
+
+
+                                <View style={{ height: 750, width: '100%', flexDirection: 'column', alignItems: 'center' }}>
+                                    {/* <View style={{ width: '100%', alignItems: 'center', justifyContent: 'center'}}>
+																			<Image
+																				source={{ uri: 'https://sharewin.pro/apiv2/assets/bwlogo1.png' }}
+																				resizeMethod='contain'
+																				style={{ height: 170, width: '100%' }}
+																				
+																			/>
+																		</View> */}
+                                    <Text style={{ ...styles.fontStyles1, fontSize: 30 }}>
+                                        OFFICIAL RECEIPT
+                                    </Text>
+                                    <View style={{ width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-evenly', paddingHorizontal: 6 }}>
+                                        <Text style={{ ...styles.fontStyles1, fontSize: 25, fontWeight: '600' }}>
+                                            TICKET #:
+                                        </Text>
+
+                                        <Text style={{ ...styles.fontStyles1, fontSize: 25, fontWeight: '600' }}>
+                                            {data.ticketNo}
+                                        </Text>
+
+                                    </View>
+
+                                    <Text style={{ ...styles.fontStyles1, fontSize: 20, fontWeight: '400' }}>
+                                        {moment().format('MMM DD, YYYY hh:mmA')}
+                                    </Text>
+
+
+                                    <Text style={{ ...styles.fontStyles1, marginTop: 10, fontSize: 20, fontWeight: '500' }}>
+                                        Agent:{String(data.collector).toUpperCase()}
+                                    </Text>
+
+                                    <View style={{ marginTop: 10, width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4 }}>
+                                        <Text style={{ ...styles.fontStyles1, fontSize: 20, fontWeight: '500' }}>
+                                            Total: {total}
+                                        </Text>
+
+                                        <Text style={{ ...styles.fontStyles1, fontSize: 20, fontWeight: '500' }}>
+                                            Game: 3D - {String(data.gameTime).toUpperCase()}
+                                        </Text>
+
+                                    </View>
+
+
+                                    <View style={{ marginTop: 20, flexDirection: 'row', borderWidth: 1, borderColor: COLORS.black, width: '100%' }}>
+                                        <View style={{ width: '25%', borderRightWidth: 1, alignItems: 'center', justifyContent: 'center' }}>
+                                            <Text style={{ ...styles.fontStyles1, fontSize: 22, fontWeight: '300' }}>
+                                                COMBI
+                                            </Text>
+                                        </View>
+
+                                        <View style={{ width: '25%', borderRightWidth: .5, alignItems: 'center', justifyContent: 'center' }}>
+                                            <Text style={{ ...styles.fontStyles1, fontSize: 22, fontWeight: '300' }}>
+                                                S
+                                            </Text>
+                                        </View>
+
+                                        <View style={{ width: '25%', borderRightWidth: .5, alignItems: 'center', justifyContent: 'center' }}>
+                                            <Text style={{ ...styles.fontStyles1, fontSize: 22, fontWeight: '300' }}>
+                                                R
+                                            </Text>
+                                        </View>
+
+                                        <View style={{ width: '25%', borderRightWidth: .5, alignItems: 'center', justifyContent: 'center' }}>
+                                            <Text style={{ ...styles.fontStyles1, fontSize: 22, fontWeight: '300' }}>
+                                                STAT
+                                            </Text>
+                                        </View>
+
+                                    </View>
+
+                                    {result?.map(resItem => (
+                                        <View style={{ flexDirection: 'row', borderWidth: 1, borderColor: COLORS.black, width: '100%' }}>
+                                            <View style={{ width: '25%', borderRightWidth: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 6 }}>
+                                                <Text style={{ ...styles.fontStyles1, fontSize: 22, fontWeight: '300' }}>
+                                                    {resItem.combination.slice(0, 1)}-{resItem.combination.slice(1, 2)}-{resItem.combination.slice(2)}
+                                                </Text>
+                                            </View>
+
+
+                                            <View style={{ width: '25%', borderRightWidth: .5, alignItems: 'center', justifyContent: 'center', paddingVertical: 6 }}>
+                                                <Text style={{ ...styles.fontStyles1, fontSize: 22, fontWeight: '300' }}>
+
+
+                                                    {resItem.straight != 0 ? resItem.straight : '-'}
+                                                </Text>
+                                            </View>
+
+                                            <View style={{ width: '25%', borderRightWidth: .5, alignItems: 'center', justifyContent: 'center', paddingVertical: 6 }}>
+                                                <Text style={{ ...styles.fontStyles1, fontSize: 22, fontWeight: '300' }}>
+                                                    {resItem.ramble != 0 ? resItem.ramble : '-'}
+                                                </Text>
+                                            </View>
+
+                                            <View style={{ width: '25%', borderRightWidth: .5, alignItems: 'center', justifyContent: 'center', paddingVertical: 6 }}>
+                                                <Text style={{ ...styles.fontStyles1, fontSize: 22, fontWeight: '300' }}>
+                                                    OK
+                                                </Text>
+                                            </View>
+
+
+                                        </View>
+                                    ))}
+
+                                    {/* <PDF417BarcodeGenerator data={data.ticketNo}/> */}
+                                    <View style={{ width: '100%', alignItems: 'center', justifyContent: 'center', }}>
+                                        <BarcodeCreatorView value={`${data.ticketNo}`} format={BarcodeFormat.PDF417} width={350} height={120} foregroundColor={'#000000'} style={{ marginVertical: 10 }} />
+                                        <Text style={{ ...styles.fontStyles1, fontSize: 30 }}>
+                                            REF #: {data.ticketNo}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </ViewShot>
+                    }
+                    <View style={{ position: 'absolute', bottom: 0, flexDirection: 'row' }}>
+                        <TouchableOpacity
+                            //  onPress={() =>
+                            // //  {
+                            // // 	// console.log(data?.isPrint, "data?.isPrintdata?.isPrintdata?.isPrintdata?.isPrint")
+                            // // 	String(users[0]?.receiptTemplate).toLowerCase() == 'samar' ?
+                            // // 	samarPrint({
+                            // // 		data: data,
+                            // // 		gameTime: data?.gameTime,
+                            // // 		collectorDetails: {
+                            // // 			firstName: users[0]?.firstName,
+                            // // 			lastName: users[0]?.lastName,
+                            // // 			mobile: users[0]?.mobile
+                            // // 		}
+                            // // 	}) : handlePrint()
+                            // // }}
+                            onPress={handlePrint}
+                            style={{ elevation: 10, shadowRadius: SIZES.radius, borderRadius: SIZES.radius, width: '100%' }}>
+                            <LinearGradient colors={['#6599c3', '#3573a2', '#165894']} style={styles.linearGradient}>
+                                <Text style={styles.buttonText}>
+                                    {data?.printCopy > 1 ? 'REPRINT' : 'PRINT'}
+                                </Text>
+                            </LinearGradient>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </SafeAreaView>
+        </>
+    );
+}
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        // backgroundColor: "#fff",
+    },
+    mainpart: {
+        padding: 16,
+    },
+    linearGradient: {
+        // flex: 1,
+        height: 40,
+        paddingLeft: 15,
+        paddingRight: 15,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 26,
+        width: '100%'
+    },
+    buttonText: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        // textAlign: 'center',
+        fontFamily: 'Gill Sans',
+        textAlign: 'center',
+        // margin: 10,
+        color: '#ffffff',
+        // width: '30%',
+        backgroundColor: 'transparent',
+    },
+    imgMain: {
+        flex: 1,
+        width: 300,
+        height: 300,
+        left: "50%",
+        marginLeft: -150,
+        resizeMode: "contain",
+    },
+    p: {
+        fontSize: 14,
+        marginBottom: 8,
+        marginTop: 8,
+    },
+    large: {
+        marginTop: 32,
+        marginBottom: 8,
+        fontSize: 22,
+    },
+    fontStyles1: {
+        fontFamily: 'RobotoMono',
+        fontWeight: 'bold',
+        color: COLORS.black,
+        textAlign: 'center',
+    },
+    fontStyles2: {
+        fontWeight: 'bold',
+        color: COLORS.black,
+        textAlign: 'center',
+    },
+});

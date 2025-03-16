@@ -1,0 +1,154 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import moment from 'moment-timezone';
+import RNFS from 'react-native-fs';
+import { Platform } from 'react-native';
+
+
+export const permuteDigits = (number) => {
+  // Convert the number to a string to manipulate individual digits
+  const strNum = number.toString();
+  const digits = strNum.split(''); // Split the number into its individual digits
+  const result = [];
+
+  // Helper function to generate permutations
+  function permute(arr, permutation = []) {
+    if (arr.length === 0) {
+      // Join the permutation array into a string, convert to an integer, then back to a string
+      // This step removes any leading zeros from the number
+      const permutedNumber = String(parseInt(permutation.join('')));
+      // Ensure the result is at least 3 digits long by padding with zeros
+      result.push(permutedNumber.padStart(3, '0'));
+      return;
+    }
+
+    for (let i = 0; i < arr.length; i++) {
+      // Remove the current element and continue permuting the rest
+      const remaining = [...arr.slice(0, i), ...arr.slice(i + 1)];
+      permute(remaining, [...permutation, arr[i]]);
+    }
+  }
+
+  // Start the permutation with the initial list of digits
+  permute(digits);
+
+  return result;
+}
+
+export const generateRandomCombination = () => {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  const charactersLength = characters.length;
+
+  for (let i = 0; i < 6; i++) {
+    result += characters.charAt(Math.floor(Math.random() * charactersLength));
+  }
+
+  return result;
+}
+
+export const getConfiguration = (user, type) => {
+  // Convert the number to a string to manipulate individual digits
+  let configs = user && user.configuration ? user.configuration : [];
+
+  let current = {}
+
+  configs.map((a, index) => {
+    if (a.title == type) {
+      current = a;
+      current.index = index;
+    }
+  });
+
+
+
+  return current;
+}
+
+export const updateDateTimeIfGreater = async () => {
+  try {
+    // Check if the current timezone is set to Asia/Manila
+    const currentTimezone = moment.tz.guess();
+    if (currentTimezone !== 'Asia/Manila') {
+      console.log('Timezone is not set to Asia/Manila.', currentTimezone);
+      // return false; // Return false if the timezone is not Asia/Manila
+    }
+
+    // Get the current date and time in number format, considering Asia/Manila timezone
+    const currentDateTime = moment.tz('Asia/Manila').format('YYYYMMDDHHmmss');
+
+    // Get the existing value from AsyncStorage
+    const existingValue = await AsyncStorage.getItem('dateTimeNumber');
+
+    if ((existingValue === null || currentDateTime > existingValue)) {
+      // Update AsyncStorage if no value exists or current datetime is greater
+      await AsyncStorage.setItem('dateTimeNumber', currentDateTime);
+      console.log('DateTime updated to:', currentDateTime);
+      return true; // Successfully updated
+    } else {
+      console.log('Current dateTime is not greater than the existing one.');
+      return false; // No update needed
+    }
+  } catch (error) {
+    console.log('Error updating dateTime:', error);
+    return false; // In case of an error
+  }
+};
+
+export const formatNumber = (value) => {
+  let num = Number(value).toFixed(0);
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+// Function to get external storage directory
+export const getExternalStoragePath = () => {
+  if (Platform.OS === 'android') {
+    return `${RNFS.ExternalStorageDirectoryPath}/MyAppFiles`; 
+  } else {
+    return `${RNFS.DocumentDirectoryPath}/MyAppFiles`; 
+  }
+};
+
+export const readFileFromExternalStorage = async () => {
+  const filePath = `${getExternalStoragePath()}/testFile.txt`;
+
+  try {
+    const fileContents = await RNFS.readFile(filePath, 'utf8');
+    console.log("File Content:", fileContents);
+  } catch (error) {
+    console.error("Error reading file:", error);
+  }
+};
+
+export const formatNumberWithComma = (num) => {
+  // Round the number to two decimal places to handle rounding
+  const roundedNum = Math.round(num * 100) / 100;
+
+  // Function to add commas to the integer part
+  const formatWithCommas = (number) => {
+    return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  };
+
+  // Check if the rounded number has a decimal part
+  if (roundedNum % 1 !== 0) {
+    // Extract the integer part
+    const integerPart = Math.floor(roundedNum);
+
+    // Extract the decimal part as a string
+    const decimalPart = roundedNum.toString().split(".")[1];
+
+    if (decimalPart?.length === 2) {
+      // Include both first and second decimal digits
+      return `${formatWithCommas(integerPart)}`;
+    } else if (decimalPart?.length === 1) {
+      // Include only the first decimal digit
+      return `${formatWithCommas(integerPart)}`;
+    }
+  }
+
+  // Return the integer part with commas if no decimals exist
+  return formatWithCommas(Math.floor(roundedNum));
+};
+
+export const cutString = (str, len) => {
+  return str?.length > len ? str?.slice(0, len) + "..." : str;
+};

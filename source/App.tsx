@@ -1,77 +1,100 @@
-import React from 'react';
-import {SafeAreaProvider} from 'react-native-safe-area-context';
-import {StyleSheet, Linking, Text, View} from 'react-native';
-import {NavigationContainer} from '@react-navigation/native';
-import {createStackNavigator} from '@react-navigation/stack';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, View, ActivityIndicator, Modal } from 'react-native';
+import { createNavigationContainerRef } from '@react-navigation/native';
+import { realmContext } from './RealmContext';
+import { Betting, Combinations, Draws, Messages, Users } from './Models';
+import * as Progress from 'react-native-progress';
+import { StackNavigator } from './StackNavigator';
+import NotifService from './utils/NotificationService';
+import Config from 'react-native-config';
+import { COLORS } from './constants';
+// import { useSelector } from 'react-redux';
 
-import {dataExplorerLink} from '../atlasConfig.json';
-import {LogoutButton} from './LogoutButton';
-import {ItemListView} from './ItemListView';
-import {OfflineModeButton} from './OfflineModeButton';
+
+
+const appId = Config.ATLAS_APP_ID_PROD
+
+console.log(appId, "APP ID")
+
+
+const usersSubscriptionName = 'users';
+const ownItemsSubscriptionName = 'bettings';
+const drawsSubscriptionName = 'draws';
+const combinationsSubscriptionName = 'combinations';
 
 // If you're getting this app code by cloning the repository at
 // https://github.com/mongodb/ template-app-react-native-todo,
 // it does not contain the data explorer link. Download the
 // app template from the Atlas UI to view a link to your data
-const dataExplorerMessage = `View your data in MongoDB Atlas: ${dataExplorerLink}.`;
+const { RealmProvider } = realmContext
 
-console.log(dataExplorerMessage);
-
-const Stack = createStackNavigator();
-
-const headerRight = () => {
-  return <OfflineModeButton />;
+const LoadingIndicator = () => {
+  return (
+    <View style={{...styles.activityContainer, backgroundColor: COLORS.transparentBlack7}}>
+        <Progress.CircleSnail color={['blue', 'yellow', 'red']} />
+      {/* <ActivityIndicator size="large" /> */}
+    </View>
+  );
 };
 
-const headerLeft = () => {
-  return <LogoutButton />;
-};
+const realmFileBehavior = {
+  type: 'downloadBeforeOpen',
+  timeOut: 5000,
+  timeOutBehavior: 'openLocalRealm',
+}
+
 
 export const App = () => {
+  
+
+  let notif = new NotifService((reg) => {
+    console.log(reg)
+  });
+
+  useEffect(() => {
+    notif.createDefaultChannels();
+  }, [])
+
   return (
     <>
       {/* All screens nested in RealmProvider have access
             to the configured realm's hooks. */}
-      <SafeAreaProvider>
-        <NavigationContainer>
-          <Stack.Navigator>
-            <Stack.Screen
-              name="Your To-Do List"
-              component={ItemListView}
-              options={{
-                headerTitleAlign: 'center',
-                headerLeft,
-                headerRight,
-              }}
-            />
-          </Stack.Navigator>
-        </NavigationContainer>
+      <RealmProvider
+        // schema={[Item]}
+        fallback={LoadingIndicator}
+        sync={{
+          flexible: true,
+          initialSubscriptions: {
+            update: (mutableSubs, realm) => {
+              mutableSubs.add(realm.objects(Users), { name: usersSubscriptionName })
+              mutableSubs.add(realm.objects(Messages));
+              // mutableSubs.add(realm.objects(Combinations));
+              // mutableSubs.add(realm.objects(Betting));
+              return mutableSubs;
+            },
+          },
+          newRealmFileBehavior: realmFileBehavior,
+          existingRealmFileBehavior: realmFileBehavior
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Log in with the same account on another device or simulator to see
-            your list sync in real time.
-          </Text>
+        }}
+      >
+        <StackNavigator />
+      </RealmProvider>
 
-          {dataExplorerLink && (
-            <View>
-              <Text style={styles.footerText}>
-                You can view your data in MongoDB Atlas:
-              </Text>
-              <Text
-                style={[styles.footerText, styles.hyperlink]}
-                onPress={() => Linking.openURL(dataExplorerLink)}>
-                {dataExplorerLink}.
-              </Text>
-            </View>
-          )}
-        </View>
-      </SafeAreaProvider>
     </>
   );
 };
 
 const styles = StyleSheet.create({
+  activityContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%'
+    // flexDirection: 'row',
+    // justifyContent: 'space-around',
+    // padding: 10,
+  },
   footerText: {
     fontSize: 12,
     textAlign: 'center',

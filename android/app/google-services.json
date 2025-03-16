@@ -1,0 +1,29 @@
+{
+    "project_info": {
+      "project_number": "764246511164",
+      "project_id": "naughty-fy-888e8",
+      "storage_bucket": "naughty-fy-888e8.appspot.com"
+    },
+    "client": [
+      {
+        "client_info": {
+          "mobilesdk_app_id": "1:764246511164:android:2434dfc78f6437bd10bd39",
+          "android_client_info": {
+            "package_name": "com.rev"
+          }
+        },
+        "oauth_client": [],
+        "api_key": [
+          {
+            "current_key": "AIzaSyDYsRg3OhW86OoE5_rBXYVkZcZJrJguHgM"
+          }
+        ],
+        "services": {
+          "appinvite_service": {
+            "other_platform_oauth_client": []
+          }
+        }
+      }
+    ],
+    "configuration_version": "1"
+  }

@@ -1,5 +1,5 @@
 {
-  "appId": "PUT YOUR APP ID HERE",
+  "appId": "application-0-pwtvfjm",
   "baseUrl": "https://services.cloud.mongodb.com",
   "dataExplorerLink": "https://cloud.mongodb.com/links/app_id/explorer/cluster_name/database/collection/find"
 }
