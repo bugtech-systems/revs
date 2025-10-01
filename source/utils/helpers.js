@@ -1,8 +1,11 @@
+import DeviceInfo from 'react-native-device-info';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import moment from 'moment-timezone';
 import RNFS from 'react-native-fs';
-import { Platform } from 'react-native';
-
+import { Alert, Dimensions, Platform } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Combinations } from '../Models';
+import { createStackNavigator } from '@react-navigation/stack';
 
 export const permuteDigits = (number) => {
   // Convert the number to a string to manipulate individual digits
@@ -151,4 +154,114 @@ export const formatNumberWithComma = (num) => {
 
 export const cutString = (str, len) => {
   return str?.length > len ? str?.slice(0, len) + "..." : str;
+};
+
+// Function to get device details
+export const getDeviceDetails = async () => {
+
+  let mac = await DeviceInfo.getMacAddress();
+  let deviceId = DeviceInfo.getDeviceId();
+  console.log(mac, "THE MAC")
+  return { mac, deviceId };
+  
+};
+
+export const useScreenSize = () => {
+  const [screenSize, setScreenSize] = useState(Dimensions.get('window'));
+
+  useEffect(() => {
+    const onChange = ({ window }) => {
+      setScreenSize(window);
+    };
+
+    const subscription = Dimensions.addEventListener('change', onChange);
+
+    return () => {
+      subscription.remove(); // Clean up on unmount
+    };
+  }, []);
+
+  return screenSize;
+};
+
+/**
+ * Checks if a combination's bet is allowed under its limit
+ * @param {object} combination - The combination object
+ * @param {number} amountTarget - Amount for straight (target) bet
+ * @param {number} amountRamble - Amount for ramble bet
+ * @returns {object} result - { canProceedTarget, canProceedRamble }
+ */
+export const checkSoldOutParts = ({
+  combination,
+  amountTarget = 0,
+  amountRamble = 0,
+  onSoldOut,
+}) => {
+  const straightLimit = combination?.straightLimit || 0;
+  const straightTotal = combination?.straightTotal || 0;
+  const rambleLimit = combination?.rambleLimit || 0;
+  const rambleTotal = combination?.rambleTotal || 0;
+  const digit = combination?.digit?.split('').join('-') || '???';
+
+  const totalStraight = straightTotal + Number(amountTarget);
+  const totalRamble = rambleTotal + Number(amountRamble);
+
+  const canProceedTarget = totalStraight <= straightLimit;
+  const canProceedRamble = totalRamble <= rambleLimit;
+
+  if (!canProceedTarget || !canProceedRamble) {
+    const remainingTarget = Math.max(0, straightLimit - straightTotal);
+    const remainingRamble = Math.max(0, rambleLimit - rambleTotal);
+    onSoldOut?.({ digit, remainingTarget, remainingRamble });
+  }
+
+  return {
+    canProceedTarget,
+    canProceedRamble,
+  };
+};
+
+export const checkSoldOut = ({ comb, combination, amountTarget, amountRamble }) => {
+  const straightExceeded = comb.straightTotal + Number(amountTarget) > comb.straightLimit;
+  const rambleExceeded = comb.rambleTotal + Number(amountRamble) > comb.rambleLimit;
+
+  const remainingStraight = Math.max(0, comb.straightLimit - comb.straightTotal);
+  const remainingRamble = Math.max(0, comb.rambleLimit - comb.rambleTotal);
+
+  let messages = [];
+
+  if (straightExceeded && Number(amountTarget) > 0) {
+    messages.push(
+      `❌ Combination ${combination.split('').join('-')} has reached the *Straight* limit.\nAvailable Straight: ₱${remainingStraight}`
+    );
+  }
+
+  if (rambleExceeded && Number(amountRamble) > 0) {
+    messages.push(
+      `❌ Combination ${combination.split('').join('-')} has reached the *Ramble* limit.\nAvailable Ramble: ₱${remainingRamble}`
+    );
+  }
+
+  if (messages.length > 0) {
+    const message = messages.join('\n\n');
+    setSoldOutMessage(message);
+    setSoldOutModalVisible(true);
+    return true; // means sold out
+  }
+
+  return false; // not sold out
+};
+
+export const getWithWin200Config = (realm, selectedDigit, user) => {
+  // Check the combination in Realm
+  const comb = realm
+    .objects(Combinations)
+    .filtered("digit == $0", selectedDigit)[0];
+
+  if (comb && comb.isWinTo) {
+    // ✅ reuse your getConfiguration helper
+    const response = getConfiguration(user, "withWin200")
+    return response;
+  }
+  return null;
 };

@@ -91,6 +91,8 @@ export default function TestScreen({ data, isPrint, onPrint }) {
     const [printCount, setPrintCount] = useState(0)
     const [rowValue, setRowValue] = useState([]);
     const dispatch = useDispatch();
+    const [viewHeight, setViewHeight] = useState(0);
+    const [readyToCapture, setReadyToCapture] = useState(false);
 
 
 
@@ -159,43 +161,92 @@ export default function TestScreen({ data, isPrint, onPrint }) {
         return Object.values(groupedCombinations);
     }
 
+    // const handlePrint = async () => {
+    //     setPrintCount(prev => prev += 1)
+    //     dispatch({ type: SET_LOADING })
+    //     let printHeader = getConfiguration(users[0], 'printHeader')
+    //     let item = realm.objectForPrimaryKey(Betting, BSON.ObjectId(data._id));
+    //     const filePath = `${DocumentDirectoryPath}/bwlogo1.png`;
+    //     let loadImage = Image.resolveAssetSource({ uri: `https://sharewin.pro/apiv2/assets/bwlogo1.png` }).uri;
+    //     // setTimeout(() => {
+    //     viewShotRef.current.capture().then(async (uri) => {
+    //         let job = new RawBTPrintJob();
+    //         let base64StringImage = await RawbtApi.getImageBase64String(loadImage);
+    //         let base64String = await RawbtApi.getImageBase64String(uri);
+    //         if (printHeader.isCheck && String(users[0]?.receiptTemplate).toLowerCase() != 'samar') {
+    //             job.image(base64StringImage, new AttributesImage(ALIGNMENT_CENTER, 16));
+    //         }
+    //         job.image(base64String);
+    //         job.cut();
+
+    //         RawbtApi.printJob(job.GSON())
+    //             .then(() => {
+    //                 realm.write(() => {
+    //                     item.isPrint = true;
+    //                 });
+    //                 onPrint();
+    //             })
+    //             .catch((err) => {
+    //                 showError(err.message)
+    //             }
+    //             );
+    //         dispatch({ type: STOP_LOADING })
+
+    //     })
+    //         .catch(err => {
+    //             dispatch({ type: STOP_LOADING })
+    //             showError(err.message)
+    //         })
+    // }
+
     const handlePrint = async () => {
-        setPrintCount(prev => prev += 1)
-        dispatch({ type: SET_LOADING })
-        let printHeader = getConfiguration(users[0], 'printHeader')
-        let item = realm.objectForPrimaryKey(Betting, BSON.ObjectId(data._id));
-        const filePath = `${DocumentDirectoryPath}/bwlogo1.png`;
-        let loadImage = Image.resolveAssetSource({ uri: `https://sharewin.pro/apiv2/assets/bwlogo1.png` }).uri;
-        // setTimeout(() => {
-        viewShotRef.current.capture().then(async (uri) => {
-            let job = new RawBTPrintJob();
-            let base64StringImage = await RawbtApi.getImageBase64String(loadImage);
-            let base64String = await RawbtApi.getImageBase64String(uri);
-            if (printHeader.isCheck && String(users[0]?.receiptTemplate).toLowerCase() != 'samar') {
-                job.image(base64StringImage, new AttributesImage(ALIGNMENT_CENTER, 16));
-            }
-            job.image(base64String);
-            job.cut();
+  setPrintCount(prev => prev + 1);
+  dispatch({ type: SET_LOADING });
 
-            RawbtApi.printJob(job.GSON())
-                .then(() => {
-                    realm.write(() => {
-                        item.isPrint = true;
-                    });
-                    onPrint();
-                })
-                .catch((err) => {
-                    showError(err.message)
-                }
-                );
-            dispatch({ type: STOP_LOADING })
+  const tryCapture = async () => {
+    try {
+      let printHeader = getConfiguration(users[0], 'printHeader');
+      let item = realm.objectForPrimaryKey(Betting, BSON.ObjectId(data._id));
+      const filePath = `${DocumentDirectoryPath}/bwlogo1.png`;
+      const loadImage = Image.resolveAssetSource({ uri: `https://sharewin.pro/apiv2/assets/bwlogo1.png` }).uri;
 
-        })
-            .catch(err => {
-                dispatch({ type: STOP_LOADING })
-                showError(err.message)
-            })
+      const uri = await viewShotRef.current.capture();
+      const base64StringImage = await RawbtApi.getImageBase64String(loadImage);
+      const base64String = await RawbtApi.getImageBase64String(uri);
+
+      let job = new RawBTPrintJob();
+      if (printHeader.isCheck && String(users[0]?.receiptTemplate).toLowerCase() != 'samar') {
+        job.image(base64StringImage, new AttributesImage(ALIGNMENT_CENTER, 16));
+      }
+      job.image(base64String);
+      job.cut();
+
+      await RawbtApi.printJob(job.GSON());
+
+      realm.write(() => {
+        item.isPrint = true;
+      });
+
+      onPrint();
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      dispatch({ type: STOP_LOADING });
     }
+  };
+
+  // Wait until layout is ready
+  if (viewHeight === 0) {
+    const interval = setInterval(() => {
+      if (viewHeight !== 0) {
+        clearInterval(interval);
+        tryCapture();
+      }
+    }, 100); // poll every 100ms
+  } else {
+    tryCapture();
+  }
+};
 
     const samarPrint = async ({ data, gameTime, collectorDetails }) => {
         let bets = [];
@@ -336,6 +387,10 @@ export default function TestScreen({ data, isPrint, onPrint }) {
     useEffect(() => {
         RawbtApi.init();
     }, [])
+
+
+console.log(data.combinations.length, 'THE VIEW HEIGHT')
+
 
     return (
         <>
@@ -560,7 +615,16 @@ export default function TestScreen({ data, isPrint, onPrint }) {
                             </ViewShot>
                             :
 
-                            <ViewShot ref={viewShotRef} options={{ format: 'webm', quality: 0.8, height: 1000 + (15 * data.combinations.length), width: 600 }} style={{ flex: 1, position: 'absolute', alignItems: 'center', top: -8999, left: -9999 }}>
+                            <ViewShot
+  ref={viewShotRef}
+  options={{ format: 'webm', quality: 0.8, width: 600, height: viewHeight + (30 * data.combinations.length) }}
+  style={{
+    position: 'absolute',
+    top: -9999,
+    left: -9999,
+    alignItems: 'center',
+  }}
+>
                                 {/* <WebView
 								// ref={webViewRef}
 								originWhitelist={['*']}
@@ -570,8 +634,16 @@ export default function TestScreen({ data, isPrint, onPrint }) {
 							/> */}
                                 {/* <Barcode value={'123123'} format="PDF417" width={250} height={100} /> */}
 
-
-                                <View style={{ height: 750, width: '100%', flexDirection: 'column', alignItems: 'center' }}>
+ <View
+    onLayout={(e) => {
+      const { height } = e.nativeEvent.layout;
+      setViewHeight(height);
+    //   setReadyToCapture(true); // layout is ready
+    }}
+    style={{ width: '100%', alignItems: 'center', height: data?.combinations.length > 2 ? 750 : 550 }}
+  >
+{/* </View> */}
+                                {/* <View style={{ height: 500, width: '100%', flexDirection: 'column', alignItems: 'center' }}> */}
                                     {/* <View style={{ width: '100%', alignItems: 'center', justifyContent: 'center'}}>
 																			<Image
 																				source={{ uri: 'https://sharewin.pro/apiv2/assets/bwlogo1.png' }}
@@ -580,35 +652,35 @@ export default function TestScreen({ data, isPrint, onPrint }) {
 																				
 																			/>
 																		</View> */}
-                                    <Text style={{ ...styles.fontStyles1, fontSize: 30 }}>
+                                    <Text style={{ ...styles.fontStyles1, fontSize: 32 }}>
                                         OFFICIAL RECEIPT
                                     </Text>
                                     <View style={{ width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-evenly', paddingHorizontal: 6 }}>
-                                        <Text style={{ ...styles.fontStyles1, fontSize: 25, fontWeight: '600' }}>
+                                        <Text style={{ ...styles.fontStyles1, fontSize: 27, fontWeight: 'bold' }}>
                                             TICKET #:
                                         </Text>
 
-                                        <Text style={{ ...styles.fontStyles1, fontSize: 25, fontWeight: '600' }}>
+                                        <Text style={{ ...styles.fontStyles1, fontSize: 27, fontWeight: 'bold' }}>
                                             {data.ticketNo}
                                         </Text>
 
                                     </View>
 
-                                    <Text style={{ ...styles.fontStyles1, fontSize: 20, fontWeight: '400' }}>
+                                    <Text style={{ ...styles.fontStyles1, fontSize: 22, fontWeight: 'bold' }}>
                                         {moment().format('MMM DD, YYYY hh:mmA')}
                                     </Text>
 
 
-                                    <Text style={{ ...styles.fontStyles1, marginTop: 10, fontSize: 20, fontWeight: '500' }}>
+                                    <Text style={{ ...styles.fontStyles1, marginTop: 10, fontSize: 22, fontWeight: 'bold' }}>
                                         Agent:{String(data.collector).toUpperCase()}
                                     </Text>
 
                                     <View style={{ marginTop: 10, width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4 }}>
-                                        <Text style={{ ...styles.fontStyles1, fontSize: 20, fontWeight: '500' }}>
+                                        <Text style={{ ...styles.fontStyles1, fontSize: 22, fontWeight: 'bold' }}>
                                             Total: {total}
                                         </Text>
 
-                                        <Text style={{ ...styles.fontStyles1, fontSize: 20, fontWeight: '500' }}>
+                                        <Text style={{ ...styles.fontStyles1, fontSize: 22, fontWeight: 'bold' }}>
                                             Game: 3D - {String(data.gameTime).toUpperCase()}
                                         </Text>
 
@@ -617,25 +689,25 @@ export default function TestScreen({ data, isPrint, onPrint }) {
 
                                     <View style={{ marginTop: 20, flexDirection: 'row', borderWidth: 1, borderColor: COLORS.black, width: '100%' }}>
                                         <View style={{ width: '25%', borderRightWidth: 1, alignItems: 'center', justifyContent: 'center' }}>
-                                            <Text style={{ ...styles.fontStyles1, fontSize: 22, fontWeight: '300' }}>
+                                            <Text style={{ ...styles.fontStyles1, fontSize: 24, fontWeight: '600', padding: 2 }}>
                                                 COMBI
                                             </Text>
                                         </View>
 
-                                        <View style={{ width: '25%', borderRightWidth: .5, alignItems: 'center', justifyContent: 'center' }}>
-                                            <Text style={{ ...styles.fontStyles1, fontSize: 22, fontWeight: '300' }}>
+                                        <View style={{ width: '25%', borderRightWidth: 1, alignItems: 'center', justifyContent: 'center' }}>
+                                            <Text style={{ ...styles.fontStyles1, fontSize: 24, fontWeight: '600', padding: 2 }}>
                                                 S
                                             </Text>
                                         </View>
 
-                                        <View style={{ width: '25%', borderRightWidth: .5, alignItems: 'center', justifyContent: 'center' }}>
-                                            <Text style={{ ...styles.fontStyles1, fontSize: 22, fontWeight: '300' }}>
+                                        <View style={{ width: '25%', borderRightWidth: 1, alignItems: 'center', justifyContent: 'center' }}>
+                                            <Text style={{ ...styles.fontStyles1, fontSize: 24, fontWeight: '600', padding: 2 }}>
                                                 R
                                             </Text>
                                         </View>
 
                                         <View style={{ width: '25%', borderRightWidth: .5, alignItems: 'center', justifyContent: 'center' }}>
-                                            <Text style={{ ...styles.fontStyles1, fontSize: 22, fontWeight: '300' }}>
+                                            <Text style={{ ...styles.fontStyles1, fontSize: 24, fontWeight: '600' , padding: 2}}>
                                                 STAT
                                             </Text>
                                         </View>
@@ -645,28 +717,28 @@ export default function TestScreen({ data, isPrint, onPrint }) {
                                     {result?.map(resItem => (
                                         <View style={{ flexDirection: 'row', borderWidth: 1, borderColor: COLORS.black, width: '100%' }}>
                                             <View style={{ width: '25%', borderRightWidth: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 6 }}>
-                                                <Text style={{ ...styles.fontStyles1, fontSize: 22, fontWeight: '300' }}>
+                                                <Text style={{ ...styles.fontStyles1, fontSize: 24, fontWeight: '600' }}>
                                                     {resItem.combination.slice(0, 1)}-{resItem.combination.slice(1, 2)}-{resItem.combination.slice(2)}
                                                 </Text>
                                             </View>
 
 
-                                            <View style={{ width: '25%', borderRightWidth: .5, alignItems: 'center', justifyContent: 'center', paddingVertical: 6 }}>
-                                                <Text style={{ ...styles.fontStyles1, fontSize: 22, fontWeight: '300' }}>
+                                            <View style={{ width: '25%', borderRightWidth: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 6 }}>
+                                                <Text style={{ ...styles.fontStyles1, fontSize: 18, fontWeight: '600' }}>
 
 
                                                     {resItem.straight != 0 ? resItem.straight : '-'}
                                                 </Text>
                                             </View>
 
-                                            <View style={{ width: '25%', borderRightWidth: .5, alignItems: 'center', justifyContent: 'center', paddingVertical: 6 }}>
-                                                <Text style={{ ...styles.fontStyles1, fontSize: 22, fontWeight: '300' }}>
+                                            <View style={{ width: '25%', borderRightWidth: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 6 }}>
+                                                <Text style={{ ...styles.fontStyles1, fontSize: 18, fontWeight: '600' }}>
                                                     {resItem.ramble != 0 ? resItem.ramble : '-'}
                                                 </Text>
                                             </View>
 
                                             <View style={{ width: '25%', borderRightWidth: .5, alignItems: 'center', justifyContent: 'center', paddingVertical: 6 }}>
-                                                <Text style={{ ...styles.fontStyles1, fontSize: 22, fontWeight: '300' }}>
+                                                <Text style={{ ...styles.fontStyles1, fontSize: 18, fontWeight: '600' }}>
                                                     OK
                                                 </Text>
                                             </View>
@@ -676,7 +748,7 @@ export default function TestScreen({ data, isPrint, onPrint }) {
                                     ))}
 
                                     {/* <PDF417BarcodeGenerator data={data.ticketNo}/> */}
-                                    <View style={{ width: '100%', alignItems: 'center', justifyContent: 'center', }}>
+                                    <View style={{ width: '100%', alignItems: 'center', justifyContent: 'center' }}>
                                         <BarcodeCreatorView value={`${data.ticketNo}`} format={BarcodeFormat.PDF417} width={350} height={120} foregroundColor={'#000000'} style={{ marginVertical: 10 }} />
                                         <Text style={{ ...styles.fontStyles1, fontSize: 30 }}>
                                             REF #: {data.ticketNo}

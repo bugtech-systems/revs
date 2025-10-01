@@ -4,9 +4,6 @@ import { COLORS, SIZES } from '../constants';
 
 const LargeInput = ({ label, value, onChangeText, placeholder, keyboardType, secureTextEntry, inputLength, editable }) => {
 
-  console.log(value, "TJE VAL")
-  
-  
     return (
       <View style={{...styles.container, borderColor: !value ? COLORS.gray300 : value && !editable ? COLORS.gray500 : COLORS.primaryTransparent3, backgroundColor: !value ? COLORS.white : value && !editable ? COLORS.gray500 : COLORS.primaryTransparent3, flexDirection: 'column', padding: 4, alignItems: 'flex-start', justifyContent: 'space-between', width: inputLength, elevation: 4, shadowRadius: SIZES.radius / 2, shadowColor: COLORS.gray600}}>
 

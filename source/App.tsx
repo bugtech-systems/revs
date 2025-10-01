@@ -8,11 +8,12 @@ import { StackNavigator } from './StackNavigator';
 import NotifService from './utils/NotificationService';
 import Config from 'react-native-config';
 import { COLORS } from './constants';
+import { AppInitializer } from './AppInitializer';
 // import { useSelector } from 'react-redux';
 
 
 
-const appId = Config.ATLAS_APP_ID_PROD
+const appId = Config.ATLAS_APP_ID_QA
 
 console.log(appId, "APP ID")
 
@@ -78,6 +79,8 @@ export const App = () => {
 
         }}
       >
+                  <AppInitializer />
+        
         <StackNavigator />
       </RealmProvider>
 

@@ -34,20 +34,20 @@ export class Betting extends Realm.Object<Betting> {
     primaryKey: '_id',
     properties: {
       _id: { type: 'objectId', default: () => new BSON.ObjectId() },
-      isDeleted: { type: 'bool', default: false },
+      isDeleted: { type: 'bool', indexed: true, default: false },
       isComplete: { type: 'bool', default: false },
       isValidated: 'date?',
-      timestamp: 'date?',
+      timestamp: { type: 'date', indexed: true, optional: true },
       straight: 'double',
       ramble: 'double',
       gross: 'double',
       net: 'double',
       isPrint: {type: 'bool', default: false},
       isWinTo: {type: 'bool', default: false},
-      inputType: { type: 'string', default: 'normal' },
+      inputType: { type: 'string', indexed: true, default: 'normal' },
       fileUrl: 'string?',
       collector: 'string',
-      owner_id: 'string',
+      owner_id: { type: 'string', indexed: true },
       printCopy: 'double?',
       draw: 'draws?',
       user: 'users?',
@@ -121,10 +121,12 @@ export class Users extends Realm.Object<Users> {
   commission?: number;
   mobile?: string;
   uplines?: Users[];
+  // uplines!: Realm.BSON.ObjectId[];
   configuration?: Configuration[];
   referral?: string;
   userLevel!: number;
   comRate!: number;
+  deviceId?: string;
   comPortion!: number;
   coordinates?: string;
   grossToday?: number;
@@ -150,7 +152,9 @@ export class Users extends Realm.Object<Users> {
       commission: 'double?',
       grossToday: 'double?',
       coordinates: 'string?',
+      deviceId: 'string?',
       mobile: 'string?',
+      // uplines: { type: 'list', objectType: 'objectId', default: [] },
       uplines: { type: 'list', objectType: 'users' },
       referral: 'string?',
       userLevel: { type: 'int', default: 0 },
@@ -205,7 +209,11 @@ export class Combinations extends Realm.Object<Combinations> {
   rambleLimit!: number;
   rambleTotal!: number;
   straightTotal!: number;
-  isWinTo!: boolean; 
+  isWinTo!: boolean;
+  riskLevel?: 'hot' | 'cold' | 'neutral';
+  winFrequency?: number;
+  straightMaxLimit?: number;
+  rambleMaxLimit?: number;
 
   static schema: Realm.ObjectSchema = {
     name: 'combinations',
@@ -217,7 +225,11 @@ export class Combinations extends Realm.Object<Combinations> {
       rambleLimit:  { type: 'double', default:  0},
       rambleTotal:  { type: 'double', default:  0},
       straightTotal:  { type: 'double', default:  0},
-      isWinTo: {type: 'bool', default: false},
+      isWinTo: {type: 'bool', default: false },
+      riskLevel: { type: 'string', default: 'neutral', optional: true },
+      winFrequency: { type: 'int', default: 0, optional: true },
+      straightMaxLimit: { type: 'double', default: 0, optional: true},
+      rambleMaxLimit: { type: 'double', default: 0, optional: true},
     }
   };
 }
@@ -284,3 +296,35 @@ export class Messages extends Realm.Object<Messages> {
     }
   };
 };
+
+export class Cashflow extends Realm.Object<Cashflow> {
+  _id!: Realm.BSON.ObjectId;
+  amount!: number;
+  description!: string;
+  inputType!: string;
+  isDeleted!: boolean;
+  owner!: string;
+  owner_name?: string;
+  user!: string;
+  updatedBy?: string | null;
+  createdAt!: Date;
+  updatedAt!: Date;
+
+  static schema: Realm.ObjectSchema = {
+    name: 'cashflow',
+    primaryKey: '_id',
+    properties: {
+      _id: { type: 'objectId', default: () => new Realm.BSON.ObjectId() },
+      amount: { type: 'double', default: 0 },  // converting from string to number
+      description: 'string',
+      inputType: 'string',
+      isDeleted: { type: 'bool', default: false },
+      owner: 'string',
+      owner_name: 'string?', // optional
+      user: 'string',
+      updatedBy: 'string?', // optional or nullable
+      createdAt: 'date',
+      updatedAt: 'date',
+    },
+  };
+}

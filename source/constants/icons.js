@@ -58,11 +58,19 @@ export const imageUpload = require('../../assets/icons/imageUpload.png')
 export const imageDownload = require('../../assets/icons/imageDownload.png')
 export const location = require('../../assets/icons/location.png')
 export const notification = require('../../assets/icons/bell.png')
+export const revokeDevice = require('../../assets/icons/access-denied.png')
+export const disabledSync = require('../../assets/icons/no-wifi.png')
+export const EnabledSync = require('../../assets/icons/wi-fi.png')
+export const cashFlow = require('../../assets/icons/money.png')
 
 
 
 
 export default {
+    cashFlow,
+    EnabledSync,
+    disabledSync,
+    revokeDevice,
     notification,
     location,
     imageDownload,

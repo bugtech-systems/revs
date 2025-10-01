@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import Realm, { BSON, internals } from 'realm';
 import axios from 'axios';
-import { StyleSheet, Text, Keyboard, View, ScrollView, TouchableOpacity, FlatList, TextInput, Image, Button, TouchableWithoutFeedback, Alert, Modal } from 'react-native'
+import { StyleSheet, Text, Keyboard, View, ScrollView, TouchableOpacity, FlatList, TextInput, Image, Button, TouchableWithoutFeedback, Alert, Modal, ToastAndroid } from 'react-native'
 // import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
 import { useUser, useApp } from '@realm/react';
 import { realmContext } from '../RealmContext';
@@ -13,17 +13,18 @@ import Icon from 'react-native-vector-icons/MaterialIcons'; // or any other icon
 // import { file_server_token, file_server_url, file_download_url } from '../../commonData.json';
 // import ImageUploader from '../components/ImageUploader';
 // import { SPrize, Win2Prize } from '../utils/commonData';
-import { getConfiguration, updateDateTimeIfGreater } from '../utils/helpers';
+import { checkSoldOutParts, getConfiguration, getWithWin200Config, updateDateTimeIfGreater } from '../utils/helpers';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Geolocation from 'react-native-geolocation-service';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, icons } from '../constants';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 const { useRealm, useQuery } = realmContext;
 
 const itemSubscriptionName = 'items';
 const ownItemsSubscriptionName = 'ownItems';
-const drawsSubscriptionName = 'draws'; 
+const drawsSubscriptionName = 'draws';
 const combinationsSubscriptionName = 'combinations';
 
 let keyPad = [
@@ -77,7 +78,6 @@ let keyPad = [
     },
 ]
 
-
 export default function TicketForm({ navigation }) {
     const dispatch = useDispatch()
     const { collector, user } = useSelector(({ user }) => user);
@@ -108,6 +108,13 @@ export default function TicketForm({ navigation }) {
     const [lastPress, setLastPress] = useState(null);
     const [showDate, setShowDate] = useState(false);
     const [date, setDate] = useState(new Date())
+    const [soldOutModalVisible, setSoldOutModalVisible] = useState(false);
+    const [showWin200Modal, setShowWin200Modal] = useState(false);
+    const [showSoldOutBetModal, setShowSoldOutBetModal] = useState(false);
+    const [modalTitle, setModalTitle] = useState('');
+    const [modalMessage, setModalMessage] = useState('');
+    const [pendingBet, setPendingBet] = useState(null);
+
     const [values, setValues] = useState({
         digit: '',
         straight: '',
@@ -121,6 +128,35 @@ export default function TicketForm({ navigation }) {
 
     // const items = useQuery(Betting);
     // const users = useQuery(Users, doc => { return doc.filtered('email == $0', collector)}, [collector]);
+
+    const showToastWin200Bet = () => {
+        ToastAndroid.showWithGravityAndOffset(
+            'Combination is Win200!',
+            ToastAndroid.LONG,
+            ToastAndroid.BOTTOM,
+            0,
+            0,
+        );
+    };
+
+    // Reusable modal for sold out
+    const showSoldOutBetModalFn = (message) => {
+        setModalTitle('SOLD OUT');
+        setModalMessage(message);
+        setShowSoldOutBetModal(true);
+    };
+
+    const showToastSoldOutBet = (message) => {
+        ToastAndroid.showWithGravityAndOffset(
+            `${message}`,
+            ToastAndroid.LONG,
+            ToastAndroid.BOTTOM,
+            0,
+            0,
+        );
+    };
+
+
 
     let users = useQuery(Users, doc => {
         let curUser = collector ? collector : user?.email
@@ -140,8 +176,6 @@ export default function TicketForm({ navigation }) {
             startOfDay, endOfDay
         ).sorted('gameTime');
     }, [users, date])
-
-
 
     let comb = useQuery(Combinations, digit => {
         return digit.filtered(
@@ -164,6 +198,213 @@ export default function TicketForm({ navigation }) {
             'isComplete == false && inputType == "sold" && gameTime == $0 && timestamp >= $1 && timestamp < $2', gameTime, startOfDay, endOfDay).sorted('timestamp');
     }, [gameTime]);
 
+    //     const checkSoldOut = ({ comb, combination, amountTarget, amountRamble }) => {
+    //     const maxLimit = comb.maxLimit ? comb.maxLimit : 50;
+    //   const straightExceeded = comb.straightTotal + Number(amountTarget) > comb.straightLimit;
+    //   const rambleExceeded = comb.rambleTotal + Number(amountRamble) > comb.rambleLimit;
+
+    //   const remainingStraight = Math.max(0, comb.straightLimit - comb.straightTotal);
+    //   const remainingRamble = Math.max(0, comb.rambleLimit - comb.rambleTotal);
+    //   console.log(maxLimit, 'MAX LIMIT')
+
+    //   let messages = [];
+
+    //   if (straightExceeded && Number(amountTarget) > 0) {
+    //     messages.push(
+    //       `❌ Combination ${combination.split('').join('-')} has reached the *Straight* limit.\nAvailable Straight: ₱${remainingStraight}`
+    //     );
+    //   }
+
+    //   if (rambleExceeded && Number(amountRamble) > 0) {
+    //     messages.push(
+    //       `❌ Combination ${combination.split('').join('-')} has reached the *Ramble* limit.\nAvailable Ramble: ₱${remainingRamble}`
+    //     );
+    //   }
+
+    //   if (messages.length > 0) {
+    //     const message = messages.join('\n\n');
+    //     setSoldOutMessage(message);
+    //     setSoldOutModalVisible(true);
+    //     return true; // means sold out
+    //   }
+
+    //   return false; // not sold out
+    // };
+
+    //   const chooseImageSource = () => {
+    //     Alert.alert(
+    //       'Upload Image',
+    //       'Choose an option',
+    //       [
+    //         { text: 'Camera', onPress: openCamera },
+    //         { text: 'Gallery', onPress: selectFile },
+    //         { text: 'Cancel', style: 'cancel' },
+    //       ],
+    //       { cancelable: true }
+    //     );
+    //   };
+
+    //   const uploadImage = async (fileImage) => {
+    //     try {
+    //       setError(null)
+    //        const imagePick = await pickImage();
+    //        const image = imagePick.assets[0];
+    //        const formData = new FormData();
+    //        formData.append('file', {
+    //        uri: image.uri,
+    //        type: image.type,
+    //        name: image.fileName,
+    //        });
+
+    //        const response = await axios.post(file_server_url, formData, {
+    //        headers: {
+    //          'Content-Type': 'multipart/form-data',
+    //          Authorization: `Bearer ${file_server_token}`
+    //        },
+    //        });
+
+    //        setSelectedImage({...response.data, uri: file_download_url + response.data._id });
+
+    //      } catch (error) {
+    //        console.error('Error uploading image:', error);
+    //      }
+    //   };
+
+    //   const selectFile = async () => {
+    // 	setBetTypeOption('file')
+    //     try {
+    //       const result = await launchImageLibrary({
+    //         mediaType: 'photo',
+    //         maxWidth: 300,
+    //         maxHeight: 300,
+    //         quality: 1,
+    //       });
+
+    //       if (result.didCancel) {
+    //         Alert.alert('Canceled');
+    // 		setBetTypeOption('')
+    // 		setBetType('')
+
+    //       } else if (result.errorCode) {
+    //         Alert.alert('Error: ' + result.errorMessage);
+    // 		setBetTypeOption('')
+    // 		setBetType('')
+
+    //       } else {
+    //         // uploadImage(result.assets[0]);
+    //       }
+    //     } catch (err) {
+    //       Alert.alert('Unknown Error: ' + JSON.stringify(err));
+    //       throw err;
+    //     }
+    //   };
+
+    // const checkSoldOut = ({ comb, combination, amountTarget, amountRamble }) => {
+    //     const straightLimit = comb.straightLimit ?? 0;
+    //     const rambleLimit = comb.rambleLimit ?? 0;
+    //     const straightMaxLimit = comb?.straightMaxLimit ?? 0;
+    //     const rambleMaxLimit = comb?.rambleMaxLimit ?? 0;
+    //     const maxLimit = comb.maxLimit ?? 50;
+
+    //     const currentStraight = comb.straightTotal ?? 0;
+    //     const currentRamble = comb.rambleTotal ?? 0;
+
+    //     const straightBet = Number(amountTarget) || 0;
+    //     const rambleBet = Number(amountRamble) || 0;
+
+    //     const newStraightTotal = currentStraight + straightBet;
+    //     const newRambleTotal = currentRamble + rambleBet;
+    //     const combinedTotal = newStraightTotal + newRambleTotal;
+
+    //     const remainingStraight = Math.max(0, straightLimit - currentStraight);
+    //     const remainingRamble = Math.max(0, rambleLimit - currentRamble);
+    //     const remainingMax = Math.max(0, maxLimit - (currentStraight + currentRamble));
+
+    //     const straightExceeded = newStraightTotal > straightLimit;
+    //     const rambleExceeded = newRambleTotal > rambleLimit;
+    //     const maxLimitExceeded = combinedTotal > maxLimit;
+
+    //     // console.log(combinedTotal, "combinedTotalcombinedTotalcombinedTotalcombinedTotal")
+
+    //     let messages = [];
+
+    //     //   if (straightExceeded && straightBet > 0) {
+    //     //     messages.push(
+    //     //       `❌ Combination ${combination.split('').join('-')} has reached the *Straight* limit.\nAvailable Straight: ₱${remainingStraight}`
+    //     //     );
+    //     //   }
+
+    //     //   if (rambleExceeded && rambleBet > 0) {
+    //     //     messages.push(
+    //     //       `❌ Combination ${combination.split('').join('-')} has reached the *Ramble* limit.\nAvailable Ramble: ₱${remainingRamble}`
+    //     //     );
+    //     //   }
+
+    //     // if (maxLimitExceeded) {
+    //     //     const availableStraight = Math.max(0, maxLimit - currentStraight);
+    //     //     const availableRamble = Math.max(0, maxLimit - currentRamble);
+
+
+
+    //     //     messages.push(
+    //     //         `Combination ${combination.split('').join('-')} has reached the *Max Limit*.\n` +
+    //     //         `Available Total Remaining: ₱${remainingMax}\n`
+    //     //         //   +
+    //     //         //   `Suggested: Straight up to ₱${availableStraight}, Ramble up to ₱${availableRamble}`
+    //     //     );
+    //     // }
+
+    //     if (maxLimitExceeded) {
+    //         const availableStraight = Math.max(0, maxLimit - currentStraight);
+    //         const availableRamble = Math.max(0, maxLimit - currentRamble);
+
+    //         const message =
+    //             `${combination.split('').join('-')}`
+    //         showSoldOutBetModalFn(message);
+    //         return true;
+    //     }
+
+    //     if (messages.length > 0) {
+    //         const message = messages.join('\n\n');
+    //         // setSoldOutMessage(message);
+    //         // setSoldOutModalVisible(true);
+    //         showToastSoldOutBet(message)
+    //         return true; // blocked due to sold out
+    //     }
+
+    //     return false; // passed validation
+    // };
+
+    const checkSoldOut = ({ comb, combination, amountTarget, amountRamble }) => {
+        let hasMaxLimit = getConfiguration(users[0], 'hasMaxLimit').isCheck;
+        const straightMaxLimit = comb?.straightMaxLimit ?? 0;
+        const rambleMaxLimit = comb?.rambleMaxLimit ?? 0;
+
+        const currentStraight = comb.straightTotal ?? 0;
+        const currentRamble = comb.rambleTotal ?? 0;
+
+        const straightBet = Number(amountTarget) || 0;
+        const rambleBet = Number(amountRamble) || 0;
+
+        const newStraightTotal = currentStraight + straightBet;
+        const newRambleTotal = currentRamble + rambleBet;
+
+        // 🚨 Check if straight exceeds max limit
+        if (hasMaxLimit && newStraightTotal > straightMaxLimit) {
+            const message = `${combination.split('').join('-')}`;
+            showSoldOutBetModalFn(message);
+            return true;
+        }
+
+        // 🚨 Check if ramble exceeds max limit
+        if (hasMaxLimit && newRambleTotal > rambleMaxLimit) {
+            const message = `${combination.split('').join('-')}`;
+            showSoldOutBetModalFn(message);
+            return true;
+        }
+
+        return false; // ✅ Passed validation
+    };
 
     const initializeGameTime = () => {
         let getGameTime = getTimeRange();
@@ -182,7 +423,7 @@ export default function TicketForm({ navigation }) {
             setGameTime('5pm');
             setIs2pmDisabled(true);
             setIs5pmDisabled(false);
-            setIs9pmDisabled(false); 
+            setIs9pmDisabled(false);
         } else if (getGameTime == '9pm') {
             setSelectedTime('9pm')
             setGameTime('9pm');
@@ -219,12 +460,6 @@ export default function TicketForm({ navigation }) {
         }
     }
 
-
-
-
-
-
-
     const handleRamble = async (item) => {
         // setBetting([]) // clear test state
         if (inputValue.length === 3 && amountVal != 0 && time != '') {
@@ -240,6 +475,10 @@ export default function TicketForm({ navigation }) {
 
     const handleBet = (item) => {
         let { combination, amount, ramble, target } = item;
+        const selectedDigit = combination;
+        let checkIfWin200 = getWithWin200Config(realm, selectedDigit, users[0]);
+
+
         // setBetting([]) // clear test state
         // search for a realm object with a primary key that is an objectId
         // itemComb[0].straightTotal += 
@@ -247,10 +486,41 @@ export default function TicketForm({ navigation }) {
         const currentHour = currentTime.getHours();
         const currentMins = currentTime.getMinutes();
 
+        console.log('combination:', combination, 'amount:', amount, 'ramble:', ramble, 'target:', target)
+
+        console.log(betType, "BET TYPE")
+
+        let straightTotalLimit = 0;
+        let rambleTotalLimit = 0;
+        let maxTotalLimit = 0;
+
+        const isSoldOut = checkSoldOut({
+            comb: comb[0],
+            combination,
+            amountTarget,
+            amountRamble
+        });
+
+        if (isSoldOut) return;
+
+
+        // if (!canProceedTarget || !canProceedRamble) {
+        //     return; // Block bet submission
+        // }
+
+
+        // console.log(currentTime, "THE TTIME")
+
+        // console.log(selectedActive, amountRamble, amountTarget, 'sss')
+
+        // if (target) {
+        //     straightTotalLimit = Number(comb.straightTotal) + Number(amount);
+        // } else {
+        //     rambleTotalLimit = Number(comb.rambleTotalLimit) + Number(amount);
+        // }
 
 
 
-        console.log(selectedActive, amountRamble, amountTarget, 'sss')
         /* 	if((!combination && !amountRamble && !amountTarget)){
                 setSelectedTab('viewBets')
                 console.log('view betss')
@@ -268,12 +538,8 @@ export default function TicketForm({ navigation }) {
             return;
         }
 
-
-
         let totalS = comb[0]?.straightTotal + Number(amountTarget);
         let totalR = comb[0]?.rambleTotal + Number(amountRamble);
-
-
 
         // if((items[0] || (currentHour == 13 || currentHour == 16 || currentHour == 20) && currentMins > 40)){
         // 	if(totalS > (comb[0]?.straightLimit * (comb[0].isWinTo ? 2 : 1))){
@@ -296,13 +562,10 @@ export default function TicketForm({ navigation }) {
             return;
         }
 
-
-
         if (selectedActive == 'target' && !amountRamble) {
             setSelectedActive('ramble')
             return;
         }
-
 
         console.log(amountTarget, amountRamble, 'amounts')
         if (selectedActive == 'ramble' && (!amountTarget && !amountRamble)) {
@@ -311,14 +574,17 @@ export default function TicketForm({ navigation }) {
             return;
         }
 
-
         let withWin200 = getConfiguration(users[0], 'withWin200').isCheck;
-
-
+        if (checkIfWin200 && selectedActive != 'target') {
+            // showToastWin200Bet();
+            setPendingBet({
+                ...item,
+                isWinTo: withWin200 ? comb[0].isWinTo : false
+            });
+            setShowWin200Modal(true);
+            return;
+        }
         if (amount != 0 || !combination) {
-
-
-
             setBetting(prevState => [...prevState, { ...item, isWinTo: withWin200 ? comb[0].isWinTo : false }]);
             setCombination('')
             setAmountRamble('')
@@ -350,7 +616,6 @@ export default function TicketForm({ navigation }) {
 
         await AsyncStorage.setItem('dateTimeNumber', currentDateTime);
     }
-
     // setLoading(false)
     const handleSubmit = useCallback(async (data) => {
         let gross = 0;
@@ -462,7 +727,6 @@ export default function TicketForm({ navigation }) {
                     Geolocation.getCurrentPosition(
                         position => {
                             let { coords } = position;
-                            console.log(coords, 'COOORDS TICKET')
                             // setMarkerLocation({ ...position.coords });
                             realm.write(async () => {
                                 users[0].coordinates = `${coords.latitude}|${coords.longitude}`;
@@ -553,9 +817,6 @@ export default function TicketForm({ navigation }) {
         // console.log(dataList);
     }
 
-
-
-
     const handleBackspace = () => {
         if (selectedActive == 'target') {
             setAmountTarget((prev) => prev.slice(0, -1));
@@ -574,80 +835,21 @@ export default function TicketForm({ navigation }) {
         ((prev) => prev.slice(0, -1));
     };
 
-
-
-
     const renderButton = ({ name, value }) => {
 
         return (
             <TouchableOpacity key={name} style={styles.button} onPress={() => !is9pmDisabled && handlePress(value)}>
                 {name === 'delete' ? (
-                     <Image 
+                    <Image
                         source={icons.backspace}
-                        style={{ height: 20, width: 20, resizeMode: 'contain'}}
-                    /> 
+                        style={{ height: 20, width: 20, resizeMode: 'contain' }}
+                    />
                 ) : (
                     <Text style={styles.buttonText}>{name}</Text>
                 )}
             </TouchableOpacity>
         );
     };
-
-
-    //   const uploadImage = async (fileImage) => {
-    //     try {
-    //       setError(null)
-    //        const imagePick = await pickImage();
-    //        const image = imagePick.assets[0];
-    //        const formData = new FormData();
-    //        formData.append('file', {
-    //        uri: image.uri,
-    //        type: image.type,
-    //        name: image.fileName,
-    //        });
-
-    //        const response = await axios.post(file_server_url, formData, {
-    //        headers: {
-    //          'Content-Type': 'multipart/form-data',
-    //          Authorization: `Bearer ${file_server_token}`
-    //        },
-    //        });
-
-    //        setSelectedImage({...response.data, uri: file_download_url + response.data._id });
-
-    //      } catch (error) {
-    //        console.error('Error uploading image:', error);
-    //      }
-    //   };
-
-    //   const selectFile = async () => {
-    // 	setBetTypeOption('file')
-    //     try {
-    //       const result = await launchImageLibrary({
-    //         mediaType: 'photo',
-    //         maxWidth: 300,
-    //         maxHeight: 300,
-    //         quality: 1,
-    //       });
-
-    //       if (result.didCancel) {
-    //         Alert.alert('Canceled');
-    // 		setBetTypeOption('')
-    // 		setBetType('')
-
-    //       } else if (result.errorCode) {
-    //         Alert.alert('Error: ' + result.errorMessage);
-    // 		setBetTypeOption('')
-    // 		setBetType('')
-
-    //       } else {
-    //         // uploadImage(result.assets[0]);
-    //       }
-    //     } catch (err) {
-    //       Alert.alert('Unknown Error: ' + JSON.stringify(err));
-    //       throw err;
-    //     }
-    //   };
 
     const openCamera = async () => {
         setBetTypeOption('camera')
@@ -674,19 +876,6 @@ export default function TicketForm({ navigation }) {
             throw err;
         }
     };
-
-    //   const chooseImageSource = () => {
-    //     Alert.alert(
-    //       'Upload Image',
-    //       'Choose an option',
-    //       [
-    //         { text: 'Camera', onPress: openCamera },
-    //         { text: 'Gallery', onPress: selectFile },
-    //         { text: 'Cancel', style: 'cancel' },
-    //       ],
-    //       { cancelable: true }
-    //     );
-    //   };
 
     const handlePress = (value) => {
         // if (combinationString.length > 2 && selectedActive === 'combi') {
@@ -746,7 +935,6 @@ export default function TicketForm({ navigation }) {
         }
     };
 
-
     const handlePress2 = () => {
         setSelectedActive('combi');
         setSelectedTab('keypads');
@@ -779,7 +967,6 @@ export default function TicketForm({ navigation }) {
         setShowDate(Platform.OS === 'ios');
         setDate(currentDate);
     };
-
 
     useEffect(() => {
         initializeGameTime()
@@ -835,8 +1022,6 @@ export default function TicketForm({ navigation }) {
             return;
         }
     };
-
-
 
     let total = arrayBetting.reduce((n, { amount }) => n + amount, 0)
     let closeDraw = (is2pmDisabled && is5pmDisabled && is9pmDisabled) ? true : false;
@@ -936,7 +1121,7 @@ export default function TicketForm({ navigation }) {
                             <TouchableOpacity
                                 onPress={handlePress2}
                                 style={{
-                                    
+
                                     width: '55%',
                                     borderWidth: 1,
                                     height: 40,
@@ -1137,7 +1322,16 @@ export default function TicketForm({ navigation }) {
 
                                             <TouchableOpacity
                                                 disabled={combinationString.length < 3 && !arrayBetting.length ? true : false}
-                                                onPress={() => handleBet({ id: generateRandomId(), amount: Number(amountRamble ? amountRamble : 0) + Number(amountTarget ? amountTarget : 0), combination: combinationString, gameTime: time, target: amountTarget, ramble: amountRamble, amountRamble, amountTarget })}
+                                                onPress={() =>
+                                                    handleBet({
+                                                        id: generateRandomId(),
+                                                        amount: Number(amountRamble ? amountRamble : 0) + Number(amountTarget ? amountTarget : 0),
+                                                        combination: combinationString,
+                                                        gameTime: time,
+                                                        target: amountTarget,
+                                                        ramble: amountRamble,
+                                                        amountRamble, amountTarget
+                                                    })}
                                                 style={{ padding: 10, elevation: 6, borderRadius: 50, borderWidth: 1, backgroundColor: '#4ba643', borderColor: '#4ba643', width: '90%', padding: 10, alignItems: 'center', justifyContent: 'center' }}>
                                                 <Text style={{ fontWeight: 'bold', fontSize: 22, color: COLORS.white }}>ADD BET</Text>
                                             </TouchableOpacity>
@@ -1233,6 +1427,89 @@ export default function TicketForm({ navigation }) {
 
                 </View>
             </View>
+            {/* <Modal visible={soldOutModalVisible} transparent animationType="fade">
+                <View style={{
+                    flex: 1,
+                    backgroundColor: 'rgba(0,0,0,0.5)',
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                }}>
+                    <View style={{
+                        backgroundColor: 'white',
+                        padding: 20,
+                        borderRadius: 12,
+                        width: '85%'
+                    }}>
+                        <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 10 }}>
+                            Sold Out Notice
+                        </Text>
+                        <Text style={{ fontSize: 14, color: '#333', marginBottom: 20 }}>
+                            {soldOutMessage}
+                        </Text>
+                        <TouchableOpacity
+                            style={{
+                                alignSelf: 'flex-end',
+                                paddingVertical: 8,
+                                paddingHorizontal: 16,
+                                backgroundColor: '#2563eb',
+                                borderRadius: 8
+                            }}
+                            onPress={() => setSoldOutModalVisible(false)}
+                        >
+                            <Text style={{ color: 'white', fontWeight: '600' }}>OK</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal> */}
+
+            {/* Sold Out Modal */}
+            <ConfirmationModal
+                visible={showSoldOutBetModal}
+                title={modalTitle}
+                titleStyles={{ fontSize: 22, fontWeight: 'bold', color: COLORS.danger }}
+                message={modalMessage}
+                messageStyles={{ fontSize: 20, fontWeight: 'bold', color: COLORS.black300, paddingBottom: 12 }}
+                buttonContainerStyle={{ justifyContent: 'center', alignItems: 'center', width: '100%' }}
+                butttonStyle={{ width: '100%',}}
+                butttonTextStyle={{ color: COLORS.white, fontWeight: '500', fontSize: 18 }}
+                onClose={() => {
+                    setShowSoldOutBetModal(false);
+                    setModalTitle('');
+                    setModalMessage('');
+                }}
+            // No handleConfirm for sold out, just close
+            />
+
+            <ConfirmationModal
+                visible={showWin200Modal}
+                title="HOT NUMBER"
+                titleStyles={{fontSize: 20, fontWeight: 'bold', color: COLORS.black900}}
+                message="Win 200/1 for this combination. Do you want to proceed?"
+                messageStyles={{ fontSize: 16, fontWeight: 'bold', color: COLORS.black300, }}
+                onClose={() => {
+                    setShowWin200Modal(false);
+                    setPendingBet(null);
+                    setCombination('');
+                    setAmountRamble('');
+                    setAmountTarget('');
+                    setSelectedActive('combi');
+                }}
+                handleConfirm={() => {
+                    if (pendingBet) {
+                        setBetting(prevState => [...prevState, pendingBet]);
+                        setCombination('');
+                        setAmountRamble('');
+                        setAmountTarget('');
+                        setSelectedActive('combi');
+                        realm.write(() => {
+                            comb[0].straightTotal = Number(comb[0]?.straightTotal) + Number(pendingBet.amountTarget);
+                            comb[0].rambleTotal = Number(comb[0]?.rambleTotal) + Number(pendingBet.amountRamble);
+                        });
+                    }
+                    setShowWin200Modal(false);
+                    setPendingBet(null);
+                }}
+            />
         </SafeAreaProvider>
     );
 }

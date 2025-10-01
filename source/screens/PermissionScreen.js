@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, PermissionsAndroid, Image, Animated, useWindowDimensions } from 'react-native';
+import { View, Text, PermissionsAndroid, Image, Animated, Linking, useWindowDimensions } from 'react-native';
 
 import { constants, icons, FONTS, SIZES, COLORS } from '../constants';
 // import { TextButton } from '../components';
@@ -54,52 +54,112 @@ const PermissionScreen = ({ navigation }) => {
     }
   }
 
-  const handleContinue = async () => {
-    const onBoarded = await AsyncStorage.getItem('onBoarded');
+  // const handleContinue = async () => {
+  //   const onBoarded = await AsyncStorage.getItem('onBoarded');
 
 
-    if(currentIndex === 0){
-        console.log('CONTINUEEING')
-      requestNotifications(['alert', 'sound']).then(({status, settings}) => {
-          console.log(status, settings, 'REQUEST NOTIF')
-          setRequestStatus(status);
+  //   if(currentIndex === 0){
+  //       console.log('CONTINUEEING')
+  //     requestNotifications(['alert', 'sound']).then(({status, settings}) => {
+  //         console.log(status, settings, 'REQUEST NOTIF')
+  //         setRequestStatus(status);
           
-          if(requestStatus === 'blocked'){
-            setRequestStatus(null);
-                   openSettings().catch(() => console.warn('cannot open settings'));
-              return;
-            }
-          if(status === 'granted'){
-            setRequestStatus(null);
-          setCurrentIndex(currentIndex + 1)
-          flatListRef?.current?.scrollToIndex({
-            index: currentIndex + 1,
-            Animated: true,
-          });
-        }
-      });
+  //         if(requestStatus === 'blocked'){
+  //           setRequestStatus(null);
+  //                  openSettings().catch(() => console.warn('cannot open settings'));
+  //             return;
+  //           }
+  //         if(status === 'granted'){
+  //           setRequestStatus(null);
+  //         setCurrentIndex(currentIndex + 1)
+  //         flatListRef?.current?.scrollToIndex({
+  //           index: currentIndex + 1,
+  //           Animated: true,
+  //         });
+  //       }
+  //     });
       
-    }
+  //   }
      
     
-    if(currentIndex ===  1){
+  //   if(currentIndex ===  1){
+  //     const granted = await PermissionsAndroid.request(
+  //       PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+  //       {
+  //           title: 'Geolocation Permission',
+  //           message: 'Can we access your location?',
+  //           buttonNeutral: 'Ask Me Later',
+  //           buttonNegative: 'Cancel',
+  //           buttonPositive: 'OK',
+  //       },
+  //   );
+
+
+  //   console.log(granted, "THE GRANT?")
+    
+  //   if(granted === 'granted'){
+  //       navigation.goBack()
+  //   }
+  //   } 
+  // }
+
+const handleContinue = async () => {
+  const onBoarded = await AsyncStorage.getItem('onBoarded');
+
+  if (currentIndex === 0) {
+    console.log('Requesting notification permission...');
+
+    try {
+      const { status, settings } = await requestNotifications(['alert', 'sound']);
+      console.log(status, settings, 'Notification Permission Status');
+
+      if (status === 'blocked') {
+        console.warn('Notification permission is blocked. Opening settings...');
+        await openSettings();
+        return;
+      }
+
+      if (status === 'granted') {
+        setCurrentIndex(currentIndex + 1);
+        flatListRef?.current?.scrollToIndex({
+          index: currentIndex + 1,
+          animated: true,
+        });
+      } else {
+        console.warn('Notification permission not granted.');
+      }
+    } catch (error) {
+      console.error('Notification permission request failed:', error);
+    }
+  }
+
+  if (currentIndex === 1 && Platform.OS === 'android') {
+    try {
       const granted = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
         {
-            title: 'Geolocation Permission',
-            message: 'Can we access your location?',
-            buttonNeutral: 'Ask Me Later',
-            buttonNegative: 'Cancel',
-            buttonPositive: 'OK',
-        },
-    );
-    if(granted === 'granted'){
-        navigation.goBack()
+          title: 'Geolocation Permission',
+          message: 'Can we access your location?',
+          buttonNeutral: 'Ask Me Later',
+          buttonNegative: 'Cancel',
+          buttonPositive: 'OK',
+        }
+      );
+
+      console.log(granted, 'Location Permission Result');
+
+      if (granted === 'denied') {
+        // console.warn('Location permission set to never ask again. Opening settings...');
+        Linking.openSettings(); // Navigates to the app's system settings
+      } else {
+        navigation.goBack();
+        // console.warn('Location permission denied.');
+      }
+    } catch (error) {
+      console.error('Location permission request failed:', error);
     }
-    } 
   }
-
-
+};
 
 
 

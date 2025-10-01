@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { createStackNavigator } from '@react-navigation/stack';
 import { realmContext } from './RealmContext';
@@ -10,11 +10,11 @@ import { Image, Text, View, PermissionsAndroid, TouchableOpacity, SafeAreaView, 
 import { useUser } from '@realm/react';
 import { useDispatch, useSelector } from 'react-redux';
 import { CLOSE_ALERT_MODAL, OPEN_ALERT_MODAL, SET_COLLECTOR, SET_USER } from './redux/actions/types';
-import { getConfiguration } from './utils/helpers';
+import { getConfiguration, getDeviceDetails } from './utils/helpers';
 import Config from 'react-native-config';
 import { Betting, Users } from './Models';
 import Dashboard from './screens/Dashboard';
-
+import { BSON } from 'realm';
 import Geolocation from 'react-native-geolocation-service';
 import { SyncComponent } from './components/SyncComponent';
 import TicketForm from './screens/TicketForm';
@@ -52,7 +52,13 @@ import LinearGradient from 'react-native-linear-gradient';
 import moment from 'moment-timezone';
 import * as Progress from 'react-native-progress';
 import CustomAlertModal from './components/CustomAlertModal';
+import EmptyScreen from './screens/EmptyScreen';
 // import SettingsScreen from './screens/drawers/CoordinatorsScreen';
+
+import DeviceInfo, { useDeviceName } from 'react-native-device-info';
+import CashFlow from './screens/drawers/CashFlow';
+import CombinationsScreen from './screens/Combinations';
+
 
 
 
@@ -115,7 +121,7 @@ function CustomDrawerIcon({ route, navigation, navType, selectedUser, headerTitl
 				</Text>
 				{/* <SyncComponent /> */}
 				<TouchableOpacity
-					onLongPress={() => {ownUser[0]?.isAdmin ? navigation.navigate('View User', JSON.stringify(ownUser[0])) : console.log('Not admin') }}
+					onLongPress={() => { ownUser[0]?.isAdmin ? navigation.navigate('View User', JSON.stringify(ownUser[0])) : console.log('Not admin') }}
 					onPress={() => (getConfiguration(ownUser[0], 'mapUsers')?.isCheck && (users[0]?.coordinates == '' || users[0]?.coordinates == null)) ? dispatch({ type: OPEN_ALERT_MODAL, payload: 'maps' }) : getConfiguration(ownUser[0], 'mapUsers')?.isCheck ? navigation.navigate('MapScreen', { collector }) : selectedUser && getConfiguration(users[0], 'mapUsers')?.isCheck ? navigation.navigate('MapScreen', collector) : navigation.navigate('Settings')}
 					style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
 				>
@@ -307,7 +313,7 @@ function CustomDrawerContent(props) {
 						</View>
 					}
 
-						
+
 
 					{getConfiguration(users[0], 'coordinators')?.isCheck &&
 						<View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' }}>
@@ -461,7 +467,6 @@ const DrawerNavigation = (granted) => {
 
 
 
-	console.log(collectorName, 'collectorNamecollectorNamecollectorName')
 
 	let curUser = users[0] ? users[0] : { isAdmin: false, role: "teller" };
 	let userNow = users[0] ? users[0]?._id : user?._id;
@@ -498,7 +503,7 @@ const DrawerNavigation = (granted) => {
 					// backgroundColor: COLORS.transparent, // Makes the drawer background transparent
 					elevation: 0, // Removes shadow on Android
 					shadowOpacity: 0, // Removes shadow on iOS
-					width: '75%', // Adjust width if necessary
+					width: '55%', // Adjust width if necessary
 				},
 				sceneContainerStyle: {
 					// backgroundColor: 'rgba(255, 255, 255, 0)', // Makes the main screen background transparent
@@ -523,33 +528,28 @@ const DrawerNavigation = (granted) => {
 					drawerActiveBackgroundColor: COLORS.secondaryTransparent,
 					drawerInactiveTintColor: COLORS.secondary,
 					drawerActiveTintColor: COLORS.white,
-					drawerItemStyle: { borderRadius: 12, width: '90%', alignSelf: 'center' },
-					drawerLabelStyle: { fontSize: 18, fontWeight: 'bold', },
+					drawerItemStyle: {
+						right: 14,
+						borderTopRightRadius: SIZES.radius / 3,
+						borderBottomRightRadius: SIZES.radius / 3,
+						width: '95%',
+						justifyContent: 'space-between',
+					},
+					drawerLabelStyle: { fontSize: 16, fontWeight: 'bold', },
 					headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
 					headerLeft: () => (
 						<CustomDrawerIcon route={null} navigation={navigation} navType={'drawer'} selectedUser={selectedUser} headerTitle={'Dashboard'} />
 					),
 					headerRight: () => (
 						<View style={{ paddingHorizontal: 16, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' }}>
-								<SyncComponent />
-							{/* <View style={{ width: '30%', alignItems: 'center'}}> */}
-							{/* <TouchableOpacity
-									onPress={() => navigation.navigate('Inbox')}
-									style={{ borderWidth: 1, padding: 2, borderColor: COLORS.primary, backgroundColor: '#0a5388', borderRadius: 10,  shadowRadius: 10, alignItems: 'center', justifyContent: 'center', }}
-								>
-									<Image 
-										source={icons.messenger}
-										style={{ height: 35, width: 35, resizeMode: 'contain', tintColor: COLORS.white}}
-									/>
-								</TouchableOpacity> */}
-							{/* </View> */}
+							<SyncComponent />
 						</View>
 					),
 					drawerIcon: ({ focused }) => (
-						<View style={{ paddingHorizontal: 10 }}>
+						<View style={{ paddingHorizontal: 20, }}>
 							<Image
 								source={icons.dashboard}
-								style={{ height: 25, width: 25, resizeMode: 'contain', tintColor: focused ? COLORS.white : COLORS.secondary }}
+								style={{ height: 20, width: 20, resizeMode: 'contain', tintColor: focused ? COLORS.white : COLORS.secondary }}
 							/>
 						</View>
 					)
@@ -565,18 +565,27 @@ const DrawerNavigation = (granted) => {
 					component={TicketForm}
 					options={({ navigation }) => ({
 						headerTitle: '',
+						drawerAllowFontScaling: true,
 						headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
 						drawerActiveBackgroundColor: COLORS.secondaryTransparent,
 						drawerInactiveTintColor: COLORS.secondary,
 						drawerActiveTintColor: COLORS.white,
-						drawerItemStyle: { borderRadius: 12, width: '90%', alignSelf: 'center' },
-						drawerLabelStyle: { fontSize: 18, fontWeight: 'bold', },
+						// drawerItemStyle: { borderRadius: 12, width: '90%', alignSelf: 'center' },
+						drawerItemStyle: {
+							right: 14,
+						borderTopRightRadius: SIZES.radius / 3,
+						borderBottomRightRadius: SIZES.radius / 3,
+							width: '95%',
+							justifyContent: 'space-between',
+
+						},
+						drawerLabelStyle: { fontSize: 16, fontWeight: 'bold', },
 						headerLeft: () => (
 							<CustomDrawerIcon route={null} navigation={navigation} navType={'drawer'} selectedUser={selectedUser} headerTitle={'Play'} />
 						),
 						headerRight: () => (
 							<View style={{ paddingHorizontal: 16, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' }}>
-									<SyncComponent />
+								<SyncComponent />
 								{/* <View style={{ width: '30%', alignItems: 'center'}}> */}
 								{/* <TouchableOpacity
 										onPress={() => navigation.navigate('Inbox')}
@@ -591,10 +600,10 @@ const DrawerNavigation = (granted) => {
 							</View>
 						),
 						drawerIcon: ({ focused }) => (
-							<View style={{ paddingHorizontal: 10 }}>
+							<View style={{ paddingHorizontal: 20, }}>
 								<Image
 									source={icons.play}
-									style={{ height: 25, width: 25, resizeMode: 'contain', tintColor: focused ? COLORS.white : COLORS.secondary }}
+									style={{ height: 20, width: 20, resizeMode: 'contain', tintColor: focused ? COLORS.white : COLORS.secondary }}
 								/>
 							</View>
 						)
@@ -606,13 +615,21 @@ const DrawerNavigation = (granted) => {
 					name="Winnings"
 					options={({ navigation }) => ({
 						headerTitle: '',
+						drawerAllowFontScaling: true,
 						// headerTitleStyle: { color: COLORS.black },
 						drawerActiveBackgroundColor: COLORS.secondaryTransparent,
 						drawerInactiveTintColor: COLORS.secondary,
 						drawerActiveTintColor: COLORS.white,
-						drawerItemStyle: { borderRadius: 12, width: '90%', alignSelf: 'center' },
+						// drawerItemStyle: { borderRadius: 12, width: '90%', alignSelf: 'center' },
+						drawerItemStyle: {
+							right: 14,
+						borderTopRightRadius: SIZES.radius / 3,
+						borderBottomRightRadius: SIZES.radius / 3,
+							width: '95%',
+							justifyContent: 'space-between',
 
-						drawerLabelStyle: { fontSize: 18, fontWeight: 'bold', },
+						},
+						drawerLabelStyle: { fontSize: 16, fontWeight: 'bold', },
 						drawerLabel: 'Winnings',
 						headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
 						headerLeft: () => (
@@ -620,7 +637,7 @@ const DrawerNavigation = (granted) => {
 						),
 						headerRight: () => (
 							<View style={{ paddingHorizontal: 16, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' }}>
-									<SyncComponent />
+								<SyncComponent />
 								{/* <View style={{ width: '30%', alignItems: 'center'}}> */}
 								{/* <TouchableOpacity
 										onPress={() => navigation.navigate('Inbox')}
@@ -635,10 +652,10 @@ const DrawerNavigation = (granted) => {
 							</View>
 						),
 						drawerIcon: ({ focused }) => (
-							<View style={{ paddingHorizontal: 10 }}>
+							<View style={{ paddingHorizontal: 20 }}>
 								<Image
 									source={icons.winnings}
-									style={{ height: 25, width: 25, resizeMode: 'contain', tintColor: focused ? COLORS.white : COLORS.secondary }}
+									style={{ height: 20, width: 20, resizeMode: 'contain', tintColor: focused ? COLORS.white : COLORS.secondary }}
 								/>
 							</View>
 						)
@@ -649,20 +666,49 @@ const DrawerNavigation = (granted) => {
 			{getConfiguration(users[0], 'ticketForm')?.isCheck &&
 				<Drawer.Screen name="Transactions" component={Transactions} options={({ navigation }) => ({
 					headerTitle: '',
+					// drawerLabel: `${myCreatedTickets.length > 0 ? 'Transactions' + '   ' + '(' + myCreatedTickets.length + ')' : 'Transactions'}`,
+					drawerLabel: ({ focused }) => {
+								return (
+									<View style={{ flexDirection: 'row', width: '100%', alignItems: 'center', justifyContent: 'space-between' }}>
+										<View style={{ width: '70%', alignItems: 'flex-start', justifyContent: 'center' }}>
+										<Text style={{ fontSize: 14, fontWeight: 'bold', color: focused ? COLORS.white : COLORS.secondary }}>
+											Transactions
+											{/* {
+												myCoordinators.length > 0 ? "Coordinators" : 'Coordinators'
+											} */}
+										</Text>
+										</View>
+										<View style={{ width: '30%', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6}}>
+										<Text style={{ paddingHorizontal: 10, fontSize: 12, fontWeight: 'bold', color: focused ? COLORS.white : COLORS.secondary,  }}>
+											{myCreatedTickets.length > 100 ? '99+' : !myCreatedTickets.length ? '' : myCreatedTickets.length }
+										</Text>
+										</View>
+									</View>
+								)
+							},
+					drawerAllowFontScaling: true,
 					headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
-					drawerLabel: `${myCreatedTickets.length > 0 ? 'Transactions' + '   ' + '(' + myCreatedTickets.length + ')' : 'Transactions'}`,
 					drawerActiveBackgroundColor: COLORS.secondaryTransparent,
 					drawerInactiveTintColor: COLORS.secondary,
 					drawerActiveTintColor: COLORS.white,
-					drawerLabelStyle: { fontSize: 18, fontWeight: 'bold' },
-					drawerItemStyle: { borderRadius: 12, width: '90%', alignSelf: 'center' },
+					drawerLabelStyle: { fontSize: 16, fontWeight: 'bold' },
+					// drawerItemStyle: { borderRadius: 12, width: '90%', alignSelf: 'center' },
+
+					drawerItemStyle: {
+						right: 14,
+						borderTopRightRadius: SIZES.radius / 3,
+						borderBottomRightRadius: SIZES.radius / 3,
+						width: '95%',
+						justifyContent: 'space-between',
+
+					},
 
 					headerLeft: () => (
 						<CustomDrawerIcon route={null} navigation={navigation} navType={'drawer'} selectedUser={selectedUser} headerTitle={'Transactions'} />
 					),
 					headerRight: () => (
 						<View style={{ paddingHorizontal: 16, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' }}>
-								<SyncComponent />
+							<SyncComponent />
 							{/* <View style={{ width: '30%', alignItems: 'center'}}> */}
 							{/* <TouchableOpacity
 									onPress={() => navigation.navigate('Inbox')}
@@ -677,10 +723,61 @@ const DrawerNavigation = (granted) => {
 						</View>
 					),
 					drawerIcon: ({ focused }) => (
-						<View style={{ paddingHorizontal: 10 }}>
+						<View style={{ paddingHorizontal: 20 }}>
 							<Image
 								source={icons.tickets}
-								style={{ height: 25, width: 25, resizeMode: 'contain', tintColor: focused ? COLORS.white : COLORS.secondary }}
+								style={{ height: 20, width: 20, resizeMode: 'contain', tintColor: focused ? COLORS.white : COLORS.secondary }}
+							/>
+						</View>
+					)
+				})} />
+			}
+
+			{(getConfiguration(users[0], 'cashFlow')?.isCheck && curUser?.isAdmin) &&
+				<Drawer.Screen name="CashFlow" component={CashFlow} options={({ navigation }) => ({
+					headerTitle: '',
+					drawerAllowFontScaling: true,
+					headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
+					drawerLabel: 'Cash Flow',
+					// drawerLabel: `${myCreatedTickets.length > 0 ? 'Transactions' + '   ' + '(' + myCreatedTickets.length + ')' : 'Transactions'}`,
+					drawerActiveBackgroundColor: COLORS.secondaryTransparent,
+					drawerInactiveTintColor: COLORS.secondary,
+					drawerActiveTintColor: COLORS.white,
+					drawerLabelStyle: { fontSize: 16, fontWeight: 'bold' },
+					// drawerItemStyle: { borderRadius: 12, width: '90%', alignSelf: 'center' },
+					drawerItemStyle: {
+						right: 14,
+						borderTopRightRadius: SIZES.radius / 3,
+						borderBottomRightRadius: SIZES.radius / 3,
+						width: '95%',
+						justifyContent: 'space-between',
+
+					},
+
+					headerLeft: () => (
+						<CustomDrawerIcon route={null} navigation={navigation} navType={'drawer'} selectedUser={selectedUser} headerTitle={'Cash Flow'} />
+					),
+					headerRight: () => (
+						<View style={{ paddingHorizontal: 16, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' }}>
+							<SyncComponent />
+							{/* <View style={{ width: '30%', alignItems: 'center'}}> */}
+							{/* <TouchableOpacity
+									onPress={() => navigation.navigate('Inbox')}
+									style={{ borderWidth: 1, padding: 2, borderColor: COLORS.primary, backgroundColor: '#0a5388', borderRadius: 10,  shadowRadius: 10, alignItems: 'center', justifyContent: 'center', }}
+								>
+									<Image 
+										source={icons.messenger}
+										style={{ height: 35, width: 35, resizeMode: 'contain', tintColor: COLORS.white}}
+									/>
+								</TouchableOpacity> */}
+							{/* </View> */}
+						</View>
+					),
+					drawerIcon: ({ focused }) => (
+						<View style={{ paddingHorizontal: 20 }}>
+							<Image
+								source={icons.cashFlow}
+								style={{ height: 25, width: 20, resizeMode: 'contain', tintColor: focused ? COLORS.white : COLORS.secondary }}
 							/>
 						</View>
 					)
@@ -690,20 +787,48 @@ const DrawerNavigation = (granted) => {
 			{curUser?.isAdmin &&
 				<Drawer.Screen name="CancelledTickets" component={CancelledTickets} options={({ navigation }) => ({
 					// drawerLabel: 'Cancelled Tickets',
-					drawerLabel: `${myCancelledTickets.length > 0 ? 'Cancelled Tickets' + '  ' + '(' + myCancelledTickets.length + ')' : 'Cancelled Tickets'}`,
+					// drawerLabel: `${myCancelledTickets.length > 0 ? 'Cancelled Tickets' + '  ' + '(' + myCancelledTickets.length + ')' : 'Cancelled Tickets'}`,
+					drawerLabel: ({ focused }) => {
+								return (
+									<View style={{ flexDirection: 'row', width: '100%', alignItems: 'center', justifyContent: 'space-between' }}>
+										<View style={{ width: '70%', alignItems: 'flex-start', justifyContent: 'center' }}>
+										<Text style={{ fontSize: 14, fontWeight: 'bold', color: focused ? COLORS.white : COLORS.secondary }}>
+											Cancelled Tickets
+											{/* {
+												myCoordinators.length > 0 ? "Coordinators" : 'Coordinators'
+											} */}
+										</Text>
+										</View>
+										<View style={{ width: '30%', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6}}>
+										<Text style={{ paddingHorizontal: 10, fontSize: 12, fontWeight: 'bold', color: focused ? COLORS.white : COLORS.secondary,  }}>
+											{myCancelledTickets.length > 100 ? '99+' : !myCancelledTickets.length ? '' : myCancelledTickets.length }
+										</Text>
+										</View>
+									</View>
+								)
+							},
 					headerTitle: '',
+					drawerAllowFontScaling: true,
 					headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
 					drawerActiveBackgroundColor: COLORS.secondaryTransparent,
 					drawerInactiveTintColor: COLORS.secondary,
 					drawerActiveTintColor: COLORS.white,
-					drawerItemStyle: { borderRadius: 12, width: '90%', alignSelf: 'center' },
-					drawerLabelStyle: { fontSize: 18, fontWeight: 'bold', },
+					// drawerItemStyle: { borderRadius: 12, width: '90%', alignSelf: 'center' },
+					drawerItemStyle: {
+						right: 14,
+						borderTopRightRadius: SIZES.radius / 3,
+						borderBottomRightRadius: SIZES.radius / 3,
+						width: '95%',
+						justifyContent: 'space-between',
+
+					},
+					drawerLabelStyle: { fontSize: 16, fontWeight: 'bold', },
 					headerLeft: () => (
 						<CustomDrawerIcon route={null} navigation={navigation} navType={'drawer'} selectedUser={selectedUser} headerTitle={'Cancelled Tickets'} />
 					),
 					headerRight: () => (
 						<View style={{ paddingHorizontal: 16, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' }}>
-								<SyncComponent />
+							<SyncComponent />
 							{/* <View style={{ width: '30%', alignItems: 'center'}}> */}
 							{/* <TouchableOpacity
 									onPress={() => navigation.navigate('Inbox')}
@@ -718,10 +843,10 @@ const DrawerNavigation = (granted) => {
 						</View>
 					),
 					drawerIcon: ({ focused }) => (
-						<View style={{ paddingHorizontal: 10 }}>
+						<View style={{ paddingHorizontal: 20 }}>
 							<Image
 								source={icons.cancelled_ticket}
-								style={{ height: 25, width: 25, resizeMode: 'contain', tintColor: focused ? COLORS.white : COLORS.secondary }}
+								style={{ height: 20, width: 20, resizeMode: 'contain', tintColor: focused ? COLORS.white : COLORS.secondary }}
 							/>
 						</View>
 					)
@@ -729,25 +854,53 @@ const DrawerNavigation = (granted) => {
 				})} />
 			}
 
-				<Drawer.Screen name="Inbox" component={Inbox} options={({ navigation }) => ({
-					// drawerLabel: 'Cancelled Tickets',
-					// drawerLabel: `${myCancelledTickets.length > 0 ? 'Cancelled Tickets' + '  ' + '(' + myCancelledTickets.length + ')' : 'Cancelled Tickets'}`,
-					drawerLabel: 'Messages',
-					headerTitle: '',
-					headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
-					drawerActiveBackgroundColor: COLORS.secondaryTransparent,
-					drawerInactiveTintColor: COLORS.secondary,
-					drawerActiveTintColor: COLORS.white,
-					drawerItemStyle: { borderBottomWidth: .5, borderRadius: 12, width: '90%', alignSelf: 'center' },
-					drawerLabelStyle: { fontSize: 18, fontWeight: 'bold', },
-					headerLeft: () => (
-						<CustomDrawerIcon route={null} navigation={navigation} navType={'drawer'} selectedUser={selectedUser} headerTitle={'Messages'} />
-					),
-					headerRight: () => (
-						<View style={{ paddingHorizontal: 16, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' }}>
-								<SyncComponent />
-							{/* <View style={{ width: '30%', alignItems: 'center'}}> */}
-							{/* <TouchableOpacity
+			<Drawer.Screen name="Inbox" component={Inbox} options={({ navigation }) => ({
+				// drawerLabel: 'Cancelled Tickets',
+				// drawerLabel: `${myCancelledTickets.length > 0 ? 'Cancelled Tickets' + '  ' + '(' + myCancelledTickets.length + ')' : 'Cancelled Tickets'}`,
+				// drawerLabel: 'Messages',
+				drawerLabel: ({ focused }) => {
+								return (
+									<View style={{ flexDirection: 'row', width: '100%', alignItems: 'center', justifyContent: 'space-between' }}>
+										<View style={{ width: '70%', alignItems: 'flex-start', justifyContent: 'center' }}>
+										<Text style={{ fontSize: 14, fontWeight: 'bold', color: focused ? COLORS.white : COLORS.secondary }}>
+											Messages
+											{/* {
+												myCoordinators.length > 0 ? "Coordinators" : 'Coordinators'
+											} */}
+										</Text>
+										</View>
+										{/* <View style={{ width: '30%', alignItems: 'flex-end', justifyContent: 'center', paddingHorizontal: 6}}>
+										<Text style={{ paddingHorizontal: 10, borderRadius: 12, backgroundColor: focused ? COLORS.white : COLORS.success500, fontSize: 12, fontWeight: 'bold', color: COLORS.secondary, }}>
+											{myCoordinators.length > 100 ? '99+' : myCoordinators.length } new
+										</Text>
+										</View> */}
+									</View>
+								)
+							},
+				headerTitle: '',
+				drawerAllowFontScaling: true,
+				headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
+				drawerActiveBackgroundColor: COLORS.secondaryTransparent,
+				drawerInactiveTintColor: COLORS.secondary,
+				drawerActiveTintColor: COLORS.white,
+				// drawerItemStyle: { borderBottomWidth: .5, borderRadius: 12, width: '90%', alignSelf: 'center' },
+				drawerItemStyle: {
+					right: 14,
+						borderTopRightRadius: SIZES.radius / 3,
+						borderBottomRightRadius: SIZES.radius / 3,
+					width: '95%',
+					justifyContent: 'space-between',
+
+				},
+				drawerLabelStyle: { fontSize: 16, fontWeight: 'bold', },
+				headerLeft: () => (
+					<CustomDrawerIcon route={null} navigation={navigation} navType={'drawer'} selectedUser={selectedUser} headerTitle={'Messages'} />
+				),
+				headerRight: () => (
+					<View style={{ paddingHorizontal: 16, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' }}>
+						<SyncComponent />
+						{/* <View style={{ width: '30%', alignItems: 'center'}}> */}
+						{/* <TouchableOpacity
 									onPress={() => navigation.navigate('Inbox')}
 									style={{ borderWidth: 1, padding: 2, borderColor: COLORS.primary, backgroundColor: '#0a5388', borderRadius: 10,  shadowRadius: 10, alignItems: 'center', justifyContent: 'center', }}
 								>
@@ -756,42 +909,71 @@ const DrawerNavigation = (granted) => {
 										style={{ height: 35, width: 35, resizeMode: 'contain', tintColor: COLORS.white}}
 									/>
 								</TouchableOpacity> */}
-							{/* </View> */}
-						</View>
-					),
-					drawerIcon: ({ focused }) => (
-						<View style={{ paddingHorizontal: 10 }}>
-							<Image
-								source={icons.send_message}
-								style={{ height: 25, width: 25, resizeMode: 'contain'}}
-							/>
-						</View>
-					)
+						{/* </View> */}
+					</View>
+				),
+				drawerIcon: ({ focused }) => (
+					<View style={{ paddingHorizontal: 20 }}>
+						<Image
+							source={icons.send_message}
+							style={{ height: 20, width: 20, resizeMode: 'contain' }}
+						/>
+					</View>
+				)
 
-				})} />
+			})} />
 
 			{(getConfiguration(users[0], 'coordinators')?.isCheck || getConfiguration(users[0], 'tellers')?.isCheck) &&
 				<>
-				<Drawer.Screen name="CoordinatorsScreen"
-					options={({ navigation }) => ({
-						headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
-						drawerLabel: `${myCoordinators.length > 0 ? "Coordinators" + "   " + '(' + myCoordinators.length + ')' : 'Coordinators'}`,
-						// drawerLabel: `Coordinators (${myCoordinators.length})`,
-						headerTitle: '',
-						drawerActiveBackgroundColor: COLORS.secondaryTransparent,
-						drawerInactiveTintColor: COLORS.secondary,
-						drawerActiveTintColor: COLORS.white,
-						drawerItemStyle: { borderRadius: 12, width: '90%', alignSelf: 'center' },
+					<Drawer.Screen name="CoordinatorsScreen"
+						options={({ navigation }) => ({
+							headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
+							drawerLabel: ({ focused }) => {
+								return (
+									<View style={{ flexDirection: 'row', width: '100%', alignItems: 'center', justifyContent: 'space-between' }}>
+										<View style={{ width: '70%', alignItems: 'flex-start', justifyContent: 'center' }}>
 
-						drawerLabelStyle: { fontSize: 18, fontWeight: 'bold', },
-						headerLeft: () => (
-							<CustomDrawerIcon route={null} navigation={navigation} navType={'drawer'} selectedUser={selectedUser} headerTitle={'Coordinators'} />
-						),
-						headerRight: () => (
-							<View style={{ paddingHorizontal: 16, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' }}>
+										<Text style={{ fontSize: 14, fontWeight: 'bold', color: focused ? COLORS.white : COLORS.secondary }}>
+											Coordinators
+											{/* {
+												myCoordinators.length > 0 ? "Coordinators" : 'Coordinators'
+											} */}
+										</Text>
+										</View>
+										<View style={{ width: '30%', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6}}>
+										<Text style={{ paddingHorizontal: 10, fontSize: 12, fontWeight: 'bold', color: focused ? COLORS.white : COLORS.secondary, }}>
+											{myCoordinators.length > 100 ? '99+' : !myCoordinators.length ? '' : myCoordinators.length }
+										</Text>
+										</View>
+									</View>
+								)
+							},
+							// drawerLabel: `${myCoordinators.length > 0 ? "Coordinators" + "   " + '(' + myCoordinators.length + ')' : 'Coordinators'}`,
+							// drawerLabel: `Coordinators (${myCoordinators.length})`,
+							headerTitle: '',
+							drawerAllowFontScaling: true,
+							drawerActiveBackgroundColor: COLORS.secondaryTransparent,
+							drawerInactiveTintColor: COLORS.secondary,
+							drawerActiveTintColor: COLORS.white,
+							// drawerItemStyle: { borderRadius: 12, width: '90%', alignSelf: 'center' },
+							drawerItemStyle: {
+right: 14,
+						borderTopRightRadius: SIZES.radius / 3,
+						borderBottomRightRadius: SIZES.radius / 3,
+								width: '95%',
+								justifyContent: 'space-between',
+
+							},
+
+							drawerLabelStyle: { fontSize: 16, fontWeight: 'bold', },
+							headerLeft: () => (
+								<CustomDrawerIcon route={null} navigation={navigation} navType={'drawer'} selectedUser={selectedUser} headerTitle={'Coordinators'} />
+							),
+							headerRight: () => (
+								<View style={{ paddingHorizontal: 16, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' }}>
 									<SyncComponent />
-								{/* <View style={{ width: '30%', alignItems: 'center'}}> */}
-								{/* <TouchableOpacity
+									{/* <View style={{ width: '30%', alignItems: 'center'}}> */}
+									{/* <TouchableOpacity
 										onPress={() => navigation.navigate('Inbox')}
 										style={{ borderWidth: 1, padding: 2, borderColor: COLORS.primary, backgroundColor: '#0a5388', borderRadius: 10,  shadowRadius: 10, alignItems: 'center', justifyContent: 'center', }}
 									>
@@ -800,37 +982,65 @@ const DrawerNavigation = (granted) => {
 											style={{ height: 35, width: 35, resizeMode: 'contain', tintColor: COLORS.white}}
 										/>
 									</TouchableOpacity> */}
-								{/* </View> */}
-							</View>
-						),
-						drawerIcon: ({ focused }) => (
-							<View style={{ paddingHorizontal: 10 }}>
-								<Image
-									source={icons.coordinator}
-									style={{ height: 25, width: 25, resizeMode: 'contain', tintColor: focused ? COLORS.white : COLORS.secondary }}
-								/>
-							</View>
-						)
-					})}
-					component={CoordinatorsScreen} />
+									{/* </View> */}
+								</View>
+							),
+							drawerIcon: ({ focused }) => (
+								<View style={{ paddingHorizontal: 20 }}>
+									<Image
+										source={icons.coordinator}
+										style={{ height: 20, width: 20, resizeMode: 'contain', tintColor: focused ? COLORS.white : COLORS.secondary }}
+									/>
+								</View>
+							)
+						})}
+						component={CoordinatorsScreen} />
 					<Drawer.Screen name="TellersScreen"
-					options={({ navigation }) => ({
-						headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
-						drawerLabel: `${myTellers.length > 0 ? 'Tellers' + '  ' + '(' + myTellers.length + ')' : 'Tellers'}`,
-						headerTitle: '',
-						drawerActiveBackgroundColor: COLORS.secondaryTransparent,
-						drawerInactiveTintColor: COLORS.secondary,
-						drawerActiveTintColor: COLORS.white,
-						drawerItemStyle: { borderRadius: 12, width: '90%', alignSelf: 'center', borderBottomWidth: .5 },
-						drawerLabelStyle: { fontSize: 18, fontWeight: 'bold', },
-						headerLeft: () => (
-							<CustomDrawerIcon route={null} navigation={navigation} navType={'drawer'} selectedUser={selectedUser} headerTitle={'Tellers'} />
-						),
-						headerRight: () => (
-							<View style={{ paddingHorizontal: 16, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' }}>
+						options={({ navigation }) => ({
+							headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
+							headerTitle: '',
+							drawerActiveBackgroundColor: COLORS.secondaryTransparent,
+							drawerInactiveTintColor: COLORS.secondary,
+							drawerActiveTintColor: COLORS.white,
+							// drawerItemStyle: { borderRa
+							drawerAllowFontScaling: true,
+							// drawerLabel: `${myTellers.length > 0 ? 'Tellers' + '  ' + '(' + myTellers.length + ')' : 'Tellers'}`,
+							drawerLabel: ({ focused }) => {
+								return (
+									<View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+										<View style={{ width: '70%', alignItems: 'flex-start', justifyContent: 'center' }}>
+										<Text style={{ fontSize: 14, fontWeight: 'bold', color: focused ? COLORS.white : COLORS.secondary }}>
+											Tellers
+											{/* {
+												myCoordinators.length > 0 ? "Coordinators" : 'Coordinators'
+											} */}
+										</Text>
+										</View>
+										<View style={{ width: '30%', paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center'}}>
+										<Text style={{ textAlign: 'center', fontSize: 12, fontWeight: 'bold', color: focused ? COLORS.white : COLORS.secondary, }}>
+											{myTellers.length > 100 ? '99+' : !myTellers.length ? '' : myTellers.length }
+										</Text>
+										</View>
+									</View>
+								)
+							},
+							drawerItemStyle: {
+								right: 14,
+								borderTopRightRadius: SIZES.radius / 3,
+								borderBottomRightRadius: SIZES.radius / 3,
+								width: '95%',
+								justifyContent: 'space-between',
+
+							},
+							drawerLabelStyle: { fontSize: 16, fontWeight: 'bold', },
+							headerLeft: () => (
+								<CustomDrawerIcon route={null} navigation={navigation} navType={'drawer'} selectedUser={selectedUser} headerTitle={'Tellers'} />
+							),
+							headerRight: () => (
+								<View style={{ paddingHorizontal: 16, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' }}>
 									<SyncComponent />
-								{/* <View style={{ width: '30%', alignItems: 'center'}}> */}
-								{/* <TouchableOpacity
+									{/* <View style={{ width: '30%', alignItems: 'center'}}> */}
+									{/* <TouchableOpacity
 										onPress={() => navigation.navigate('Inbox')}
 										style={{ borderWidth: 1, padding: 2, borderColor: COLORS.primary, backgroundColor: '#0a5388', borderRadius: 10,  shadowRadius: 10, alignItems: 'center', justifyContent: 'center', }}
 									>
@@ -839,20 +1049,20 @@ const DrawerNavigation = (granted) => {
 											style={{ height: 35, width: 35, resizeMode: 'contain', tintColor: COLORS.white}}
 										/>
 									</TouchableOpacity> */}
-								{/* </View> */}
-							</View>
-						),
-						drawerIcon: ({ focused }) => (
-							<View style={{ paddingHorizontal: 10 }}>
-								<Image
-									source={icons.teller}
-									style={{ height: 25, width: 25, resizeMode: 'contain', tintColor: focused ? COLORS.white : COLORS.secondary }}
-								/>
-							</View>
-						)
-					})}
-					component={TellersScreen} />
-					</>
+									{/* </View> */}
+								</View>
+							),
+							drawerIcon: ({ focused }) => (
+								<View style={{ paddingHorizontal: 20 }}>
+									<Image
+										source={icons.teller}
+										style={{ height: 20, width: 20, resizeMode: 'contain', tintColor: focused ? COLORS.white : COLORS.secondary }}
+									/>
+								</View>
+							)
+						})}
+						component={TellersScreen} />
+				</>
 			}
 			{getConfiguration(users[0], 'ticketForm')?.isCheck &&
 				<Drawer.Screen
@@ -860,13 +1070,22 @@ const DrawerNavigation = (granted) => {
 					component={Results2}
 					options={({ navigation }) => ({
 						headerTitle: '',
+						drawerAllowFontScaling: true,
 						headerTitleStyle: { color: COLORS.black },
 						drawerActiveBackgroundColor: COLORS.secondaryTransparent,
 						drawerInactiveTintColor: COLORS.secondary,
 						drawerActiveTintColor: COLORS.white,
-						drawerItemStyle: { borderRadius: 12, width: '90%', alignSelf: 'center' },
+						// drawerItemStyle: { borderRadius: 12, width: '90%', alignSelf: 'center' },
+						drawerItemStyle: {
+							right: 14,
+						borderTopRightRadius: SIZES.radius / 3,
+						borderBottomRightRadius: SIZES.radius / 3,
+							width: '95%',
+							justifyContent: 'space-between',
 
-						drawerLabelStyle: { fontSize: 18, fontWeight: 'bold', },
+						},
+
+						drawerLabelStyle: { fontSize: 16, fontWeight: 'bold', },
 						drawerLabel: 'Results',
 						headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
 						headerRight: () => (
@@ -890,10 +1109,10 @@ const DrawerNavigation = (granted) => {
 							<CustomDrawerIcon route={null} navigation={navigation} navType={'drawer'} selectedUser={selectedUser} headerTitle={'Results'} />
 						),
 						drawerIcon: ({ focused }) => (
-							<View style={{ paddingHorizontal: 10 }}>
+							<View style={{ paddingHorizontal: 20 }}>
 								<Image
 									source={icons.results}
-									style={{ height: 25, width: 25, resizeMode: 'contain', tintColor: focused ? COLORS.white : COLORS.secondary }}
+									style={{ height: 20, width: 20, resizeMode: 'contain', tintColor: focused ? COLORS.white : COLORS.secondary }}
 								/>
 							</View>
 						)
@@ -907,23 +1126,32 @@ const DrawerNavigation = (granted) => {
 					headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
 					drawerActiveBackgroundColor: COLORS.secondaryTransparent,
 					drawerInactiveTintColor: COLORS.secondary,
+					drawerAllowFontScaling: true,
 					drawerActiveTintColor: COLORS.white,
-					drawerItemStyle: { borderRadius: 12, width: '90%', alignSelf: 'center' },
+					// drawerItemStyle: { borderRadius: 12, width: '90%', alignSelf: 'center' },
+					drawerItemStyle: {
+						right: 14,
+						borderTopRightRadius: SIZES.radius / 3,
+						borderBottomRightRadius: SIZES.radius / 3,
+						width: '95%',
+						justifyContent: 'space-between',
 
-					drawerLabelStyle: { fontSize: 18, fontWeight: 'bold', },
+					},
+
+					drawerLabelStyle: { fontSize: 16, fontWeight: 'bold', },
 					headerLeft: () => (
 						<CustomDrawerIcon route={null} navigation={navigation} navType={'drawer'} selectedUser={selectedUser} headerTitle={'Summary Report'} />
 					),
 					headerRight: () => (
 						<View style={{ paddingHorizontal: 16, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' }}>
-								<SyncComponent />
+							<SyncComponent />
 						</View>
 					),
 					drawerIcon: ({ focused }) => (
-						<View style={{ paddingHorizontal: 10 }}>
+						<View style={{ paddingHorizontal: 20 }}>
 							<Image
 								source={icons.summary}
-								style={{ height: 25, width: 25, resizeMode: 'contain', tintColor: focused ? COLORS.white : COLORS.secondary }}
+								style={{ height: 20, width: 20, resizeMode: 'contain', tintColor: focused ? COLORS.white : COLORS.secondary }}
 							/>
 						</View>
 					)
@@ -940,25 +1168,34 @@ const DrawerNavigation = (granted) => {
 							headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
 							headerTitle: '',
 							drawerLabel: 'Sold Outs',
+							drawerAllowFontScaling: true,
 							drawerActiveBackgroundColor: COLORS.secondaryTransparent,
 							drawerInactiveTintColor: COLORS.secondary,
 							drawerActiveTintColor: COLORS.white,
-							drawerItemStyle: { borderRadius: 12, width: '90%', alignSelf: 'center' },
+							drawerItemStyle: {
+								right: 14,
+						borderTopRightRadius: SIZES.radius / 3,
+						borderBottomRightRadius: SIZES.radius / 3,
+								width: '95%',
+								justifyContent: 'space-between',
 
-							drawerLabelStyle: { fontSize: 18, fontWeight: 'bold', },
+							},
+							// drawerItemStyle: { borderRadius: 12, width: '90%', alignSelf: 'center' },
+
+							drawerLabelStyle: { fontSize: 16, fontWeight: 'bold', },
 							headerLeft: () => (
 								<CustomDrawerIcon route={null} navigation={navigation} navType={'drawer'} selectedUser={selectedUser} headerTitle={'Sold Outs'} />
 							),
 							headerRight: () => (
 								<View style={{ paddingHorizontal: 16, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' }}>
-										<SyncComponent />
+									<SyncComponent />
 								</View>
 							),
 							drawerIcon: ({ focused }) => (
-								<View style={{ paddingHorizontal: 10 }}>
+								<View style={{ paddingHorizontal: 20 }}>
 									<Image
 										source={icons.soldout}
-										style={{ height: 25, width: 25, resizeMode: 'contain', tintColor: focused ? COLORS.white : COLORS.secondary }}
+										style={{ height: 20, width: 20, resizeMode: 'contain', tintColor: focused ? COLORS.white : COLORS.secondary }}
 									/>
 								</View>
 							)
@@ -971,20 +1208,32 @@ const DrawerNavigation = (granted) => {
 					headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
 					drawerLabel: 'Settings',
 					headerTitle: '',
+					drawerAllowFontScaling: true,
 					drawerActiveBackgroundColor: COLORS.secondaryTransparent,
 					drawerInactiveTintColor: COLORS.secondary,
 					drawerActiveTintColor: COLORS.white,
-					drawerItemStyle: { borderRadius: 12, width: '90%', alignSelf: 'center' },
+					// drawerItemStyle: { borderRadius: 12, width: '90%', alignSelf: 'center' },
+					drawerItemStyle: {
+						right: 14,
+						borderTopRightRadius: SIZES.radius / 3,
+						borderBottomRightRadius: SIZES.radius / 3,
+						width: '95%',
+						justifyContent: 'space-between',
 
-					drawerLabelStyle: { fontSize: 18, fontWeight: 'bold', },
+					},
+
+					drawerLabelStyle: { fontSize: 16, fontWeight: 'bold', },
 					headerLeft: () => (
 						<CustomDrawerIcon route={null} navigation={navigation} navType={'drawer'} selectedUser={selectedUser} headerTitle={'Settings'} />
 					),
+					headerRight: () => (
+						<OfflineModeButton />
+					),
 					drawerIcon: ({ focused }) => (
-						<View style={{ paddingHorizontal: 10 }}>
+						<View style={{ paddingHorizontal: 20 }}>
 							<Image
 								source={icons.settings}
-								style={{ height: 25, width: 25, resizeMode: 'contain', tintColor: focused ? COLORS.white : COLORS.secondary }}
+								style={{ height: 20, width: 20, resizeMode: 'contain', tintColor: focused ? COLORS.white : COLORS.secondary }}
 							/>
 						</View>
 					)
@@ -995,8 +1244,87 @@ const DrawerNavigation = (granted) => {
 };
 
 
-const StackNavigates = () => {
+const StackNavigates = ({ navigation }) => {
 	const { selectedUser, user } = useSelector(({ user }) => user);
+	const dispatch = useDispatch();
+	const realm = useRealm()
+	const ownUser = useUser();
+	const { loading, result } = useDeviceName(); // { loading: true, result: "Becca's iPhone 6"}
+
+
+
+
+	console.log(loading, result, "LODS RES")
+
+
+	const signOut = useCallback(async (userId) => {
+		let user = realm.objectForPrimaryKey(Users, BSON.ObjectId(userId));
+		if (user?.deviceId == 'revoke') {
+			realm.write(() => {
+				user.deviceId = '';
+			});
+		}
+		await ownUser?.logOut();
+		dispatch({ type: SET_COLLECTOR, payload: null })
+		dispatch({ type: SET_USER, payload: null })
+	}, [ownUser, dispatch]);
+
+	// Check if deviceMacAddress is same with current device
+
+	const checkAndUpdateUserDevice = async (userId) => {
+
+		console.log('cheking')
+
+
+		try {
+			let user = realm.objectForPrimaryKey(Users, BSON.ObjectId(userId));
+
+
+
+			console.log(user, "USEEEEEEEEEEER@@@@")
+
+
+			const deviceDetails = DeviceInfo.getUniqueId().then((uniqueId) => {
+				console.log(uniqueId, "<<<<< DEVICE UNIQUE ID HERE!")
+				console.log(user?.deviceId, "EXISTING USER DEVICE ID")
+
+				if (user?.deviceId !== '' && user?.deviceId && user?.deviceId !== uniqueId) {
+					console.log('NOT MATCH DEVICE ID')
+					// INFORM USER THAT YOU CAN ONLY USE ONE DEVICE PER USER
+					Alert.alert('This device is not recognized.',
+						'Contact your administrator for assistance.',
+						[
+							//  {text: 'Ask me later', onPress: () => console.log('Ask me later pressed')},
+							//  {text: 'Cancel', onPress: () => console.log('Cancel Pressed'), style: 'cancel'},
+							{ text: 'OK', onPress: () => signOut(user._id) },
+						]
+					)
+				} else if (!user?.deviceId) {
+					realm.write(() => {
+						user.deviceId = uniqueId;
+					});
+				}
+
+			});
+		} catch (error) {
+			console.error("Failed to update user device:", error);
+		}
+	};
+
+
+
+
+	useEffect(() => {
+		async function validateDevice() {
+			if (user) {
+				let userDevice = await checkAndUpdateUserDevice(user._id)
+				console.log(userDevice, "THE DEVICE ID")
+			}
+		}
+
+		// Comment out the function below when DEVELOPMENT mode.
+		// validateDevice();
+	}, [user])
 
 	return (
 		<Stack.Navigator
@@ -1008,7 +1336,6 @@ const StackNavigates = () => {
 					headerShown: false,
 				}}
 			/>
-
 			<Stack.Screen
 				name="VoidScreen"
 				component={VoidScreen}
@@ -1021,7 +1348,6 @@ const StackNavigates = () => {
 					),
 				})}
 			/>
-
 			<Stack.Screen
 				name="Receipt"
 				component={Receipt}
@@ -1050,20 +1376,6 @@ const StackNavigates = () => {
 				headerLeft: () => (
 					<CustomDrawerIcon route={null} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'Test Printer'} />
 				),
-				// drawerLabel: () => null, drawerActiveBackgroundColor: COLORS.white, title: 'Test Printer', headerTitleStyle: { color: COLORS.black }, headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: .5, shadowOpacity: 1, shadowColor: COLORS.black }, headerTitleAlign: 'left',
-				// headerLeft: () => (
-				// 	<TouchableOpacity
-				// 		onPress={() => navigation.goBack()}
-				// 		style={{ padding: 10, alignItems: 'center', justifyContent: 'center', }}
-				// 	>
-				// 		<Image
-				// 			source={icons.back}
-				// 			style={{
-				// 				height: 20,
-				// 				width: 20,
-				// 				tintColor: COLORS.black
-				// 			}} />
-				// 	</TouchableOpacity>),
 			})
 			}
 			/>
@@ -1080,7 +1392,6 @@ const StackNavigates = () => {
 					),
 				})}
 			/>
-
 			<Stack.Screen
 				name="UpdateTicket"
 				component={TicketForm3}
@@ -1092,7 +1403,6 @@ const StackNavigates = () => {
 					),
 				})}
 			/>
-
 			<Stack.Screen
 				name="Winning Ticket"
 				component={ViewTicket}
@@ -1105,7 +1415,6 @@ const StackNavigates = () => {
 					),
 				})}
 			/>
-
 			<Stack.Screen
 				name="ViewTicket"
 				component={ReviewScreen}
@@ -1118,7 +1427,6 @@ const StackNavigates = () => {
 					),
 				})}
 			/>
-
 			<Stack.Screen
 				name="ViewImage"
 				component={ViewImage}
@@ -1126,19 +1434,6 @@ const StackNavigates = () => {
 					headerShown: false,
 				}}
 			/>
-
-			{/* <Stack.Screen
-				name="Inbox"
-				component={Inbox}
-				options={({ navigation }) => ({
-					headerTitle: '',
-					headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
-					headerLeft: () => (
-						<CustomDrawerIcon route={null} navigation={navigation} navType={'screen'} selectedUser={null} headerTitle={'Inbox'} />
-					),
-				})}
-			/> */}
-
 			<Stack.Screen
 				name="Test"
 				component={TestScreen}
@@ -1146,7 +1441,6 @@ const StackNavigates = () => {
 					headerShown: false,
 				}}
 			/>
-
 			<Stack.Screen
 				component={SummaryReportUser}
 				name="UserSummaryReport"
@@ -1158,7 +1452,7 @@ const StackNavigates = () => {
 					),
 					headerRight: () => (
 						<View style={{ paddingHorizontal: 16, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' }}>
-								<SyncComponent />
+							<SyncComponent />
 						</View>
 					),
 				})
@@ -1196,7 +1490,6 @@ const StackNavigates = () => {
 				})
 				}
 			/>
-
 			<Stack.Screen name="ViewSoldOut" component={ViewSoldOuts}
 				options={({ navigation }) => ({
 					headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
@@ -1206,7 +1499,6 @@ const StackNavigates = () => {
 					),
 				})}
 			/>
-
 			<Stack.Screen name="ViewTip" component={TipScreen}
 				options={({ navigation }) => ({
 					headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
@@ -1222,19 +1514,16 @@ const StackNavigates = () => {
 				component={PermissionScreen}
 				options={{ headerShown: false }}
 			/>
-
 			<Stack.Screen
 				name="CurrentLocation"
 				component={CurrentLocation}
 				options={{ headerShown: false }}
 			/>
-
 			<Stack.Screen
 				name="MapScreen"
 				component={MapScreen}
 				options={{ headerShown: false }}
 			/>
-
 			<Stack.Screen name="UserOptions" component={UserOptionsForm}
 				options={({ navigation }) => ({
 					headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
@@ -1251,49 +1540,36 @@ const StackNavigates = () => {
 				})
 				}
 			/>
-			{/* <Stack.Screen name="BLE" component={BluetoothShare}
+			<Stack.Screen name="EmptyScreen" component={EmptyScreen}
 				options={({ navigation }) => ({
-					drawerLabel: () => null,
-					drawerActiveBackgroundColor: COLORS.white,
-					headerTitleAlign: 'left',
-					title: "Options",
-					headerLeft: () => (
-						<TouchableOpacity
-							onPress={() => navigation.goBack()}
-							style={{ padding: 10, alignItems: 'center', justifyContent: 'center', }}
-						>
-							<Image
-								source={icons.back}
-								style={{
-									height: 20,
-									width: 20,
-									tintColor: COLORS.black
-								}} />
-						</TouchableOpacity>),
+					headerShown: false,
 				})
 				}
-			/> */}
+			/>
+			<Stack.Screen
+				name="Combinations"
+				component={CombinationsScreen}
+				options={({ navigation, route }) => ({
+					headerTitle: '',
+					headerTitleStyle: { color: COLORS.white },
+					headerStyle: { backgroundColor: COLORS.secondary },
+					headerLeft: () => (
+						<CustomDrawerIcon route={route} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'Combinations'} />
+					),
+				})}
+			/>
 		</Stack.Navigator>
 	)
 }
 
-
-
-
-
-
-
-export function StackNavigator({ }) {
+export function StackNavigator({ navigation }) {
 	const { loading, alertModal } = useSelector(({ ui }) => ui);
 	const userRealm = useUser();
 	const realm = useRealm()
-
 	const dispatch = useDispatch();
-
 	const [isModalVisible, setModalVisible] = useState(false);
 	const { collector, user } = useSelector(({ user }) => user);
 	let { email } = userRealm.profile;
-
 
 	// Initialize Notifications
 	const notif = useMemo(() => new NotifService((reg) => console.log("Initializing Push notification", reg)), []);
@@ -1305,7 +1581,6 @@ export function StackNavigator({ }) {
 		);
 	}, [email])
 
-
 	const handleInitUser = () => {
 		console.log('Authenticated User:', email)
 		if (!collector) {
@@ -1313,7 +1588,6 @@ export function StackNavigator({ }) {
 		}
 
 		if (users[0]) {
-			console.log(users, 'currr')
 			let configuration = users[0].configuration;
 			let userObject = {
 				_id: users[0]._id,
@@ -1351,7 +1625,7 @@ export function StackNavigator({ }) {
 					buttonPositive: 'OK',
 				},
 			);
-			console.log('granted', granted);
+			// console.log('granted', granted);
 			if (granted === 'granted') {
 				console.log('You can use Geolocation');
 				return true;
@@ -1371,19 +1645,13 @@ export function StackNavigator({ }) {
 				Geolocation.getCurrentPosition(
 					position => {
 						let { coords } = position;
-						console.log(coords, 'COOORDS')
-						// setMarkerLocation({ ...position.coords });
 						if (users[0]) {
 							realm.write(async () => {
 								users[0].coordinates = `${coords.latitude}|${coords.longitude}`;
 							})
 						}
-						// setCurrentLatitude(coords.latitude)
-						// setCurrentLongitude(coords.longitude)
-						// onCenter(coords.latitude, coords.longitude);
 					},
 					error => {
-						// See error code charts below.
 						console.log(error.code, error.message);
 					},
 					{ enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
@@ -1393,28 +1661,22 @@ export function StackNavigator({ }) {
 	};
 
 	useEffect(() => {
-
 		if (email) {
 			handleInitUser()
 		}
 	}, [users])
 
-
 	useEffect(() => {
-
 		if (email) {
 			getCurrentLocation()
 		}
 	}, [realm])
 
-
 	useEffect(() => {
-
 		if (email) {
-
 			if (getConfiguration(users[0], 'soldouts')?.isCheck) {
 				notif.cancelAllNotif()
-				notif.scheduleNotif()		// scheduleNotification()
+				notif.scheduleNotif()
 				console.log('Current user is included to allowed users for Push Notification')
 			} else {
 				console.log('User not Included to allowed users for Push Notification')
@@ -1425,7 +1687,7 @@ export function StackNavigator({ }) {
 	return (
 		<SafeAreaProvider>
 			<NavigationContainer>
-				<CustomAlertModal 
+				<CustomAlertModal
 					visible={alertModal == 'maps' ? true : false}
 					onClose={() => {
 						dispatch({ type: CLOSE_ALERT_MODAL, payload: null });
@@ -1440,25 +1702,25 @@ export function StackNavigator({ }) {
 				/>
 				{
 					loading &&
-					<Modal 
+					<Modal
 						visible={true}
 						transparent={true}
 						animationType='fade'
 					>
 						<View
-							style={{ 
-								flex: 1, 
-								width: '100%', 
-								alignItems: 'center', 
-								justifyContent: 'center', 
+							style={{
+								flex: 1,
+								width: '100%',
+								alignItems: 'center',
+								justifyContent: 'center',
 								backgroundColor: COLORS.transparentBlack7
 							}}
 						>
 
-						<Progress.CircleSnail color={['blue', 'yellow', 'red']} />
+							<Progress.CircleSnail color={['blue', 'yellow', 'red']} />
 						</View>
 					</Modal>
-				} 
+				}
 				<StackNavigates />
 			</NavigationContainer>
 		</SafeAreaProvider>

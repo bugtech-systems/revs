@@ -1,4 +1,4 @@
-import { FlatList, Image, StyleSheet, Text, TextInput, TouchableOpacity, Switch, View, Platform } from 'react-native'
+import { FlatList, Image, StyleSheet, Text, TextInput, TouchableOpacity, Switch, View, Platform, Alert } from 'react-native'
 import React, { useCallback, useEffect, useState } from 'react'
 import moment from 'moment-timezone'
 import { useUser, useApp } from '@realm/react';
@@ -121,7 +121,6 @@ const Winnings = ({ navigation }) => {
         setShowTime(Platform.OS === 'ios');
         if (filteredData) {
             const selectedOption = filteredData.find(item => {
-                console.log(item, selectedTime, "ONCHANGE!")
                 return item.gameTime == selectedTime
             }
             );
@@ -341,7 +340,7 @@ const Winnings = ({ navigation }) => {
                         <Text style={{ fontWeight: 'bold', color: COLORS.black, fontSize: 16 }}>{formatNumberWithComma(totalWins)}</Text>
                     </View>
                 </View>
-                {users[0] && users[0].role !== 'teller' &&
+                {(users[0] && users[0].role !== 'teller' && getConfiguration(users[0], 'showAllData')?.isCheck) &&
                     <View style={styles.toggleRow}>
                         <Switch
                             trackColor={{ true: '#00ED64' }}

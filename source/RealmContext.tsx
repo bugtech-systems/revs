@@ -1,5 +1,5 @@
 import { createRealmContext } from "@realm/react";
-import { Betting, Users, Draws, Combinations, Combination, Commission, Configuration, Messages, Conversation } from "./Models";
+import { Betting, Users, Draws, Combinations, Combination, Commission, Configuration, Messages, Conversation, Cashflow } from "./Models";
 
 export const realmContext = createRealmContext({
     schema: [
@@ -7,6 +7,7 @@ export const realmContext = createRealmContext({
       Messages,
       Conversation,
       Commission,
+      Cashflow,
       Users,
       Draws,
       Combinations,

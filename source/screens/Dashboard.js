@@ -7,8 +7,9 @@ import { realmContext } from '../RealmContext'
 import { Betting, Draws, Users, Combinations, Messages } from '../Models';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSelector, useDispatch } from 'react-redux';
-import { getConfiguration } from '../utils/helpers';
+import { formatNumber, getConfiguration } from '../utils/helpers';
 import { SET_LOADING, STOP_LOADING } from '../redux/actions/types';
+import Config from 'react-native-config'
 
 const { useRealm, useQuery } = realmContext;
 
@@ -26,6 +27,8 @@ const Dashboard = ({ navigation }) => {
 	const [includeAll, setIncludeAll] = useState(false);
 
 	const ableToSetLastSummary = getConfiguration(user, 'lastSummaryReport')?.isCheck;
+
+	console.log(user.appVersion, 'the user')
 	
 	const users = useQuery(Users, (doc) => doc.filtered('email == $0', collector), [collector]);
 	const userNow = users[0] ? users[0]?._id : "";
@@ -105,14 +108,10 @@ const Dashboard = ({ navigation }) => {
 	  };
 	
 	const handleLastSummary = async () => {
-		await realm.write(() => {
+		realm.write(() => {
 			users[0].lastSummary = date;
 		});
-		console.log('HANDLE LAST SUMMARY', moment(date).format('MM-DD-YYYY'))
 	}
-	
-
-	// console.log(user, 'ableToSetLastSummaryableToSetLastSummaryableToSetLastSummary')
 	
 	
 	function renderHeader() {
@@ -169,16 +168,6 @@ const Dashboard = ({ navigation }) => {
 			</View>
 		)
 	}
-
-	// Scale font size based on screen width
-	const scaleFont = (size) => {
-		const baseWidth = 375; // Base design width (adjust as needed)
-		return size * (width / baseWidth);
-	};
-
-	
-
-	// console.log(currentDraw, 'currentDraw')
 
 	const renderList = (data) => {
 		let grandGross = 0;
@@ -292,7 +281,7 @@ const Dashboard = ({ navigation }) => {
 								GROSS
 							</Text>
 							<Text style={{ ...styles.textRowValue, textAlign: 'center', paddingTop: 10 }}>
-					            {Number(grandGross).toFixed(0)}
+					            {formatNumber(grandGross)}
 							</Text>
 						</View>
 						<View style={{ width: '25%', borderLeftWidth: 1, height: 55, borderColor: COLORS.white2, alignItems: 'center', justifyContent: 'flex-start', flexDirection: 'column' }}>
@@ -301,7 +290,7 @@ const Dashboard = ({ navigation }) => {
 							</Text>
 							<Text style={{ ...styles.textRowValue, textAlign: 'center', paddingTop: 10 }}>
 
-								{Number(grandHits).toFixed(0)}
+								{formatNumber(grandHits)}
 							</Text>
 						</View>
 						<View style={{ width: '25%', borderLeftWidth: 1, height: 55, borderColor: COLORS.white2, alignItems: 'center', justifyContent: 'flex-start', flexDirection: 'column' }}>
@@ -309,15 +298,15 @@ const Dashboard = ({ navigation }) => {
 								COMM
 							</Text>
 							<Text style={{ ...styles.textRowValue, textAlign: 'center', paddingTop: 10 }}>
-								{Number(grandComm).toFixed(0)}
+								{formatNumber(grandComm)}
 							</Text>
 						</View>
 						<View style={{ width: '25%', borderLeftWidth: 1, height: 55, borderColor: COLORS.white2, alignItems: 'center', justifyContent: 'flex-start', flexDirection: 'column' }}>
 							<Text style={{ ...styles.textRow }}>
 								NET
 							</Text>
-							<Text style={{ fontWeight: 'bold', textAlign: 'center', paddingTop: 10, color: Math.sign(Number(grandNet)) == -1 ? COLORS.red : COLORS.black }}>
-								{Number(grandNet ? grandNet : 0).toFixed(0)}
+							<Text style={{ fontWeight: 'bold', textAlign: 'center', paddingTop: 10, color: Math.sign(formatNumber(grandNet)) == -1 ? COLORS.red : COLORS.black }}>
+								{formatNumber(grandNet ? grandNet : 0)}
 
 							</Text>
 						</View>
@@ -356,7 +345,7 @@ const Dashboard = ({ navigation }) => {
 			mutableSubs.add(currentUser, { name: usersSubscriptionName });
 			mutableSubs.add(drawsDataArray, { name: drawsSubscriptionName });
 		});
-	}, [realm]);
+	}, [realm, user]);
 
 
 	useEffect(() => {

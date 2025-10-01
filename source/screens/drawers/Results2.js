@@ -1,37 +1,36 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, FlatList, TextInput, Image, Button, SafeAreaView, Modal } from 'react-native'
 import { COLORS } from '../../constants/theme';
-import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
-import { useUser, useApp } from '@realm/react';
 import { realmContext } from '../../RealmContext';
-import { Users, Draws } from '../../Models';
+import { Draws, Combinations } from '../../Models';
 import moment from 'moment-timezone';
-import { useSelector, useDispatch } from 'react-redux';
 import Animated, { BounceOutDown, FadeInDown, FadeOutDown } from 'react-native-reanimated';
-import { icons } from '../../constants';
 
 
 const { useRealm, useQuery } = realmContext;
 
 export default function Results2({ navigation }) {
-	const { collector, user } = useSelector(({ user }) => user);
 	const today = moment().tz('Asia/Manila').toDate();
 	let startDate = moment(today).startOf('day').toDate();
-
-	const realm = useRealm()
-	const userRealm = useUser();
-	const app = useApp();
-
 	// const items = useQuery(Betting);
-	const users = useQuery(Users, user => { return user.filtered('email == $0', collector) }, [collector]);
 	const draws = useQuery(Draws, draw => draw.sorted('drawDate', true))
+	  // 👇 Get all winning combinations
+	const winningCombinations = useQuery(
+		Combinations,
+		q => q.filtered('isWinTo == true'),
+		[]
+	);
 
+	// Convert to a Set for fast lookup
+	const winningDigits = new Set(
+		winningCombinations.map(c => String(c.digit))
+	);
 
 	function renderHeaderDatePicker() {
 		return (
 			<>
 
-				<View style={{ flexDirection: 'row', borderTopWidth: 1, justifyContent: 'space-between', padding: 10, borderBottomWidth: 1, borderColor: COLORS.gray600, backgroundColor: COLORS.gray400 }}>
+				<View style={{ flexDirection: 'row', borderTopWidth: 1, justifyContent: 'space-between', paddingVertical: 4, paddingHorizontal: 10, borderBottomWidth: 1, borderColor: COLORS.gray600, backgroundColor: COLORS.gray400 }}>
 					<Text style={{ ...styles.rowHeader, width: '40%' }}>
 						DATE
 					</Text>
@@ -72,10 +71,12 @@ export default function Results2({ navigation }) {
 						{moment(item.date).isSame(startDate) ? 'Today' : moment(item.date).format('MM/DD/YYYY')}
 					</Text>
 					{[0, 1, 2].map((game, i) => {
-
 						let draw = item.draws[game];
+						// 👇 Check if this draw digit is in winning combinations
+						const isWinningDigit =
+						draw?.digit && winningDigits.has(String(draw.digit));
 						return (
-							<Text key={Math.random()} style={{ ...styles.rowHeader, width: '20%', color: index ? COLORS.black : draw?.isWinTo ? COLORS.danger : '#1a90ff' }}>
+							<Text key={Math.random()} style={{ ...styles.rowHeader, width: '20%', color: isWinningDigit ? COLORS.danger : index ? COLORS.black : '#1a90ff', }}>
 								{(draw && draw.digit) ? String(draw.digit).split('').join('-') : '_-_-_'}
 							</Text>
 						)

@@ -1,4 +1,4 @@
-import { FlatList, Image, StyleSheet, Text, TextInput, TouchableOpacity, View, RefreshControl } from 'react-native'
+import { FlatList, Image, StyleSheet, Text, TextInput, Alert, TouchableOpacity, View, RefreshControl, Switch } from 'react-native'
 import React, { useEffect, useState } from 'react'
 import moment from 'moment-timezone'
 // import { realmContext } from '../RealmContext'
@@ -11,7 +11,7 @@ import { Betting, Draws, Users } from '../../Models'
 import { COLORS, icons } from '../../constants'
 import { SET_ACTIVE_USER } from '../../redux/actions/types';
 import { realmContext } from '../../RealmContext';
-import { formatNumberWithComma } from '../../utils/helpers';
+import { formatNumberWithComma, getConfiguration } from '../../utils/helpers';
 
 const { useRealm, useQuery } = realmContext;
 const drawTimes = [
@@ -53,12 +53,14 @@ const Transactions = ({ navigation }) => {
   const [filterTime, setFilterTime] = useState(drawTimes[0].name)
   const [showTime, setShowTime] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [includeAll, setIncludeAll] = useState(false);
 
-  const startOfDay = moment(date).startOf('day').toDate();
-  const endOfDay = moment(date).endOf('day').toDate();
+  let startOfDay = moment(date).startOf('day').toDate();
+  let endOfDay = moment(date).endOf('day').toDate();
 
   let collectorName = selectedUser ? selectedUser : collector;
-  
+
+
   const users = useQuery(Users, user => {
     return user.filtered(
       'email == $0',
@@ -67,18 +69,23 @@ const Transactions = ({ navigation }) => {
   }, [collectorName]);
 
 
+  const updateTickets =  getConfiguration(users[0], 'updateTickets')?.isCheck;
 
+  console.log(updateTickets, "CAN EDIT?")
 
-  console.log(users, "usersusersusersusers")
 
   const items = useQuery(Betting, data => {
     let userNow = users[0] ? users[0]._id : "";
-    if (new Date(date) <= new Date(user?.lastSummary)) {
-      startOfDay = moment().add(1, 'd').endOf('day').toDate();
-      endOfDay = moment().add(1, 'd').endOf('day').toDate();
+    if (includeAll) {
+      return data.filtered('ANY uplines == $0 &&  isDeleted == false && inputType == "normal" && timestamp >= $1 && timestamp <= $2', String(userNow), startOfDay, endOfDay).sorted('timestamp');
+    } else {
+      if (new Date(date) <= new Date(user?.lastSummary)) {
+        startOfDay = moment().add(1, 'd').endOf('day').toDate();
+        endOfDay = moment().add(1, 'd').endOf('day').toDate();
+      }
+      return data.filtered('isDeleted == false && inputType == "normal" && timestamp >= $0 && timestamp < $1 && owner_id == $2', startOfDay, endOfDay, String(userNow)).sorted('timestamp', true)
     }
-    return data.filtered('isDeleted == false && inputType == "normal" && timestamp >= $0 && timestamp < $1 && owner_id == $2', startOfDay, endOfDay, String(userNow)).sorted('timestamp', true)
-  }, [date, users, selectedUser]);
+  }, [date, users, selectedUser, includeAll]);
 
 
   // DATE
@@ -233,7 +240,7 @@ const Transactions = ({ navigation }) => {
           <TouchableOpacity
             // disabled={moment(date).isAfter(today) ? false : true}
             onLongPress={() => {
-              if (user.isAdmin) {
+              if (updateTickets) {
                 // dispatch({ type: SET_ACTIVE_USER, payload: collector })
                 handleLongPress(item)
               }
@@ -317,21 +324,21 @@ const Transactions = ({ navigation }) => {
   }
 
   // useEffect(() => {
-    // let cur = users[0] ? users[0]._id : "";
-    // let filterString = `owner_id == "${cur}"`;
+  // let cur = users[0] ? users[0]._id : "";
+  // let filterString = `owner_id == "${cur}"`;
 
 
-    // let data =  realm.objects(Betting).filtered(filterString);
+  // let data =  realm.objects(Betting).filtered(filterString);
 
-    //   realm.subscriptions.update(mutableSubs => {
-    //     mutableSubs.removeByName(itemSubscriptionName);
-    //     mutableSubs.add(data, { name: ownItemsSubscriptionName });
-    //   });
+  //   realm.subscriptions.update(mutableSubs => {
+  //     mutableSubs.removeByName(itemSubscriptionName);
+  //     mutableSubs.add(data, { name: ownItemsSubscriptionName });
+  //   });
 
-      // realm.subscriptions.update(mutableSubs => {
-    // mutableSubs.add(userData, {name: 'items3'});
-    // mutableSubs.add(drawsDataArray, { name: drawsSubscriptionName });
-    // });		
+  // realm.subscriptions.update(mutableSubs => {
+  // mutableSubs.add(userData, {name: 'items3'});
+  // mutableSubs.add(drawsDataArray, { name: drawsSubscriptionName });
+  // });		
 
 
 
@@ -401,12 +408,31 @@ const Transactions = ({ navigation }) => {
             <Text style={styles.fontsHeader}>Total Tickets</Text>
             <Text style={{ fontWeight: 'bold', color: COLORS.black, fontSize: 16 }}>{formatNumberWithComma(filteredList.length)}</Text>
 
+
           </View>
+
           <View style={{ flex: 1, flexDirection: 'column', width: '40%', alignItems: 'flex-start' }}>
             <Text style={styles.fontsHeader}>Total Sales</Text>
             <Text style={{ fontWeight: 'bold', color: COLORS.black, fontSize: 16 }}>{formatNumberWithComma(totalGross)}</Text>
           </View>
         </View>
+        {(users[0] && users[0].role !== 'teller' && getConfiguration(users[0], 'showAllData')?.isCheck) &&
+          <View style={{ ...styles.toggleRow, justifyContent: 'flex-start' }}>
+            <Switch
+              trackColor={{ true: '#00ED64' }}
+              render
+              onValueChange={() => {
+                if (realm.syncSession?.state !== 'active') {
+                  Alert.alert(
+                    'Switching subscriptions does not affect Realm data when the sync is offline.',
+                  );
+                }
+                setIncludeAll(!includeAll);
+              }}
+              value={includeAll}
+            />
+              <Text style={{ ...styles.toggleText, color: COLORS.black, fontWeight: '500' }}>Show All</Text>
+          </View>}
         {renderTickerList(filteredList)}
 
       </View>
@@ -544,6 +570,16 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     color: COLORS.white2,
 
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 5,
+  },
+  toggleText: {
+    flex: 1,
+    fontSize: 16,
+    color: COLORS.black
   },
   itemText: {
     padding: 8

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Image, Text, View } from 'react-native';
+import { Image, Text, TouchableOpacity, View } from 'react-native';
 import { realmContext } from '../RealmContext';
-import { Combinations } from '../Models';
+import { Combinations, Users } from '../Models';
 import Realm, { BSON } from 'realm';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNetInfo } from '@react-native-community/netinfo';
@@ -10,12 +10,14 @@ import { STOP_LOADING } from '../redux/actions/types';
 import Config from 'react-native-config';
 import axios from 'axios';
 import * as Progress from 'react-native-progress';
+import { useNavigation } from '@react-navigation/native';
+import { getConfiguration } from '../utils/helpers';
 
 
 const { useRealm, useQuery } = realmContext
 
 export function SyncComponent() {
-  const { user } = useSelector(({ user }) => user);
+  const { collector, user, selectedUser } = useSelector(({ user }) => user);
   const dispatch = useDispatch();
   const realm = useRealm();
   const netInfo = useNetInfo();
@@ -25,6 +27,25 @@ export function SyncComponent() {
   const [uploadProgressPercent, setUploadProgressPercent] = useState(0);
   const [progress, setProgress] = useState(0);
   const [syncing, setSyncing] = useState(false);
+
+  const [connectionState, setConnectionState] = useState("Disconnected");
+  const navigation = useNavigation();
+
+  let collectorName = selectedUser ? selectedUser : collector;
+
+    const users = useQuery(Users, user => {
+      return user.filtered(
+        'email == $0',
+        collectorName,
+      );
+    }, [collectorName]);
+  
+  let analytics = getConfiguration(users[0], 'analytics').isCheck;
+  let dataAnalytics = getConfiguration(users[0], 'dataAnalytics').isCheck;
+
+
+  console.log(analytics, "THE ANALYTICS ALLOWED", "DATA ANALYTICS", dataAnalytics)
+  
   
   let combs = useQuery(Combinations, combination => {
     return combination.filtered('straightTotal == 0 && rambleTotal == 0');
@@ -56,61 +77,72 @@ export function SyncComponent() {
   }
 
   useEffect(() => {
-    handleConnection();
+    // handleConnection();
     handleSms();
   }, [])
 
+
   useEffect(() => {
-    setTimeout(() => {
-      dispatch({ type: STOP_LOADING })
-    }, 30000)
+    if (!realm?.syncSession) return;
 
+    // Get the initial state
+    setConnectionState(realm.syncSession.connectionState);
 
+    // Listen for connection state changes
+    const listener = (newState) => {
+      console.log("New Connection State:", newState);
+      setConnectionState(newState);
+    };
+
+    realm.syncSession.addConnectionNotification(listener);
+
+    // Cleanup listener on unmount
+    return () => {
+      realm.syncSession?.removeConnectionNotification(listener);
+    };
+  }, [realm]);
+  
+  useEffect(() => {
+    let lastTransferred = 0;
+    
     const progressNotificationCallback = (transferred, transferable) => {
-      // Convert decimal to percent with no decimals
-      // (e.g. 0.6666... -> 67)
-      // console.log("THE TRANSFERABLE SYNC:", transferable, "THE TEANSFERRED:", transferred)
+      if (transferable === 0) return; // Avoid division by zero
 
+      let percentTransferred = (transferred / transferable) * 100;
 
-
-      console.log(transferable, 'transferable')
-      console.log(transferred, 'transferred')
-
-
-      console.log(Number(transferable / transferred), "TT")
-      
-      const percentTransferred = parseFloat((transferred / transferable).toFixed(2)) * 100;
-
-
-      // setProgress(percentTransferred)
-
-      
-      
-      setUploadProgressPercent(percentTransferred);
-      if (percentTransferred == 100) {
-        dispatch({ type: STOP_LOADING })
+      // Ensure progress moves smoothly, avoiding large jumps
+      if (percentTransferred > lastTransferred + 10) {
+        percentTransferred = lastTransferred + 5; // Increment in smaller steps
       }
-      // console.log(uploadProgressPercent, "THE PERCENT!")
-      // console.log(progress, percentTransferred, '1percentTransferredpercentTransferredpercentTransferredpercentTransferred')
-      return percentTransferred;
+
+      setProgress(percentTransferred);
+      lastTransferred = percentTransferred;
+
+      // Stop loading when upload completes
+      if (percentTransferred >= 100) {
+        dispatch({ type: STOP_LOADING });
+      }
     };
 
 
-    // Listen for changes to connection state
-    realm.syncSession?.addProgressNotification(
+
+    console.log(JSON.stringify(realm?.syncSession.connectionState), 'USER SESSION')
+
+    // Start progress from 0% and attach listener
+
+    realm?.syncSession?.addProgressNotification(
       Realm.ProgressDirection.Upload,
       Realm.ProgressMode.ReportIndefinitely,
-      progressNotificationCallback,
+      progressNotificationCallback
     );
 
-    // Remove the connection listener when component unmounts
+    // Cleanup on unmount
     return () => {
-      realm.syncSession?.removeProgressNotification(
-        progressNotificationCallback,
-      );
-      dispatch({ type: STOP_LOADING })
-    }
-    // Run useEffect only when component mounts
+      realm?.syncSession?.removeProgressNotification(progressNotificationCallback);
+      console.log(JSON.stringify(realm?.syncSession.connectionState), 'USER SESSION ON COMPONENT UN-MOUNT')
+      setProgress(0)
+      dispatch({ type: STOP_LOADING });
+    };
   }, [realm]);
 
   const intervalTime = 5 * 60 * 1000;
@@ -125,25 +157,33 @@ export function SyncComponent() {
   }, []);
 
 
+
+  console.log(connectionState, "CONN STATE")
+  console.log('Account Role:', user?.isAdmin, 'Analytics:', analytics)
+
   return (
     <View style={{ alignItems: 'center', justifyContent: 'flex-start', flexDirection: 'column' }}>
-      {(user && user.isAdmin) ?
-        <View style={{ flexDirection: 'row' }}>
+      {user?.isAdmin && analytics ?
+        <TouchableOpacity 
+          disabled={dataAnalytics ? false : true}
+          onPress={() => navigation.navigate('Combinations', {})} 
+          style={{ flexDirection: 'row' }}
+        >
           {smsError ? <Text style={{ fontSize: 12, color: COLORS.darkGray2, fontWeight: '500'}}>SMS</Text> : ''}
-          {combs.length && (combs.length < 999) ?
+          {/* {combs.length && (combs.length < 999) ? */}
             <Text style={{ fontSize: 12, color: COLORS.darkGray2, fontWeight: '500', textAlign: 'center'}}>
               {combs.length}
             </Text>
-            : ''
-          }
-        </View>
+            {/* : '' */}
+          {/* } */}
+        </TouchableOpacity>
         : ''
 
       }
-      {(uploadProgressPercent && uploadProgressPercent < 100) ?
-        <Progress.Circle progress={uploadProgressPercent} showsText={true} textStyle={{fontSize: 10, color: COLORS.black, fontWeight: '500'}} thickness={1.5} size={32} color={COLORS.primary} />
-        : ''
-      } 
+      {(Number(progress / 100) > 1 && Number(progress / 100) < 100) ?
+      <Progress.CircleSnail color={['blue', 'yellow', 'red']} size={22} />
+        : '' 
+        } 
     </View>
   );
 }

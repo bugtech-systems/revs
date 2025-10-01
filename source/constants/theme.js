@@ -9,6 +9,8 @@ export const COLORS = {
   primaryTransparent3: '#f5faff',
   secondary: '#003580', // gray
   secondaryTransparent: 'rgba(0, 53, 128, 0.8)',
+  unfilledBar: 'rgba(0, 53, 128, 0.43)',
+  secondaryTransparent2: 'rgba(51, 80, 121, 0.36)',
   warningBorderColor: '#e6a700',
   warningBackgroundColor: '#544d2f',
   warningTextColor: '#fff8e6',
@@ -22,6 +24,7 @@ export const COLORS = {
   lightGray2: "#F5F5F8",
   transparentSuccess: '#a1fcc5',
   transparentDanger: '#e67e8f',
+  transparentDanger2: '#e48f9dff',
   lightGray1: "#DDDDDD",
   // colors
   black: '#0d0d0e',
@@ -36,6 +39,7 @@ export const COLORS = {
   transparent: 'rgba(255, 255, 255, 0)',
   transparentBlack1: 'rgba(0, 0, 0, 0.2)',
   transparentBlack7: 'rgba(0, 0, 0, 0.7)',
+  transparentBlack8: 'rgba(0, 0, 0, 0.3)',
   darkgray: '#898C95',
   darkGray2: '#57585b',
   // custom

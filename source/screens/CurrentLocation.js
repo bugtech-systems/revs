@@ -59,7 +59,6 @@ export default function CurrentLocation() {
           Geolocation.getCurrentPosition(
             position => {
               let { coords } = position;
-              console.log(coords, 'COOORDS')
               // setMarkerLocation({ ...position.coords });
               setCurrentLatitude(coords.latitude)
               setCurrentLongitude(coords.longitude)

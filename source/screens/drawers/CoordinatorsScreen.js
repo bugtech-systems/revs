@@ -155,7 +155,12 @@ const CoordinatorsScreen = ({ navigation }) => {
 
 
   let filteredList = usersCoord;
-  filteredList = searchQuery ? filteredList.filter(a => String(a.email).toLowerCase().includes(String(searchQuery).toLowerCase())) : filteredList;
+  filteredList = searchQuery ? 
+  filteredList.filter(a => String(a.email).toLowerCase().includes(String(searchQuery).toLowerCase()) || String(a.address).toLowerCase().includes(String(searchQuery).toLowerCase())) : 
+  filteredList;
+
+
+
 
 
   return (

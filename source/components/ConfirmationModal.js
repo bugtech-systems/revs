@@ -3,7 +3,7 @@ import { Modal, View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-
 import { COLORS } from '../constants/theme';
 
 
-const ConfirmationModal = ({ visible, title, message, onClose, handleConfirm }) => {
+const ConfirmationModal = ({ visible, title, message, onClose, handleConfirm, titleStyles, messageStyles, buttonContainerStyle, butttonStyle, butttonTextStyle }) => {
   const handleConfirmLogout = () => {
     // console.log('Confirm!')
     handleConfirm();
@@ -23,16 +23,30 @@ const ConfirmationModal = ({ visible, title, message, onClose, handleConfirm }) 
     >
       <View style={styles.overlay}>
         <View style={styles.modalContainer}>
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.message}>{message}</Text>
-          <View style={{ flexDirection: 'row', width: '90%', justifyContent: 'space-between', alignItems: 'center'}}>
-            <TouchableOpacity style={{...styles.button, backgroundColor: '#226cbf', width: '40%', alignItems: 'center', justifyContent: 'center', elevation: 4}} 
+          <Text style={{ ...styles.title, ...titleStyles }}>{title}</Text>
+          <Text style={{ ...styles.message, ...messageStyles }}>{message}</Text>
+          <View style={{ flexDirection: 'row', width: '100%', justifyContent: 'space-between', alignItems: 'center'}}>
+            {
+              onClose && handleConfirm ? 
+            <>
+              <TouchableOpacity style={{...styles.button, width: '48%', alignItems: 'center', justifyContent: 'center', elevation: 4}} 
             onPress={handleClose}>
-                <Text style={{...styles.buttonText, color: COLORS.white, fontWeight: '500'}}>{'Cancel'}</Text>
+                <Text style={{...styles.buttonText, color: '#226cbf', fontWeight: '500'}}>{'Cancel'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={{...styles.button, width: '40%', alignItems: 'center', justifyContent: 'center', elevation: 4}} onPress={handleConfirmLogout}>
-                <Text style={{...styles.linkText, color: '#226cbf', fontWeight: '500'}}>{'Yes'}</Text>
+            <TouchableOpacity style={{...styles.button, backgroundColor: '#226cbf', width: '48%', alignItems: 'center', justifyContent: 'center', elevation: 4}} onPress={handleConfirmLogout}>
+                <Text style={{...styles.linkText,  fontWeight: '500', color: COLORS.white,}}>{'Yes'}</Text>
             </TouchableOpacity>
+            </>
+            :
+            <View style={{width: '100%', alignItems: 'center', justifyContent: 'center', ...buttonContainerStyle }}>
+              <TouchableOpacity style={{...styles.button, backgroundColor: '#226cbf', width: '40%', alignItems: 'center', justifyContent: 'center', elevation: 4, ...butttonStyle }} 
+              onPress={handleClose}>
+                  <Text style={{...styles.buttonText, color: COLORS.white, fontWeight: '500', ...butttonTextStyle }}>{'Confirm'}</Text>
+              </TouchableOpacity>
+            </View>
+            }
+            
+            
         </View>
         </View>
       </View>

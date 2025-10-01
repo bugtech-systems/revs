@@ -87,8 +87,8 @@ export default class NotifService {
           }
           
   
-          console.log(notificationDate,"NOTIF DATE!")
-          console.log(now,"NOW!")
+          // console.log(notificationDate,"NOTIF DATE!")
+          // console.log(now,"NOW!")
 
   
           PushNotification.localNotificationSchedule({

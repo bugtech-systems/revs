@@ -29,6 +29,7 @@ const ViewUserForm = ({ route, navigation }) => {
   const app = useApp();
   const [values, setValues] = useState({
     type: 'Coordinator',
+    deviceId: '',
     commission: '',
     firstName: '',
     lastName: '',
@@ -141,6 +142,7 @@ const ViewUserForm = ({ route, navigation }) => {
       ...values,
       firstName: userDetails.firstName,
       lastName: userDetails.lastName,
+      deviceId: userDetails?.deviceId,
       mobile: userDetails.mobile,
       address: userDetails.address,
       username: String(userDetails.email).split('@')[0],
@@ -161,10 +163,6 @@ const ViewUserForm = ({ route, navigation }) => {
   let isWin200 = getConfiguration(users[0], 'withWin200');
   let printHeader = getConfiguration(users[0], 'printHeader')
 
-
-
-  console.log(values, "THE VAL")
-  
   return (
     <SafeAreaView style={{ ...styles.wrapper }}>
       {/* <View style={{ borderWidth: 1 }}> */}
@@ -374,6 +372,13 @@ const ViewUserForm = ({ route, navigation }) => {
             }}
             showsVerticalScrollIndicator={false}
             dropdownStyle={styles.dropdownMenuStyle}
+          />
+          <LargeInput
+            editable={false}
+            label={'Device ID'}
+            onChangeText={handleChanges('deviceId')}
+            value={String(values.deviceId ? values.deviceId : "T.B.A")}
+            inputLength={'48%'}
           />
         </View>
 

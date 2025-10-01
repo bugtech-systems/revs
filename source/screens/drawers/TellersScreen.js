@@ -88,9 +88,6 @@ const TellersScreen = ({ navigation }) => {
     let displayName = String(item.email).split('@')[0];
     const backgroundColor = index % 2 === 0 ? COLORS.gray200 : COLORS.gray300;
 
-
-    console.log(item, "LISTA")
-
     return (
       <Animated.View
         key={index}

@@ -63,17 +63,32 @@ const CancelledTickets = ({ navigation }) => {
     );
   }, [collectorName]);
 
+  const adminAccess = users[0]?.isAdmin;
 
-  const items = useQuery(Betting, data => {
-    const startOfDay = moment(date).startOf('day').toDate();
-    const endOfDay = moment(date).endOf('day').toDate();
+const items = useQuery(Betting, data => {
+  const startOfDay = moment(date).startOf('day').toDate();
+  const endOfDay = moment(date).endOf('day').toDate();
 
-    return data.filtered('isDeleted == true && timestamp >= $0 && timestamp < $1 && owner_id == $2', startOfDay, endOfDay, String(users[0]._id)).sorted('timestamp', true)
-  }, [realm, date]);
+  if (adminAccess) {
+    // Admin: no owner_id filter
+    return data.filtered(
+      'isDeleted == true && timestamp >= $0 && timestamp < $1',
+      startOfDay,
+      endOfDay
+    ).sorted('timestamp', true);
+  } else {
+    // Non-admin: filter by owner_id
+    return data.filtered(
+      'isDeleted == true && timestamp >= $0 && timestamp < $1 && owner_id == $2',
+      startOfDay,
+      endOfDay,
+      String(users[0]._id)
+    ).sorted('timestamp', true);
+  }
+}, [realm, date, adminAccess]);
 
   const onChangeDate = (event, selectedDate) => {
     const currentDate = selectedDate || date;
-    console.log(event?.type, "THE EVENT")
     if (event?.type == 'neutralButtonPressed') {
       setShowDate(Platform.OS === 'ios');
       // setFilterDate(false)

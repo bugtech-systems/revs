@@ -92,18 +92,9 @@ const SoldOuts = ({ navigation }) => {
     const endOfDay = moment(endDate).endOf('day').toDate();
     let userNow = users[0] ? users[0]._id : "";
 
-
-    console.log(userNow, "DAYUSERNAW")
-
     return data.filtered('isDeleted == false && inputType == "sold" && timestamp >= $0 && timestamp < $1 && owner_id == $2', startOfDay, endOfDay, String(users[0]._id)).sorted('timestamp', true)
     // return data.filtered('isDeleted == false && timestamp >= $0 && timestamp < $1 && owner_id == $2', startOfDay, endOfDay, String(userNow)).sorted('timestamp', true)
   }, [startDate, endDate, realm, users ]);
-
-
-  console.log(users[0]._id, "USER NOW")
-  console.log(items.length, "SOLD OUT ITEMS")
-  
-  
   
   function getTimeRange() {
     const currentTime = new Date();
@@ -146,8 +137,6 @@ const SoldOuts = ({ navigation }) => {
     const onChangeDate = (event, selectedDate) => {
       const currentDate = selectedDate || startDate;
   
-      console.log(show, 'change date prop', selectedDate)
-  
       // setShowDate(null)
   
       if (show === 'start') {
@@ -180,7 +169,6 @@ const SoldOuts = ({ navigation }) => {
     };
 
     const showDatePicker = (val) => {
-      console.log(val, 'show Date')
       setShowDate(val);
     };
 
@@ -444,8 +432,8 @@ const SoldOuts = ({ navigation }) => {
             //   alignItems: 'flex-start'
             // }}
             style={{ paddingHorizontal: SIZES.padding, borderColor: COLORS.gray600, width: '100%', flexDirection: 'row', paddingVertical: SIZES.padding * 2, alignItems: 'flex-start', justifyContent: 'space-around', backgroundColor: backgroundColor }}>
-            <Text style={{ fontWeight: '500', fontSize: 18, width: '33%', textAlign: 'left', color: COLORS.black600,overflow: 'hidden' }}>
-              {moment(item?.timestamp).format('MMM DD, YYYY')}
+            <Text style={{ fontWeight: '600', fontSize: 18, width: '33%', textAlign: 'left', color: COLORS.black600,overflow: 'hidden' }}>
+              {moment(item?.timestamp).format('MMM DD, YYYY hh:mm A')}
             </Text>
             <Text style={{ textAlign: 'center', paddingRight: 10, fontSize: 18, width: '33%', fontWeight: 'bold', color: item.gameTime == '2pm' ? '#3897e7' : item.gameTime == '5pm' ? '#ff9d3e' : item.gameTime == '9pm' ? COLORS.black600 : null }}>
               {String(item.gameTime).toUpperCase()}
@@ -463,7 +451,7 @@ const SoldOuts = ({ navigation }) => {
       <>
         <View style={{ paddingLeft: 10, width: '100%', flexDirection: 'row', borderBottomWidth: 1, borderTopWidth: 1, borderColor: COLORS.gray600, color: COLORS.black, justifyContent: 'flex-start', backgroundColor: COLORS.gray400, alignItems: 'flex-start' }}>
           <Text style={{ textAlign: 'left', fontWeight: 'bold', color: COLORS.black, fontSize: 16, width: '33%' }}>
-            Ticket#
+            DATE & TIME
           </Text>
           <Text style={{ textAlign: 'center', width: '33%', fontWeight: 'bold', color: COLORS.black, fontSize: 16, }}>
             GAME TIME
@@ -562,12 +550,9 @@ const SoldOuts = ({ navigation }) => {
   let totalGross = filteredList.reduce((n, { gross }) => n + gross, 0);
   let totalWins = filteredList.reduce((n, { winning }) => n + winning, 0);
 
+  let totalWinsDummy = 3.34
 
-
-  // console.log(JSON.stringify(users), "selectedUserselectedUserselectedUser")
-  
-  
-  
+  console.log(totalWins, "THE TOTAL WINS")
 
   return (
     <SafeAreaProvider style={styles.wrapper}>
@@ -612,7 +597,7 @@ const SoldOuts = ({ navigation }) => {
           </View>
           <View style={{ flex: 1, flexDirection: 'column', width: '40%', alignItems: 'flex-start' }}>
             <Text style={styles.fontsHeader}>Total Hits</Text>
-            <Text style={{ fontWeight: 'bold', color: COLORS.black, fontSize: 16 }}>{formatNumberWithComma(totalWins)}</Text>
+            <Text style={{ fontWeight: 'bold', color: COLORS.black, fontSize: 16 }}>{Number(totalWins).toFixed(2)}</Text>
           </View>
         </View>
         {renderTickerList(filteredList)}

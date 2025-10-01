@@ -12,6 +12,7 @@ import { Betting, Draws, Users } from '../Models';
 import WarningModal from '../components/WarningModal';
 import ConfirmationModal from '../components/ConfirmationModal';
 import TestScreen from './TestScreen';
+import { getConfiguration } from '../utils/helpers';
 
 
 
@@ -39,15 +40,14 @@ const ReviewScreen = ({ route, navigation, onPress }) => {
     );
   }, [collector]);
 
+  const updateTickets =  getConfiguration(users[0], 'updateTickets')?.isCheck;
+  
   const currentUsers = useQuery(Users, user => {
     return user.filtered(
       'email == $0',
       user?.email,
     );
   }, [user]);
-
-
-
 
   function getTimeRange() {
     const currentTime = new Date();
@@ -65,13 +65,6 @@ const ReviewScreen = ({ route, navigation, onPress }) => {
   const captureImage = async () => {
     return Math.random();
   }
-
-
-
-
-  console.log(ticketDetails, "ticketDetailsticketDetailsticketDetailsticketDetailsticketDetailsticketDetailsticketDetails")
-
-
 
   const handleCancelTicket1 = useCallback(
     (_id: BSON.ObjectId) => {
@@ -92,10 +85,9 @@ const ReviewScreen = ({ route, navigation, onPress }) => {
     [realm, users],
   );
 
-
   const handleCancelTicket = (ticket) => {
 
-    if (ticket.owner_id !== String(user._id)) {
+    if (!user?.isAdmin && !updateTickets) {
       setWarningType('unauthorize')
       return dispatch({ type: OPEN_WARNING_MODAL })
     } else {
@@ -118,7 +110,6 @@ const ReviewScreen = ({ route, navigation, onPress }) => {
     }
   }
 
-
   const handleConfirmButton = useCallback(async (_id) => {
 
     const item = realm.objectForPrimaryKey(Betting, BSON.ObjectId(_id)); // search for a realm object with a primary key that is an objectId
@@ -138,11 +129,9 @@ const ReviewScreen = ({ route, navigation, onPress }) => {
     dispatch({ type: CLOSE_CONFIRMATION_MODAL });
   })
 
-
   const handleConfirmWarning = () => {
     dispatch({ type: CLOSE_WARNING_MODAL })
   }
-
 
   const renderBet = ({ item }) => (
     <View style={styles.betRow}>
@@ -160,8 +149,6 @@ const ReviewScreen = ({ route, navigation, onPress }) => {
     setTotal(totalAmount)
     // captureImage()
   }, [])
-
-
 
   let totalGross = ticketDetails.combinations.reduce((n, { amount }) => n + amount, 0);
 
@@ -199,7 +186,7 @@ const ReviewScreen = ({ route, navigation, onPress }) => {
       <View style={styles.detailsContainer}>
         <View style={{ width: '100%', justifyContent: 'space-between', flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: COLORS.gray400, paddingVertical: 6 }}>
           <Text style={{ ...styles.detailText }}>Agent:</Text>
-          <Text style={styles.detailValue}>{ticketDetails.collector}</Text>
+          <Text style={styles.detailValue}>{String(ticketDetails.collector).toUpperCase()}</Text>
         </View>
         <View style={{ width: '100%', justifyContent: 'space-between', flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: COLORS.gray400, paddingVertical: 6 }}>
           <Text style={{ ...styles.detailText }}>Ticket ID:</Text>
@@ -281,7 +268,7 @@ const ReviewScreen = ({ route, navigation, onPress }) => {
           </TouchableOpacity>
         }
         {ticketDetails.isDeleted ?
-          <TouchableOpacity activeOpacity={.6} onPress={() => handleCancelTicket(ticketDetails._id)} style={{ width: '30%' }}>
+          <TouchableOpacity activeOpacity={.6} disabled={true} onPress={() => handleCancelTicket(ticketDetails._id)} style={{ width: '30%', opacity: .5 }}>
             <LinearGradient colors={['#6ddc59', '#39ad4a', '#217735']} style={styles.linearGradientOk}>
               <Text style={styles.buttonTextOk}>
                 Restore

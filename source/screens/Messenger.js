@@ -243,7 +243,7 @@ const Messenger = ({ route, navigation }) => {
                                 setSelectedImage(`${item?.imageUrl}`)
                                 setIsModalVisible(true)
                             }}
-                            style={[String(item.owner_id) == String(user?._id) ? styles.sent : styles.received, { width: 150, height: 200, borderWidth: 1, borderColor: COLORS.transparentBlack1, borderRadius: 6, backgroundColor: COLORS.transparentBlack1 }]}
+                            style={[String(item.owner_id) == String(user?._id) ? styles.sent : styles.received, { width: 150, height: 200, borderWidth: 1, borderColor: COLORS.transparentBlack1, borderRadius: 6, backgroundColor: COLORS.transparentBlack8 }]}
                         >
 
                             <Image
@@ -253,7 +253,7 @@ const Messenger = ({ route, navigation }) => {
                                 resizeMode='contain'
                             />
                         </TouchableOpacity>
-                        {
+                        {/* {
                             String(item.owner_id) !== String(user?._id) &&
 
                             <TouchableOpacity
@@ -265,7 +265,7 @@ const Messenger = ({ route, navigation }) => {
                                     style={{ height: 25, width: 25, resizeMode: 'contain', tintColor: COLORS.darkGray2 }}
                                 />
                             </TouchableOpacity>
-                        }
+                        } */}
                     </View>
 
                     :
@@ -394,9 +394,19 @@ const Messenger = ({ route, navigation }) => {
                         onChangeText={setTextInput}
                     />
                     <TouchableOpacity style={styles.sendButton} onPress={() => handleImageUpload()}>
+                        {
+                            imageUrl && 
+                            <View
+                            style={{ position: 'absolute', alignItems: 'center', justifyContent: 'center', zIndex: 2, backgroundColor: COLORS.transparentRed, borderRadius: SIZES.radius, width: 14, bottom: 34, left: 15}}
+                        >
+                            <Text style={{ fontWeight: 'bold', color: COLORS.white, fontSize: 10}}>
+                                1
+                            </Text>
+                        </View>
+                        }
                         <Image
                             source={icons.add_image}
-                            style={{ height: 25, width: 25, tintColor: COLORS.primary }}
+                            style={{ zIndex: 1, height: 25, width: 25, tintColor: COLORS.primary }}
                         />
                     </TouchableOpacity>
                 </View>

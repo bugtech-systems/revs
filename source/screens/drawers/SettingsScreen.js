@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Image, Button, TouchableOpacity, Alert, ScrollView, SafeAreaView, Easing } from 'react-native';
+import { View, Text, Image, Button, TouchableOpacity, Alert, ScrollView, SafeAreaView, Easing, Dimensions } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { realmContext } from '../../RealmContext';
 import { useUser } from '@realm/react';
@@ -8,7 +8,7 @@ import { CLOSE_CONFIRMATION_MODAL, OPEN_CONFIRMATION_MODAL, SET_ACTIVE_USER, SET
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import UpdateModal from '../../components/UpdateModal';
 import Config from 'react-native-config';
-import { getConfiguration } from '../../utils/helpers';
+import { getConfiguration, useScreenSize } from '../../utils/helpers';
 import ConfirmationModal from '../../components/ConfirmationModal';
 import { BSON } from 'realm';
 import { COLORS, icons, SIZES } from '../../constants';
@@ -17,21 +17,19 @@ const { useRealm, useQuery } = realmContext;
 const usersSubscriptionName = 'users';
 
 const SettingsScreen = ({ navigation }) => {
+  const { width, height } = Dimensions.get('window');
   const realm = useRealm()
   const dispatch = useDispatch();
-  const { user, apkUrl, collector } = useSelector(({ user }) => user)
+  const { user, collector } = useSelector(({ user }) => user)
   const { confirmationModal } = useSelector(({ ui }) => ui)
   const [isModalVisible, setModalVisible] = useState(false);
   const [updateUrl, setUpdateUrl] = useState(null);
   const [rnd, setRnd] = useState(0);
   const [userToUpdate, setUserToUpdate] = useState(null);
+  const [screenDimensions, setScreenDimensions] = useState(Dimensions.get('window'));
 
   const [activeDropDown, setActiveDropDown] = useState('');
-
-  // const rotation = useRef(new Animated.Value(0)).current; // Initialize animation value
-  // const animatedHeight = useRef(new Animated.Value(0)).current; // Initial height is 0
-
-
+  const apkUrl = Config.APK_URL;
   const ownUser = useUser();
 
   const users = useQuery(Users, users => {
@@ -73,10 +71,8 @@ const SettingsScreen = ({ navigation }) => {
 
   const handleDoublePress = (val) => {
 
-    console.log('AW AW')
 
     dispatch({ type: SET_USER_CONFIG, payload: val })
-    // console.log()
     navigation.navigate('View User', JSON.stringify(val))
 
   }
@@ -91,10 +87,13 @@ const SettingsScreen = ({ navigation }) => {
       });
 
 
-      console.log(reactivatedUser, "WEW")
-    } else {
+    } else if (updateUser && user?.actionType == 'deactivate') {
       realm.write(() => {
         updateUser.isDeleted = true;
+      });
+    } else {
+      realm.write(() => {
+        updateUser.deviceId = 'revoke';
       });
     }
   }
@@ -124,6 +123,9 @@ const SettingsScreen = ({ navigation }) => {
     dispatch({ type: SET_ACTIVE_USER, payload: null})
     return
   }
+
+
+  const screen = useScreenSize();
   
   useEffect(() => {
     const currentUser = realm.objects(Users);
@@ -137,22 +139,25 @@ const SettingsScreen = ({ navigation }) => {
     //     handleAppVersion(users[0])
     // }
   }, [realm, users])
+  
 
   let selUser = users[0] ? users[0] : {}
   let ableToViewDeletedUsers = getConfiguration(users[0], 'deletedUsers')?.isCheck;
   let ableToViewAppUsers = getConfiguration(users[0], 'appUsers')?.isCheck;
+  let ableToViewMap = getConfiguration(users[0], 'mapUsers')?.isCheck;
 
   return (
-    // <SafeAreaView style={{ flex: 1 }}>
+    <SafeAreaView style={{ flex: 1, position: 'relative', backgroundColor: COLORS.gray300 }}>
     <ScrollView
       // contentContainerStyle={{ flex: 1}}
-      style={{ flex: 1, backgroundColor: COLORS.gray300 }}>
+      style={{ backgroundColor: COLORS.gray300 }}>
       {
         apkUrl &&
         <UpdateModal
           visible={isModalVisible}
           onClose={closeModal}
           updateUrl={apkUrl}
+          required={false}
         />
       }
       <ConfirmationModal
@@ -162,7 +167,7 @@ const SettingsScreen = ({ navigation }) => {
           setUserToUpdate(null);
         }}
         title={'Confirmation'}
-        message={`Are you sure you want to ${userToUpdate?.actionType} this user?`}
+        message={`Are you sure you want to ${userToUpdate?.actionType == 'revoke session' ? userToUpdate?.actionType + ' ' + 'of' : userToUpdate?.actionType} this user?`}
         handleConfirm={() => {
           // handleCancelTicket(ticketDetails._id)
           handleReactivateUser(userToUpdate);
@@ -172,10 +177,34 @@ const SettingsScreen = ({ navigation }) => {
       />
 
       {selUser && (selUser.role == 'coordinator' && selUser.isAdmin) &&
-        <View style={{ padding: 10, backgroundColor: COLORS.gray300, }}>
-            <Button title="New User" onPress={() => navigation.navigate('Create User', JSON.stringify(users[0]))} />
-            {/* <Button title="" onPress={() => navigation.navigate('Create User', JSON.stringify(users[0]))} /> */}
+        // <View style={{ padding: 10, backgroundColor: COLORS.gray300, }}>
+        //     <Button title="New User" 
+        // onPress={() => navigation.navigate('Create User', JSON.stringify(users[0]))} 
+        // />
+        //     {/* <Button title="" onPress={() => navigation.navigate('Create User', JSON.stringify(users[0]))} /> */}
+        // </View>
+        <View style={{ padding: 10, backgroundColor: COLORS.gray300 }}>
+
+        <TouchableOpacity
+        onPress={() => navigation.navigate('Create User', JSON.stringify(users[0]))}
+        style={{
+            backgroundColor: COLORS.secondaryTransparent,
+            paddingVertical: 12,
+            paddingHorizontal: 24,
+            borderRadius: 12,
+            width: '100%',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+
+          <Text style={{ fontSize: 16, fontWeight: 'bold', color: COLORS.white }}>
+            NEW USER
+          </Text>
+        </TouchableOpacity>
         </View>
+
       }
 
       <View style={{ flex: 1, padding: 10, }}>
@@ -183,7 +212,7 @@ const SettingsScreen = ({ navigation }) => {
         {selUser && (selUser.role == 'coordinator' && selUser.isAdmin &&  ableToViewAppUsers) &&
           <>
             <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
-              <Text style={{ padding: 6, color: COLORS.darkgray, fontWeight: '500' }}>
+              <Text style={{ padding: 6, color: COLORS.primary, fontSize: 12, fontWeight: '500' }}>
                 App Users
               </Text>
             {
@@ -210,8 +239,8 @@ const SettingsScreen = ({ navigation }) => {
                   padding: 6,
                   flexDirection: 'row',
                   alignItems: 'center',
-                  borderBottomWidth: .5,
-                  borderBottomColor: COLORS.secondary,
+                    borderBottomWidth: 1,
+                    borderBottomColor: COLORS.gray600,
                   // backgroundColor:  activeDropDown == 'coordinators' ? COLORS.gray400 : COLORS.gray300,
                   // borderTopRightRadius: SIZES.radius / 2,
                   // borderTopLeftRadius: SIZES.radius / 2,
@@ -262,7 +291,7 @@ const SettingsScreen = ({ navigation }) => {
                           onLongPress={() => handleDoublePress(list)}
                           onPress={() => handleSelectCollector(list)}
                           style={{
-                            width: '90%',
+                            width: '80%',
                             paddingVertical: 14,
                             justifyContent: 'center'
                             // borderWidth: 1, 
@@ -274,6 +303,20 @@ const SettingsScreen = ({ navigation }) => {
                         </TouchableOpacity>
                         {
                           selUser && (selUser.role == 'coordinator' && selUser.isAdmin && collector !== list.email) ?
+                          <View style={{ width: '20%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-evenly'}}>
+                          <TouchableOpacity
+                              style={{ alignItems: 'center', justifyContent: 'center', width: '10%', opacity: list?.deviceId ? 1 : .5 }}
+                              disabled={list?.deviceId ? false : true}
+                              onPress={() => {
+                                dispatch({ type: OPEN_CONFIRMATION_MODAL, payload: 'update_user' });
+                                setUserToUpdate({ ...list, actionType: 'revoke session' });
+                              }}
+                            >
+                              <Image
+                                source={icons.revokeDevice}
+                                style={{ height: 24, width: 24, resizeMode: 'contain' }}
+                              />
+                            </TouchableOpacity>
                             <TouchableOpacity
                               style={{ alignItems: 'center', justifyContent: 'center', width: '10%' }}
                               onPress={() => {
@@ -286,6 +329,8 @@ const SettingsScreen = ({ navigation }) => {
                                 style={{ height: 26, width: 26, resizeMode: 'contain', tintColor: COLORS.red }}
                               />
                             </TouchableOpacity>
+                          </View>
+
                             :
                             null
                         }
@@ -307,8 +352,8 @@ const SettingsScreen = ({ navigation }) => {
                     flexDirection: 'row',
                     // backgroundColor:  activeDropDown == 'tellers' ? COLORS.gray400 : COLORS.gray300,
                     // backgroundColor: COLORS.gray400,
-                    borderBottomWidth: .5,
-                    borderBottomColor: COLORS.secondary,
+                    borderBottomWidth: 1,
+                    borderBottomColor: COLORS.gray600,
                     // borderTopRightRadius: SIZES.radius / 2,
                     // borderTopLeftRadius: SIZES.radius / 2,
                     borderBottomRightRadius: SIZES.radius / 3,
@@ -362,7 +407,7 @@ const SettingsScreen = ({ navigation }) => {
                             onLongPress={() => handleDoublePress(list)}
                             onPress={() => handleSelectCollector(list)}
                             style={{
-                              width: '90%',
+                              width: '80%',
                               paddingVertical: 1,
                               justifyContent: 'center'
                               // borderWidth: 1, 
@@ -375,6 +420,20 @@ const SettingsScreen = ({ navigation }) => {
                           </TouchableOpacity>
                           {
                             selUser && (selUser.role == 'coordinator' && selUser.isAdmin) ?
+                            <View style={{ width: '20%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-evenly'}}>
+                          <TouchableOpacity
+                              style={{ alignItems: 'center', justifyContent: 'center', width: '10%', opacity: list?.deviceId ? 1 : .5 }}
+                              disabled={list?.deviceId ? false : true}
+                              onPress={() => {
+                                dispatch({ type: OPEN_CONFIRMATION_MODAL, payload: 'update_user' });
+                                setUserToUpdate({ ...list, actionType: 'revoke session' });
+                              }}
+                            >
+                              <Image
+                                source={icons.revokeDevice}
+                                style={{ height: 24, width: 24, resizeMode: 'contain' }}
+                              />
+                            </TouchableOpacity>
                               <TouchableOpacity
                                 style={{ padding: 10, alignItems: 'center', justifyContent: 'center', width: '10%' }}
                                 onPress={() => {
@@ -387,6 +446,7 @@ const SettingsScreen = ({ navigation }) => {
                                   style={{ height: 26, width: 26, resizeMode: 'contain', tintColor: COLORS.red }}
                                 />
                               </TouchableOpacity>
+                            </View>
                               :
                               null
                           }
@@ -409,8 +469,8 @@ const SettingsScreen = ({ navigation }) => {
                     padding: 6,
                     flexDirection: 'row',
                     // backgroundColor: COLORS.gray400,
-                    borderBottomWidth: .5,
-                    borderBottomColor: COLORS.secondary,
+                    borderBottomWidth: 1,
+                    borderBottomColor: COLORS.gray600,
                     // borderTopRightRadius: SIZES.radius / 2,
                     // borderTopLeftRadius: SIZES.radius / 2,
                     borderBottomRightRadius: SIZES.radius / 3,
@@ -484,36 +544,53 @@ const SettingsScreen = ({ navigation }) => {
         }
         <View style={{ flex: 1, justifyContent: 'flex-end' }}>
 
-          {(selUser && selUser.isAdmin) &&
+          {selUser && (selUser.role == 'coordinator' && selUser.isAdmin &&  ableToViewMap) &&
             <>
-              <Text style={{ padding: 6, color: COLORS.darkgray, fontWeight: '500', marginTop: 10 }}>
-                Map
+              <Text style={{ padding: 6, color: COLORS.primary, fontSize: 12, fontWeight: '500', marginTop: 10 }}>
+                Preferences
               </Text>
               <TouchableOpacity style={{ paddingVertical: 1 }} onPress={() => navigation.navigate('MapScreen', {})}>
                 <View
                   style={{
-                    backgroundColor: COLORS.gray400,
+                    // backgroundColor: COLORS.gray400,
                     padding: 10,
+                    borderTopRightRadius: 12,
+                    borderBottomLeftRadius: 12,
                     flexDirection: 'row',
                     alignItems: 'center',
+                    justifyContent: 'space-between',
+                                  borderBottomLeftRadius: 12,
+              borderBottomRightRadius: 12,
+              borderBottomWidth: 1,
+              borderBottomColor: COLORS.gray600
                   }}>
                   <Text style={{ fontSize: 18, color: COLORS.secondary, fontWeight: 'bold' }}>
                     Map Users
                   </Text>
+                  <Image
+                source={icons.go}
+                style={{ height: 15, width: 15, tintColor: COLORS.black900 }}
+              />
                 </View>
               </TouchableOpacity>
             </>
           }
 
-          <Text style={{ padding: 6, color: COLORS.darkgray, fontWeight: '500', marginTop: 10 }}>
+          {/* <Text style={{ padding: 6, color: COLORS.primary, fontSize: 12, fontWeight: '500', marginTop: 10 }}>
             Printer
-          </Text>
+          </Text> */}
           <TouchableOpacity style={{ paddingVertical: 1 }} onPress={() => navigation.navigate('TestPrinter', {})}>
             <View style={{
-              backgroundColor: COLORS.gray400,
+              // backgroundColor: COLORS.gray400,
               padding: 10,
               flexDirection: 'row',
               alignItems: 'center',
+              justifyContent: 'space-between',
+              // borderTopRightRadius: 12,
+              borderBottomLeftRadius: 12,
+              borderBottomRightRadius: 12,
+              borderBottomWidth: 1,
+              borderBottomColor: COLORS.gray600
               // borderRadius: rowList === 0 ? 10 : rowList === lists.length - 1 ? 10 : 0,
               // borderTopRightRadius: rowList === 0 ? 10 : 0,
               // borderTopLeftRadius: rowList === 0 ? 10 : 0,
@@ -523,37 +600,59 @@ const SettingsScreen = ({ navigation }) => {
               <Text style={{ fontSize: 18, color: COLORS.secondary, fontWeight: 'bold' }}>
                 Test Printer
               </Text>
+              <Image
+                source={icons.go}
+                style={{ height: 15, width: 15, tintColor: COLORS.black900 }}
+              />
             </View>
           </TouchableOpacity>
 
 
-          <Text style={{ padding: 6, color: COLORS.darkgray, fontWeight: '500', marginTop: 10 }}>
-            App Version {`${Config.APP_VERSION + '-' + String(Config.ATLAS_APP_ID_PROD).split('-')[0]}`}
-          </Text>
+          {/* <Text style={{ padding: 6, color: COLORS.primary, fontSize: 12, fontWeight: '500', marginTop: 10 }}>
+            App Version {`${Config.APP_VERSION + '-' + String(Config.ATLAS_APP_ID_QA).split('-')[0]}`}
+          </Text> */}
 
 
           <TouchableOpacity disabled={!apkUrl} style={{ paddingVertical: 1 }} onPress={() => openModal()}>
             <View style={{
-              backgroundColor: COLORS.gray400,
+              // backgroundColor: COLORS.gray400,
               padding: 10,
               flexDirection: 'row',
+              justifyContent: 'space-between',
               alignItems: 'center',
+              borderTopRightRadius: 12,
+              borderBottomLeftRadius: 12,
+                            borderBottomLeftRadius: 12,
+              borderBottomRightRadius: 12,
+              borderBottomWidth: 1,
+              borderBottomColor: COLORS.gray600
             }}>
               <Text style={{ fontSize: 18, color: COLORS.secondary, fontWeight: 'bold' }}>
                 Update Application
               </Text>
+              <Image
+                source={icons.go}
+                style={{ height: 15, width: 15, tintColor: COLORS.black900 }}
+              />
             </View>
           </TouchableOpacity>
 
-          <Text style={{ padding: 6, color: COLORS.darkgray, fontWeight: '500', marginTop: 10 }}>
+          <Text style={{ padding: 6, color: COLORS.primary, fontSize: 12, fontWeight: '500', marginTop: 10 }}>
             Security
           </Text>
           <TouchableOpacity style={{ paddingVertical: 1 }} onPress={() => navigation.navigate('Permissions', {})}>
             <View style={{
-              backgroundColor: COLORS.gray400,
+              // backgroundColor: COLORS.gray400,
               padding: 10,
               flexDirection: 'row',
+              justifyContent: 'space-between',
               alignItems: 'center',
+              borderTopRightRadius: 12,
+              borderBottomLeftRadius: 12,
+                            borderBottomLeftRadius: 12,
+              borderBottomRightRadius: 12,
+              borderBottomWidth: 1,
+              borderBottomColor: COLORS.gray600
               // borderRadius: rowList === 0 ? 10 : rowList === lists.length - 1 ? 10 : 0,
               // borderTopRightRadius: rowList === 0 ? 10 : 0,
               // borderTopLeftRadius: rowList === 0 ? 10 : 0,
@@ -563,38 +662,103 @@ const SettingsScreen = ({ navigation }) => {
               <Text style={{ fontSize: 18, color: COLORS.secondary, fontWeight: 'bold' }}>
                 Permissions
               </Text>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={{ paddingVertical: 1 }} onPress={() => signOut()}>
-            <View style={{
-              backgroundColor: COLORS.gray400,
-              padding: 10,
-              flexDirection: 'row',
-              alignItems: 'center',
-              // borderRadius: rowList === 0 ? 10 : rowList === lists.length - 1 ? 10 : 0,
-              // borderTopRightRadius: rowList === 0 ? 10 : 0,
-              // borderTopLeftRadius: rowList === 0 ? 10 : 0,
-              // borderBottomRightRadius: rowList === lists.length - 1 ? 10 : 0,
-              // borderBottomLeftRadius: rowList === lists.length - 1 ? 10 : 0,
-            }}>
               <Image
-                source={icons.back}
+                source={icons.go}
                 style={{ height: 15, width: 15, tintColor: COLORS.black900 }}
               />
-              <Text style={{ fontSize: 18, color: COLORS.secondary, fontWeight: 'bold' }}>
-                Logout
-              </Text>
             </View>
           </TouchableOpacity>
         </View>
         {/* </View> */}
 
         {/* <View style={{ flex: 1, padding: 10 }}> */}
+{/* 
+        <View style={{ flex: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
+          <Text style={{ padding: 6, color: COLORS.gray600, fontSize: 12, fontWeight: '500', marginTop: 10 }}>
+            Current Version {Config.APP_VERSION}
+          </Text>
+        </View> */}
+
+{ height < 600 && 
+
+<TouchableOpacity onPress={signOut}>
+        <View
+          style={{
+            backgroundColor: COLORS.gray400,
+            paddingVertical: 12,
+            paddingHorizontal: 24,
+            marginTop: 10,
+            borderRadius: 6,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+                          // borderTopRightRadius: 12,
+              // borderBottomLeftRadius: 12,
+          }}
+        >
+          {/* <Image
+            source={icons.back}
+            style={{ height: 16, width: 16, tintColor: COLORS.black900, marginRight: 8 }}
+          /> */}
+          <Text style={{ fontSize: 16, fontWeight: 'bold', color: COLORS.secondary }}>
+            Logout
+          </Text>
+        </View>
+      </TouchableOpacity>
+}
+
+
+
 
       </View>
     </ScrollView>
-    // </SafeAreaView>
+       {/* Fixed Logout button at bottom center */}
+       { height > 600  && 
+       
+       
+    <View
+      style={{
+        position: 'absolute',
+        bottom: 20,
+        left: 0,
+        right: 0,
+        // alignItems: 'center',
+        zIndex: 999,
+        padding: 10
+        // width: '100%'
+      }}
+    >
+       <View style={{ flex: 1, justifyContent: 'flex-end', alignItems: 'center', marginBottom: SIZES.padding * 3 }}>
+          <Text style={{ padding: 6, color: COLORS.gray600, fontSize: 12, fontWeight: '500', marginTop: 10 }}>
+            Current Version {Config.APP_VERSION}
+          </Text>
+        </View>
+      <TouchableOpacity onPress={signOut}>
+        <View
+          style={{
+            backgroundColor: COLORS.gray400,
+            paddingVertical: 12,
+            paddingHorizontal: 24,
+            borderRadius: 12,
+            width: '100%',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {/* <Image
+            source={icons.back}
+            style={{ height: 16, width: 16, tintColor: COLORS.black900, marginRight: 8 }}
+          /> */}
+          <Text style={{ fontSize: 16, fontWeight: 'bold', color: COLORS.secondary }}>
+            Logout
+          </Text>
+        </View>
+      </TouchableOpacity>
+    </View>
+       }
+
+    </SafeAreaView>
 
   );
 };

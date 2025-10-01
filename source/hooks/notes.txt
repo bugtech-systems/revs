@@ -1,0 +1,3 @@
+Flaws:
+Sometimes Cut off button for 2pm appears 2-5 minutes before cut-off. 
+Cut-off button logic was base on time. Specifically on getTimeRange function. It appears every 5 minutes before game time.

@@ -5,16 +5,19 @@ import {WelcomeView} from './WelcomeView';
 import { Provider } from 'react-redux';
 import { store } from './redux/store';
 import Config from 'react-native-config';
+import { UpdateModalProvider } from './UpdateModalContext';
 
 export const AppWrapper = () => {
-  const appId = `${Config.ATLAS_APP_ID_PROD}`;
+  const appId = `${Config.ATLAS_APP_ID_QA}`;
   const baseUrl = `${Config.ATLAS_BASE_URL}`;
   return (
     
    <Provider store={store}>
     <AppProvider id={appId} baseUrl={baseUrl}>
       <UserProvider fallback={WelcomeView}>
+        <UpdateModalProvider>
           <App />
+        </UpdateModalProvider>
       </UserProvider>
     </AppProvider>
     </Provider>
