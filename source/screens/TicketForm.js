@@ -1,15 +1,10 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import Realm, { BSON, internals } from 'realm';
-import axios from 'axios';
 import { StyleSheet, Text, Keyboard, View, ScrollView, TouchableOpacity, FlatList, TextInput, Image, Button, TouchableWithoutFeedback, Alert, Modal, ToastAndroid } from 'react-native'
 // import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
-import { useUser, useApp } from '@realm/react';
-import { realmContext } from '../RealmContext';
 import { Betting, Users, Draws, Combinations } from '../Models';
 import moment from 'moment-timezone';
 import { useSelector, useDispatch } from 'react-redux';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import Icon from 'react-native-vector-icons/MaterialIcons'; // or any other icon library
 // import { file_server_token, file_server_url, file_download_url } from '../../commonData.json';
 // import ImageUploader from '../components/ImageUploader';
 // import { SPrize, Win2Prize } from '../utils/commonData';
@@ -19,13 +14,8 @@ import Geolocation from 'react-native-geolocation-service';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, icons } from '../constants';
 import ConfirmationModal from '../components/ConfirmationModal';
+import { fetchUser, getLocalUser, initDB, placeBet, syncBettings, syncPendingBets } from '../utils/db';
 
-const { useRealm, useQuery } = realmContext;
-
-const itemSubscriptionName = 'items';
-const ownItemsSubscriptionName = 'ownItems';
-const drawsSubscriptionName = 'draws';
-const combinationsSubscriptionName = 'combinations';
 
 let keyPad = [
     {
@@ -81,15 +71,11 @@ let keyPad = [
 export default function TicketForm({ navigation }) {
     const dispatch = useDispatch()
     const { collector, user } = useSelector(({ user }) => user);
-    const realm = useRealm()
-    const userRealm = useUser();
-    const app = useApp();
-    const [error, setError] = useState(null);
+
     const [amountVal, setAmountVal] = useState('')
     const [time, setSelectedTime] = useState('2pm')
     const [arrayBetting, setBetting] = useState([]);
     const [selectedTab, setSelectedTab] = useState('keypads');
-    const [toBet, setToBet] = useState([]);
     const [loading, setLoading] = useState(false);
     const [selectedActive, setSelectedActive] = useState('combi')
     const [amountTarget, setAmountTarget] = useState('')
@@ -99,45 +85,23 @@ export default function TicketForm({ navigation }) {
     const [is2pmDisabled, setIs2pmDisabled] = useState(false);
     const [is5pmDisabled, setIs5pmDisabled] = useState(false);
     const [is9pmDisabled, setIs9pmDisabled] = useState(false);
-    const [selectedImage, setSelectedImage] = useState(null);
     const [betType, setBetType] = useState('')
     const [betTypeOption, setBetTypeOption] = useState('')
     const [inputValue, setInputValue] = useState('');
-    const [image, setImage] = useState(null);
-    const [pressCount, setPressCount] = useState(0);
-    const [lastPress, setLastPress] = useState(null);
     const [showDate, setShowDate] = useState(false);
     const [date, setDate] = useState(new Date())
-    const [soldOutModalVisible, setSoldOutModalVisible] = useState(false);
     const [showWin200Modal, setShowWin200Modal] = useState(false);
     const [showSoldOutBetModal, setShowSoldOutBetModal] = useState(false);
     const [modalTitle, setModalTitle] = useState('');
     const [modalMessage, setModalMessage] = useState('');
     const [pendingBet, setPendingBet] = useState(null);
 
-    const [values, setValues] = useState({
-        digit: '',
-        straight: '',
-        ramble: ''
-    })
-
     let isWinTo = false;
     const current = new Date();
     const hoursNow = current.getHours();
     const minNow = current.getMinutes();
 
-    // const items = useQuery(Betting);
-    // const users = useQuery(Users, doc => { return doc.filtered('email == $0', collector)}, [collector]);
 
-    const showToastWin200Bet = () => {
-        ToastAndroid.showWithGravityAndOffset(
-            'Combination is Win200!',
-            ToastAndroid.LONG,
-            ToastAndroid.BOTTOM,
-            0,
-            0,
-        );
-    };
 
     // Reusable modal for sold out
     const showSoldOutBetModalFn = (message) => {
@@ -146,57 +110,20 @@ export default function TicketForm({ navigation }) {
         setShowSoldOutBetModal(true);
     };
 
-    const showToastSoldOutBet = (message) => {
-        ToastAndroid.showWithGravityAndOffset(
-            `${message}`,
-            ToastAndroid.LONG,
-            ToastAndroid.BOTTOM,
-            0,
-            0,
-        );
-    };
 
 
+    let users = []
 
-    let users = useQuery(Users, doc => {
-        let curUser = collector ? collector : user?.email
-        return doc.filtered(
-            'email == $0',
-            curUser
-        );
-    }, [collector, user])
+    const draws = []
+    
+    
+    let comb = []
 
-    const draws = useQuery(Draws, draw => {
-        const startOfDay = moment(date).startOf('day').toDate();
-        const endOfDay = moment(date).endOf('day').toDate();
-
-
-        return draw.filtered(
-            'drawDate >= $0 && drawDate < $1',
-            startOfDay, endOfDay
-        ).sorted('gameTime');
-    }, [users, date])
-
-    let comb = useQuery(Combinations, digit => {
-        return digit.filtered(
-            'digit == $0',
-            combinationString,
-        );
-    }, [combinationString, collector])
-
-    let combs = useQuery(Combinations, combination => {
-        return combination.filtered('straightTotal == 0 && rambleTotal == 0');
-    }, [arrayBetting])
+    let combs = []
 
     // let comb = useQuery(Combinations).filtered('digit == $0', combinationString)
     // , digit => { return digit.filtered('digit == $0', values.digit )}, [values.digit])
-    const items = useQuery(Betting, betting => {
-        const startOfDay = moment(current).startOf('day').toDate();
-        const endOfDay = moment(current).endOf('day').toDate();
 
-        return betting.filtered(
-            'isComplete == false && inputType == "sold" && gameTime == $0 && timestamp >= $1 && timestamp < $2', gameTime, startOfDay, endOfDay).sorted('timestamp');
-    }, [gameTime]);
 
     //     const checkSoldOut = ({ comb, combination, amountTarget, amountRamble }) => {
     //     const maxLimit = comb.maxLimit ? comb.maxLimit : 50;
@@ -476,7 +403,7 @@ export default function TicketForm({ navigation }) {
     const handleBet = (item) => {
         let { combination, amount, ramble, target } = item;
         const selectedDigit = combination;
-        let checkIfWin200 = getWithWin200Config(realm, selectedDigit, users[0]);
+         let checkIfWin200 = false;
 
 
         // setBetting([]) // clear test state
@@ -486,47 +413,17 @@ export default function TicketForm({ navigation }) {
         const currentHour = currentTime.getHours();
         const currentMins = currentTime.getMinutes();
 
-        console.log('combination:', combination, 'amount:', amount, 'ramble:', ramble, 'target:', target)
 
-        console.log(betType, "BET TYPE")
 
         let straightTotalLimit = 0;
         let rambleTotalLimit = 0;
         let maxTotalLimit = 0;
 
-        const isSoldOut = checkSoldOut({
-            comb: comb[0],
-            combination,
-            amountTarget,
-            amountRamble
-        });
+        const isSoldOut = false
 
         if (isSoldOut) return;
 
 
-        // if (!canProceedTarget || !canProceedRamble) {
-        //     return; // Block bet submission
-        // }
-
-
-        // console.log(currentTime, "THE TTIME")
-
-        // console.log(selectedActive, amountRamble, amountTarget, 'sss')
-
-        // if (target) {
-        //     straightTotalLimit = Number(comb.straightTotal) + Number(amount);
-        // } else {
-        //     rambleTotalLimit = Number(comb.rambleTotalLimit) + Number(amount);
-        // }
-
-
-
-        /* 	if((!combination && !amountRamble && !amountTarget)){
-                setSelectedTab('viewBets')
-                console.log('view betss')
-                return;
-            } 
-             */
 
         if ((!combination || combination.length < 3)) {
             setSelectedActive('combi')
@@ -541,21 +438,6 @@ export default function TicketForm({ navigation }) {
         let totalS = comb[0]?.straightTotal + Number(amountTarget);
         let totalR = comb[0]?.rambleTotal + Number(amountRamble);
 
-        // if((items[0] || (currentHour == 13 || currentHour == 16 || currentHour == 20) && currentMins > 40)){
-        // 	if(totalS > (comb[0]?.straightLimit * (comb[0].isWinTo ? 2 : 1))){
-        // 				let minTotal = (comb[0]?.straightLimit * (comb[0].isWinTo ? 2 : 1)) - comb[0]?.straightTotal
-        // 				let tryBet = minTotal > 5 ? `Try ₱${minTotal}` : '';
-        // 		Alert.alert(`Sold Out for Straight ${combination.split('').join('-')} \n ${tryBet}`)
-        // 	return 
-        // 	}
-
-        // 	if(totalR > (comb[0]?.rambleLimit * (comb[0].isWinTo ? 2 : 1))){
-        // 				let minTotal = (comb[0]?.rambleLimit * (comb[0].isWinTo ? 2 : 1)) - comb[0]?.rambleTotal
-        // 				let tryBet = minTotal > 5 ? `Try ₱${minTotal}` : '';
-        // 		Alert.alert(`Sold Out for Ramble ${combination.split('').join('-')} \n ${tryBet}`)
-        // 	return 
-        // 	}
-        // 	}
 
         if (((combs.length > 1 && combs.length < 300) && (!comb[0]?.straightTotal && !comb[0]?.rambleTotal))) {
             Alert.alert(`Sold Out Combination!`)
@@ -567,7 +449,6 @@ export default function TicketForm({ navigation }) {
             return;
         }
 
-        console.log(amountTarget, amountRamble, 'amounts')
         if (selectedActive == 'ramble' && (!amountTarget && !amountRamble)) {
             setSelectedActive('ramble')
             Alert.alert(`${!target && !ramble ? 'Please provide amount' : amountVal == 0 ? 'Plesae provide amount' : time == '' ? 'Please select time' : 'Something went wrong'}`)
@@ -583,17 +464,17 @@ export default function TicketForm({ navigation }) {
             });
             setShowWin200Modal(true);
             return;
-        }
+        } 
         if (amount != 0 || !combination) {
             setBetting(prevState => [...prevState, { ...item, isWinTo: withWin200 ? comb[0].isWinTo : false }]);
             setCombination('')
             setAmountRamble('')
             setAmountTarget('')
             setSelectedActive('combi')
-            realm.write(() => {
-                comb[0].straightTotal = Number(totalS);
-                comb[0].rambleTotal = Number(totalR);
-            });
+            // realm.write(() => {
+            //     comb[0].straightTotal = Number(totalS);
+            //     comb[0].rambleTotal = Number(totalR);
+            // });
             return
         } else {
             Alert.alert(`${!target && !ramble ? 'Please provide amount' : amountVal == 0 ? 'Plesae provide amount' : time == '' ? 'Please select time' : 'Something went wrong'}`)
@@ -629,7 +510,7 @@ export default function TicketForm({ navigation }) {
             let winWin200 = getConfiguration(users[0], 'withWin200')?.value;
             let winStraight = getConfiguration(users[0], 'winStraight')?.value
             let validDate = await updateDateTimeIfGreater();
-            console.log(validDate, 'VALID DATE?')
+            let selectedUser = await fetchUser(collector)
             // if(!validDate){
             // 	setLoading(false)
             // 	Alert.alert('Set Timezone Properly!');
@@ -663,12 +544,11 @@ export default function TicketForm({ navigation }) {
 
 
                 let commissions = [];
-                let uplines = users[0]?.uplines ? users[0]?.uplines : [];
+                let uplines = selectedUser?.uplines ? selectedUser?.uplines : [];
                 let newUplines = [];
-                // let comUplines = [...uplines, users[0]];
+                // let comUplines = [...uplines, selectedUser];
 
-                let netRate = 100 - users[0]?.uplines[0]?.comRate ? users[0]?.uplines[0]?.comRate : 0;
-
+                // let netRate = 100 - selectedUser?.uplines[0]?.com_rate ? selectedUser?.uplines[0]?.com_rate : 0;
 
 
 
@@ -677,28 +557,29 @@ export default function TicketForm({ navigation }) {
 
                 uplines.forEach(line => {
                     newUps.push(line)
-                    newUplines.push(String(line._id))
+                    newUplines.push(String(line.user_id))
                 });
 
-                newUps.push(users[0])
-                newUplines.push(String(users[0]._id));
+                // newUps.push(selectedUser)
+                // newUplines.push(String(selectedUser?.id));
+
 
                 for (let i = 0; i < newUps.length; i++) {
-                    let agentComAmnt = (newUps[i].comRate / 100) * gross;
+                    let agentComAmnt = (newUps[i]?.com_rate / 100) * gross;
 
                     if (newUps[i + 1]) {
-                        let subAgentComAmnt = (agentComAmnt * (newUps[i + 1].comPortion / 100))
+                        let subAgentComAmnt = (agentComAmnt * (newUps[i + 1].com_portion / 100))
                         let comAmnt = agentComAmnt - subAgentComAmnt;
                         commissions.push({
-                            userLevel: String(newUps[i].userLevel),
-                            referral: String(newUps[i]._id),
+                            user_level: String(newUps[i]?.user_level),
+                            referral: String(newUps[i].user_id),
                             rate: Number((comAmnt / gross) * 100).toFixed(2),
                             amount: Number(comAmnt).toFixed(2)
                         })
                     } else {
                         commissions.push({
-                            userLevel: String(newUps[i].userLevel),
-                            referral: String(newUps[i]._id),
+                            user_level: String(newUps[i]?.user_level),
+                            referral: String(newUps[i].user_id),
                             rate: Number((agentComAmnt / gross) * 100).toFixed(2),
                             amount: Number(agentComAmnt).toFixed(2)
                         })
@@ -718,7 +599,6 @@ export default function TicketForm({ navigation }) {
 
                 let drawResult = draws.find(a => a.gameTime == gameTime);
 
-                console.log(drawResult, 'DRAW RESULT', gameTime)
                 /* 		if(drawResult){
                             console.log(drawResult, 'DRAW RESULT')
                         return;
@@ -728,68 +608,96 @@ export default function TicketForm({ navigation }) {
                         position => {
                             let { coords } = position;
                             // setMarkerLocation({ ...position.coords });
-                            realm.write(async () => {
-                                users[0].coordinates = `${coords.latitude}|${coords.longitude}`;
-                            })
+                            // realm.write(async () => {
+                            //     users[0].coordinates = `${coords.latitude}|${coords.longitude}`;
+                            // })
                         },
                         error => {
                             // See error code charts below.
-                            console.log(error.code, error.message);
+                            console.log(error.code, error.message, 'LOCATION ERROR');
                         },
                         { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
                     );
                 }
 
+       
 
-                await realm.write(async () => {
 
-
-                    let betCreated = new Betting(realm, {
-                        // amount: data.amount,
-                        // gameTime: data.gameTime,
+                    let placedBet = await placeBet({
                         ramble: Number(totalRamble),
                         straight: Number(totalStraight),
                         isComplete: false,
-                        owner_id: String(users[0]._id),
+                        owner_id: String(selectedUser?.id),
                         gross: Number(gross),
                         net: Number(netTotal),
                         ticketNo: `${generateTicketNumber()}`,
-                        collector: users[0].firstName,
+                        collector: selectedUser.first_name,
                         isWinTo: false,
                         isPrint: false,
                         isDeleted: false,
                         timestamp: date,
                         gameTime: time,
                         printCopy: 0,
-                        contact: users[0].mobile,
-                        // betType: 'straight',
+                        contact: selectedUser.mobile,
                         winning: 0,
                         combinations: combinations,
                         commissions: newComms,
                         uplines: newUplines
                     })
+                    
+                    
+                    console.log(placedBet, 'PLACEDD BETSS')
+                    
+                    await syncBettings()
+                // await realm.write(async () => {
+
+
+                //     let betCreated = new Betting(realm, {
+                //         // amount: data.amount,
+                //         // gameTime: data.gameTime,
+                //         ramble: Number(totalRamble),
+                //         straight: Number(totalStraight),
+                //         isComplete: false,
+                //         owner_id: String(users[0]._id),
+                //         gross: Number(gross),
+                //         net: Number(netTotal),
+                //         ticketNo: `${generateTicketNumber()}`,
+                //         collector: users[0].firstName,
+                //         isWinTo: false,
+                //         isPrint: false,
+                //         isDeleted: false,
+                //         timestamp: date,
+                //         gameTime: time,
+                //         printCopy: 0,
+                //         contact: users[0].mobile,
+                //         // betType: 'straight',
+                //         winning: 0,
+                //         combinations: combinations,
+                //         commissions: newComms,
+                //         uplines: newUplines
+                //     })
 
 
 
 
-                    setLoading(false)
-                    // dispatch({type: SET_LOADING})
-                    setSelectedTab('keypads')
-                    setBetting([]);
-                    setDate(new Date());
-                    navigation.navigate('VoidScreen', JSON.stringify(betCreated))
+                //     setLoading(false)
+                //     // dispatch({type: SET_LOADING})
+                //     setSelectedTab('keypads')
+                //     setBetting([]);
+                //     setDate(new Date());
+                //     navigation.navigate('VoidScreen', JSON.stringify(betCreated))
 
-                })
+                // })
             } else {
                 Alert.alert('No tickets to submit')
             }
         } catch (err) {
-            console.log(err)
+            console.log(err, 'ERRRORR')
             return
         }
         setLoading(false)
 
-    }, [users, draws, arrayBetting])
+    }, [collector, draws, arrayBetting])
 
     function removeItemByRamble(data) {
 
@@ -799,20 +707,20 @@ export default function TicketForm({ navigation }) {
         setBetting(dataList);
 
 
-        const itemComb = realm.objects(Combinations).filtered(
-            'digit == $0',
-            data.combination);
+        // const itemComb = realm.objects(Combinations).filtered(
+        //     'digit == $0',
+        //     data.combination);
 
 
-        let totalS = itemComb[0].straightTotal - Number(data.amountTarget);
-        let totalR = itemComb[0].rambleTotal - Number(data.amountRamble);
+        // let totalS = itemComb[0].straightTotal - Number(data.amountTarget);
+        // let totalR = itemComb[0].rambleTotal - Number(data.amountRamble);
 
 
 
-        realm.write(() => {
-            itemComb[0].straightTotal = Number(totalS) < 0 ? 0 : Number(totalS);
-            itemComb[0].rambleTotal = Number(totalR) < 0 ? 0 : Number(totalR);
-        });
+        // realm.write(() => {
+        //     itemComb[0].straightTotal = Number(totalS) < 0 ? 0 : Number(totalS);
+        //     itemComb[0].rambleTotal = Number(totalR) < 0 ? 0 : Number(totalR);
+        // });
 
         // console.log(dataList);
     }
@@ -831,9 +739,7 @@ export default function TicketForm({ navigation }) {
 
     };
 
-    const handleBackspaceAmount = () => {
-        ((prev) => prev.slice(0, -1));
-    };
+
 
     const renderButton = ({ name, value }) => {
 
@@ -968,11 +874,12 @@ export default function TicketForm({ navigation }) {
         setDate(currentDate);
     };
 
-    useEffect(() => {
-        initializeGameTime()
-    }, [draws])
+    // useEffect(() => {
+    //     initializeGameTime()
+    // }, [draws])
 
     useEffect(() => {
+        initDB()
         return () => {
             setIs2pmDisabled(false)
             setIs5pmDisabled(false)
@@ -982,23 +889,23 @@ export default function TicketForm({ navigation }) {
         }
     }, [])
 
-    useEffect(() => {
-        const current = new Date();
-        const startOfDay = moment(current).startOf('day').toDate();
-        const endOfDay = moment(current).endOf('day').toDate();
+    // useEffect(() => {
+    //     const current = new Date();
+    //     const startOfDay = moment(current).startOf('day').toDate();
+    //     const endOfDay = moment(current).endOf('day').toDate();
 
-        let combinationsData = realm.objects(Combinations);
-        let drawsDataArray = realm.objects(Draws);
-
-
+    //     let combinationsData = realm.objects(Combinations);
+    //     let drawsDataArray = realm.objects(Draws);
 
 
-        realm.subscriptions.update(mutableSubs => {
-            mutableSubs.add(combinationsData, { name: combinationsSubscriptionName });
-            mutableSubs.add(drawsDataArray, { name: drawsSubscriptionName });
-        });
 
-    }, [realm, users])
+
+    //     realm.subscriptions.update(mutableSubs => {
+    //         mutableSubs.add(combinationsData, { name: combinationsSubscriptionName });
+    //         mutableSubs.add(drawsDataArray, { name: drawsSubscriptionName });
+    //     });
+
+    // }, [realm, users])
 
     const intervalTime = 3 * 60 * 1000;
 
@@ -1013,7 +920,6 @@ export default function TicketForm({ navigation }) {
     }, []);
 
     const triggerAction = async () => {
-        console.log('Triggered every 3 minutes');
         // You can put any logic you want to trigger here
         let validDate = await updateDateTimeIfGreater();
         console.log(validDate, 'VALID DATE?')
@@ -1027,6 +933,9 @@ export default function TicketForm({ navigation }) {
     let closeDraw = (is2pmDisabled && is5pmDisabled && is9pmDisabled) ? true : false;
 
     let curDraw = (draws.find(a => !a.combination) || ((hoursNow == 13 && minNow >= 55) || (hoursNow == 16 && minNow >= 55) || (hoursNow == 20 && minNow >= 55)));
+
+
+
 
     return (
         <SafeAreaProvider style={{ flexGrow: 1 }}>
@@ -1501,10 +1410,10 @@ export default function TicketForm({ navigation }) {
                         setAmountRamble('');
                         setAmountTarget('');
                         setSelectedActive('combi');
-                        realm.write(() => {
-                            comb[0].straightTotal = Number(comb[0]?.straightTotal) + Number(pendingBet.amountTarget);
-                            comb[0].rambleTotal = Number(comb[0]?.rambleTotal) + Number(pendingBet.amountRamble);
-                        });
+                        // realm.write(() => {
+                        //     comb[0].straightTotal = Number(comb[0]?.straightTotal) + Number(pendingBet.amountTarget);
+                        //     comb[0].rambleTotal = Number(comb[0]?.rambleTotal) + Number(pendingBet.amountRamble);
+                        // });
                     }
                     setShowWin200Modal(false);
                     setPendingBet(null);

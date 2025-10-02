@@ -78,7 +78,7 @@ android {
         abi {
             enable true
             reset()
-            include "armeabi-v7a", "arm64-v8a" // Remove x86 if not needed
+            include "armeabi-v7a", "arm64-v8a", "x86", "x86_64" // Remove x86 if not needed
             universalApk false // Prevents large universal APK
         }
     }

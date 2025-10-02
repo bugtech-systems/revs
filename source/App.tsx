@@ -1,89 +1,88 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, ActivityIndicator, Modal } from 'react-native';
-import { createNavigationContainerRef } from '@react-navigation/native';
-import { realmContext } from './RealmContext';
-import { Betting, Combinations, Draws, Messages, Users } from './Models';
+import React, { useContext, useEffect, useState } from 'react';
+import { View, Modal, StyleSheet } from 'react-native';
 import * as Progress from 'react-native-progress';
-import { StackNavigator } from './StackNavigator';
+import { StackNavigator } from './StackNavigator2';
+// import { AppInitializer } from './AppInitializer';
 import NotifService from './utils/NotificationService';
-import Config from 'react-native-config';
 import { COLORS } from './constants';
-import { AppInitializer } from './AppInitializer';
-// import { useSelector } from 'react-redux';
+import { getLocalUser, initDB, saveLocalUser } from './utils/db';
+import  supabase  from './utils/supabaseClient';
+import { useDispatch } from 'react-redux';
+import { SET_USER } from './redux/actions/types';
+import { SessionContext } from './context/SessionContext';
+import { SyncProvider } from './context/SyncContext';
 
-
-
-const appId = Config.ATLAS_APP_ID_QA
-
-console.log(appId, "APP ID")
-
-
-const usersSubscriptionName = 'users';
-const ownItemsSubscriptionName = 'bettings';
-const drawsSubscriptionName = 'draws';
-const combinationsSubscriptionName = 'combinations';
-
-// If you're getting this app code by cloning the repository at
-// https://github.com/mongodb/ template-app-react-native-todo,
-// it does not contain the data explorer link. Download the
-// app template from the Atlas UI to view a link to your data
-const { RealmProvider } = realmContext
-
-const LoadingIndicator = () => {
-  return (
-    <View style={{...styles.activityContainer, backgroundColor: COLORS.transparentBlack7}}>
-        <Progress.CircleSnail color={['blue', 'yellow', 'red']} />
-      {/* <ActivityIndicator size="large" /> */}
-    </View>
-  );
-};
-
-const realmFileBehavior = {
-  type: 'downloadBeforeOpen',
-  timeOut: 5000,
-  timeOutBehavior: 'openLocalRealm',
-}
-
+const LoadingIndicator = () => (
+  <View style={{ ...styles.activityContainer, backgroundColor: COLORS.transparentBlack7 }}>
+    <Progress.CircleSnail color={['blue', 'yellow', 'red']} />
+  </View>
+);
 
 export const App = () => {
-  
+  const [loading, setLoading] = useState(true);
+    const { session } = useContext(SessionContext);
+  const dispatch = useDispatch();
 
-  let notif = new NotifService((reg) => {
-    console.log(reg)
-  });
+  const notif = new NotifService((reg) => console.log('Push registered:', reg));
 
   useEffect(() => {
+
     notif.createDefaultChannels();
-  }, [])
+  }, []);
+
+useEffect(() => {
+  const initUser = async (email) => {
+    if (!email) return;
+
+    console.log(email, 'EMAIL');
+
+    // Try fetching from local SQLite
+    let localUser = await getLocalUser(email);
+    console.log(localUser, 'LOCAL USER');
+
+    if (!localUser) {
+      // Fetch from Supabase by email if not found locally
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', email) // filter by email
+        .limit(1)
+        .single();
+
+      if (error) {
+        console.error('Supabase fetch error:', error);
+      }
+
+      if (data) {
+        // Save fetched user to local SQLite
+        await saveLocalUser(data);
+        localUser = data;
+      }
+    }
+
+    if (localUser) {
+      dispatch({ type: SET_USER, payload: localUser });
+    }
+
+    setLoading(false);
+  };
+
+  initUser(session?.user?.email);
+}, [dispatch, session?.user?.email]);
+
+
+
+console.log(session?.user?.email, 'APP SESSION')
+
+
+  if (loading) return <LoadingIndicator />;
 
   return (
     <>
-      {/* All screens nested in RealmProvider have access
-            to the configured realm's hooks. */}
-      <RealmProvider
-        // schema={[Item]}
-        fallback={LoadingIndicator}
-        sync={{
-          flexible: true,
-          initialSubscriptions: {
-            update: (mutableSubs, realm) => {
-              mutableSubs.add(realm.objects(Users), { name: usersSubscriptionName })
-              mutableSubs.add(realm.objects(Messages));
-              // mutableSubs.add(realm.objects(Combinations));
-              // mutableSubs.add(realm.objects(Betting));
-              return mutableSubs;
-            },
-          },
-          newRealmFileBehavior: realmFileBehavior,
-          existingRealmFileBehavior: realmFileBehavior
-
-        }}
-      >
-                  <AppInitializer />
-        
-        <StackNavigator />
-      </RealmProvider>
-
+      {/* <AppInitializer /> */}
+      <SyncProvider>
+      <StackNavigator />
+      </SyncProvider>
     </>
   );
 };
@@ -93,21 +92,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    width: '100%'
-    // flexDirection: 'row',
-    // justifyContent: 'space-around',
-    // padding: 10,
-  },
-  footerText: {
-    fontSize: 12,
-    textAlign: 'center',
-    marginVertical: 4,
-  },
-  hyperlink: {
-    color: 'blue',
-  },
-  footer: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    width: '100%',
   },
 });

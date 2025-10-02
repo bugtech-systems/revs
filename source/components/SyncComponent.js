@@ -158,8 +158,6 @@ export function SyncComponent() {
 
 
 
-  console.log(connectionState, "CONN STATE")
-  console.log('Account Role:', user?.isAdmin, 'Analytics:', analytics)
 
   return (
     <View style={{ alignItems: 'center', justifyContent: 'flex-start', flexDirection: 'column' }}>

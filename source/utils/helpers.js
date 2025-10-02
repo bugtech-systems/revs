@@ -4,8 +4,7 @@ import moment from 'moment-timezone';
 import RNFS from 'react-native-fs';
 import { Alert, Dimensions, Platform } from 'react-native';
 import { useEffect, useState } from 'react';
-import { Combinations } from '../Models';
-import { createStackNavigator } from '@react-navigation/stack';
+// import { Combinations } from '../Models';
 
 export const permuteDigits = (number) => {
   // Convert the number to a string to manipulate individual digits
@@ -254,14 +253,14 @@ export const checkSoldOut = ({ comb, combination, amountTarget, amountRamble }) 
 
 export const getWithWin200Config = (realm, selectedDigit, user) => {
   // Check the combination in Realm
-  const comb = realm
-    .objects(Combinations)
-    .filtered("digit == $0", selectedDigit)[0];
+  // const comb = realm
+  //   .objects(Combinations)
+  //   .filtered("digit == $0", selectedDigit)[0];
 
-  if (comb && comb.isWinTo) {
-    // ✅ reuse your getConfiguration helper
-    const response = getConfiguration(user, "withWin200")
-    return response;
-  }
+  // if (comb && comb.isWinTo) {
+  //   // ✅ reuse your getConfiguration helper
+  //   const response = getConfiguration(user, "withWin200")
+  //   return response;
+  // }
   return null;
 };
