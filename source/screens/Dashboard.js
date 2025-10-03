@@ -126,10 +126,10 @@ const Dashboard = ({ navigation }) => {
 	let grossCards = grouped_bettings.map((a, index) => {
 			let { gameTime, bettings } = a;
 			let gross = bettings.reduce((n, { gross }) => Number(n) + Number(gross), 0);
-			let currentDraw = draws.filter(dr => dr.gameTime == gameTime)[0];
-
+			let currentDraw = draws.filter(dr => dr.game_time == gameTime)[0];
+				console.log(a.gameTime, a.game_time, 'BEEET')
 			
-			let isWin200 = currentDraw?.isWinTo ? getConfiguration(user, 'withWin200')?.isCheck : false;
+			let isWin200 = currentDraw?.is_win_to ? getConfiguration(user, 'withWin200')?.isCheck : false;
 			let winPrize = isWin200 ? getConfiguration(user, 'withWin200').value : getConfiguration(user, 'winStraight').value
 				
 			grand_gross = Number(grand_gross) + Number(gross);
@@ -137,9 +137,9 @@ const Dashboard = ({ navigation }) => {
 			let genCommsTotal = 0;
 
 			for (let bet of bettings) {
-				commsTotal += bet.commissions.filter(coms => String(coms.referral) == String(user?._id)).reduce((n, { amount }) => n + amount, 0);
+				commsTotal += bet.commissions.filter(coms => String(coms.referral) == String(user?.id)).reduce((n, { amount }) => n + amount, 0);
 			}
-			genCommsTotal += gross * (user?.comRate / 100);
+			genCommsTotal += gross * (user?.com_rate / 100);
 			let comms = commsTotal ? commsTotal : 0;
 			grand_comm = grand_comm + comms;
 			let winning = bettings.reduce((n, { winning }) => n + (winning * winPrize), 0);
@@ -147,7 +147,7 @@ const Dashboard = ({ navigation }) => {
 			let net = gross - winning - genCommsTotal;
 			grand_hits = grand_hits + winning;
 			grand_net = grand_net + net;
-
+console.log(gameTime, 'ggg')
 			return (
 				<View
 					key={gameTime}
@@ -223,7 +223,7 @@ console.log(grand_gross, 'GRAAND')
 							GRAND TOTAL
 						</Text>
 						<Text style={{ fontWeight: 'bold', color: COLORS.black, fontSize: 16 }}>
-							{moment(date).format('MM DD, YYYY')}
+							{moment(date).format('MMMM DD, YYYY')}
 						</Text>
 
 					</View>
@@ -288,18 +288,30 @@ console.log(grand_gross, 'GRAAND')
       if (!collector) return;
 		let selectedCollector = await fetchUser(collector);
 
-		console.log(selectedCollector, 'SELECTED')
+		console.log(selectedCollector.id, 'SELECTED')
 
+//   const today = new Date().toISOString(); 
 
-      const start_of_day = moment(date).startOf('day').format('YYYY-MM-DD');
-      const end_of_day = moment(date).endOf('day').format('YYYY-MM-DD');
-	  let filters = {};
-	  
-	  if(includeAll){
-	   filters = { ...filters, uplines: { op: "contains", value: selectedCollector.id }}
-	  } else {
-	    filters = { ...filters, owner_id: selectedCollector.id }
-	  }
+// Start and end of the day
+const start_of_day = moment(new Date(date)).startOf('day').toISOString();
+const end_of_day = moment(new Date(date)).endOf('day').toISOString();
+
+// Build filters
+let filters = {};
+
+if (includeAll) {
+  filters = {
+    ...filters,
+    uplines: { op: "contains", value: selectedCollector.id },
+    timestamp: { op: "between", from: start_of_day, to: end_of_day },
+  };
+} else {
+  filters = {
+    ...filters,
+    owner_id: selectedCollector.id,
+    timestamp: { op: "between", from: start_of_day, to: end_of_day },
+  };
+}
 
 
 
@@ -308,6 +320,8 @@ console.log(grand_gross, 'GRAAND')
         orderBy: 'timestamp DESC',
         // limit: 20,
       });
+
+	console.log(localBettings, filters, start_of_day, end_of_day, 'bettings query')
 
 
     
@@ -330,7 +344,7 @@ console.log(grand_gross, 'GRAAND')
   }, [date, includeAll, collector]);
 
 
-console.log(bettings.length, includeAll, 'dass', user.id, collector)
+console.log(bettings.length, draws, includeAll, 'dass', user.id, collector)
 
   return (
   	<SafeAreaView style={{ ...styles.wrapper }}>

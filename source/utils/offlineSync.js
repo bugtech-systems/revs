@@ -706,7 +706,7 @@ export const api = {
   updateDraw: async (id, patch) => localUpdate('draws', id, patch),
   deleteDraw: async (id) => localDelete('draws', id),
   getDraw: async (id) => localGet('draws', id),
-  listDraws: async (params) => localQuery('draws', params),
+  listDraws: async (params) => fetchWithFallback('draws', params),
 
   // bettings
   createBetting: async (b) => localInsert('bettings', { ...b }),
@@ -720,7 +720,7 @@ export const api = {
   updateMasterCombination: async (id, patch) => localUpdate('master_combinations', id, patch),
   deleteMasterCombination: async (id) => localDelete('master_combinations', id),
   getMasterCombination: async (id) => localGet('master_combinations', id),
-  listMasterCombinations: async () => localList('master_combinations'),
+  listMasterCombinations: async (params) => fetchWithFallback('master_combinations', params),
 
   // messages
   createMessage: async (m) => localInsert('messages', { ...m }),
@@ -800,7 +800,7 @@ function buildWhereClause(filters = {}) {
 
       case "between":
         // Ensure date format is YYYY-MM-DD (safe for SQLite)
-        whereClauses.push(`${key} BETWEEN DATE(?) AND DATE(?)`);
+         whereClauses.push(`${key} BETWEEN ? AND ?`);
         values.push(filter.from, filter.to);
         break;
 

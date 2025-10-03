@@ -26,12 +26,10 @@ import {
 } from '../../redux/actions/types';
 import { getLocalUsers, saveLocalUsers } from '../../utils/db';
 import { useScreenSize, getConfiguration } from '../../utils/helpers';
-import { api, clearAllStorage } from '../../utils/offlineSync';
+import { api, clearAllStorage, deleteDB, forceSync } from '../../utils/offlineSync';
 
-const usersSubscriptionName = 'users';
 
 const SettingsScreen = ({ navigation }) => {
-  const { width, height } = Dimensions.get('window');
   const dispatch = useDispatch();
   const { user, collector } = useSelector(({ user }) => user);
   const { confirmationModal } = useSelector(({ ui }) => ui);
@@ -108,6 +106,15 @@ const SettingsScreen = ({ navigation }) => {
   const toggleDropdown = key => {
     setActiveDropDown(prev => (prev === key ? '' : key));
   };
+  
+    const handleDelete = async () => {
+  
+  await deleteDB()
+    // now safe to write to RNFS.DownloadDirectoryPath
+  
+    }
+  
+  
 
   // const signOut = useCallback(() => {
   //   dispatch({ type: SET_COLLECTOR, payload: null });
@@ -383,6 +390,16 @@ console.log(selUser.email, selUser.configuration, ableToViewAppUsers, ableToView
 
       {/* Fixed Logout */}
       <View style={{ position: 'absolute', bottom: 20, left: 0, right: 0, padding: 10 }}>
+          <TouchableOpacity onPress={forceSync} style={{ marginBottom: 10 }}>
+          <View style={{ backgroundColor: COLORS.gray400, paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', color: COLORS.secondary }}>Force Sync</Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={handleDelete} style={{ marginBottom: 10 }}>
+          <View style={{ backgroundColor: COLORS.gray400, paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', color: COLORS.secondary }}>Delete DB</Text>
+          </View>
+        </TouchableOpacity>
         <TouchableOpacity onPress={signOut}>
           <View style={{ backgroundColor: COLORS.gray400, paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
             <Text style={{ fontSize: 16, fontWeight: 'bold', color: COLORS.secondary }}>Logout</Text>
