@@ -4,7 +4,7 @@ import supabase from "./supabaseClient";
 import { api, getDB } from "./offlineSync";
 
 // Enable debug (optional for development)
-SQLite.DEBUG(true);
+SQLite.DEBUG(false);
 // SQLite.enablePromise(true);
 
 
@@ -13,82 +13,189 @@ SQLite.DEBUG(true);
 // db.js
 
 
-// Initialize DB and create tables
+// Initialize DB and handle migrations
 export const initDB = async () => {
   try {
-  let db = await SQLite.openDatabase({ name: "app.db", location: "default" });
+    const db = await SQLite.openDatabase({ name: "app.db", location: "default" });
 
     await new Promise((resolve, reject) => {
       db.transaction(
         (tx) => {
-          // Users table
+          // Always ensure schema_info exists
           tx.executeSql(
-            `CREATE TABLE IF NOT EXISTS users (
-              id TEXT PRIMARY KEY,
-              first_name TEXT,
-              last_name TEXT,
-              email TEXT,
-              device_id TEXT,
-              app_version TEXT,
-              configuration TEXT
-            );`
-          );
-
-          // Draws table
-          tx.executeSql(
-            `CREATE TABLE IF NOT EXISTS draws (
-              id TEXT PRIMARY KEY,
-              game_time TEXT,
-              draw_date TEXT,
-              combination TEXT
-            );`
-          );
-
-          // Bettings table
-          tx.executeSql(
-            `CREATE TABLE IF NOT EXISTS bettings (
-              id TEXT PRIMARY KEY,
-              isComplete INTEGER DEFAULT 0,
-              isDeleted INTEGER DEFAULT 0,
-              isValidated TEXT,
-              timestamp TEXT,
-              inputType TEXT,
-              straight REAL,
-              ramble REAL,
-              gross REAL,
-              net REAL,
-              isPrint INTEGER DEFAULT 0,
-              isWinTo INTEGER DEFAULT 0,
-              collector TEXT,
-              ownerId TEXT,
-              printCopy INTEGER,
-              drawId TEXT,
-              user TEXT,
-              fileUrl TEXT,
-              note TEXT,
-              contact TEXT,
-              ticketNo TEXT,
-              winning REAL,
-              gameTime TEXT,
-              hits TEXT,
-              commissions TEXT,
-              combinations TEXT,
-              uplines TEXT,
-              last_updated TEXT,
-              synced INTEGER DEFAULT 0
-            );`
+            `CREATE TABLE IF NOT EXISTS schema_info (version INTEGER);`
           );
         },
-        (error) => {
-          console.log("❌ DB init error:", error);
-          reject(error);
-        },
-        () => {
-          console.log("✅ Tables created");
-          resolve(true);
-        }
+        (error) => reject(error),
+        () => resolve(true)
       );
     });
+
+    // Get local schema version
+    let localVersion = 0;
+    await new Promise((resolve) => {
+      db.transaction((tx) => {
+        tx.executeSql(
+          "SELECT version FROM schema_info LIMIT 1;",
+          [],
+          (_, results) => {
+            if (results.rows.length > 0) {
+              localVersion = results.rows.item(0).version;
+            }
+            resolve(true);
+          },
+          () => resolve(true)
+        );
+      });
+    });
+
+    // Get latest schema version from Supabase (works without auth)
+    const { data, error } = await supabase
+      .from("schema_versions")
+      .select("version")
+      .order("version", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error) {
+      console.log("⚠️ Could not fetch schema version:", error.message);
+    }
+
+    const cloudVersion = data?.version || 1;
+
+    // Run migrations if needed
+    if (localVersion < cloudVersion) {
+      console.log(`🔄 Migrating schema v${localVersion} → v${cloudVersion}`);
+
+      await new Promise((resolve, reject) => {
+        db.transaction(
+          (tx) => {
+            // Ensure core tables exist
+            tx.executeSql(
+              `CREATE TABLE IF NOT EXISTS users (
+                id TEXT PRIMARY KEY,
+                first_name TEXT,
+                last_name TEXT,
+                email TEXT UNIQUE,
+                device_id TEXT,
+                app_version TEXT,
+                configuration TEXT
+              );`
+            );
+
+            tx.executeSql(
+              `CREATE TABLE IF NOT EXISTS draws (
+                id TEXT PRIMARY KEY,
+                game_time TEXT,
+                draw_date TEXT,
+                combination TEXT
+              );`
+            );
+
+            tx.executeSql(
+              `CREATE TABLE IF NOT EXISTS bettings (
+                id TEXT PRIMARY KEY NOT NULL,
+                is_complete INTEGER DEFAULT 0,
+                is_deleted INTEGER DEFAULT 0,
+                is_validated TEXT,
+                timestamp TEXT,
+                input_type TEXT DEFAULT 'normal',
+                straight REAL NOT NULL,
+                ramble REAL NOT NULL,
+                gross REAL NOT NULL,
+                net REAL NOT NULL,
+                is_print INTEGER DEFAULT 0,
+                is_win_to INTEGER DEFAULT 0,
+                collector TEXT NOT NULL,
+                owner_id TEXT NOT NULL,
+                print_copy INTEGER,
+                draw_id TEXT,
+                user_id TEXT,
+                file_url TEXT,
+                note TEXT,
+                contact TEXT,
+                ticket_no TEXT,
+                winning REAL,
+                game_time TEXT DEFAULT '2pm',
+                hits TEXT,
+                commissions TEXT,
+                combinations TEXT,
+                uplines TEXT,
+                last_updated TEXT,
+                synced INTEGER DEFAULT 0
+              );`
+            );
+
+            tx.executeSql(
+              `CREATE TABLE IF NOT EXISTS master_combinations (
+                id TEXT PRIMARY KEY NOT NULL,
+                digit TEXT NOT NULL,
+                straight_limit REAL DEFAULT 0,
+                ramble_limit REAL DEFAULT 0,
+                ramble_total REAL DEFAULT 0,
+                straight_total REAL DEFAULT 0,
+                is_win_to INTEGER DEFAULT 0,
+                risk_level TEXT DEFAULT 'neutral',
+                win_frequency INTEGER DEFAULT 0,
+                straight_max_limit REAL DEFAULT 0,
+                ramble_max_limit REAL DEFAULT 0,
+                created_at TEXT DEFAULT (datetime('now')),
+                updated_at TEXT DEFAULT (datetime('now'))
+              );`
+            );
+
+            tx.executeSql(
+              `CREATE TABLE IF NOT EXISTS messages (
+        id TEXT PRIMARY KEY,
+        createdBy TEXT NOT NULL,
+        recepient TEXT NOT NULL,
+        recepientName TEXT,
+        updated_at TEXT NOT NULL,
+        isDeleted INTEGER DEFAULT 0,
+        unreadCount INTEGER DEFAULT 0
+      );`
+            );
+
+            // Create Conversations table
+            tx.executeSql(
+              `CREATE TABLE IF NOT EXISTS conversations (
+        id TEXT PRIMARY KEY,
+        message_id TEXT NOT NULL,
+        owner_id TEXT NOT NULL,
+        message TEXT,
+        createdAt TEXT NOT NULL,
+        isViewed INTEGER DEFAULT 0,
+        FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE
+      );`
+            );
+
+            // Example migration: add a column if version < 2
+            if (localVersion < 2) {
+              tx.executeSql(
+                `ALTER TABLE bettings ADD COLUMN example_migration TEXT;`
+              );
+            }
+
+            // Update schema_info
+            tx.executeSql("DELETE FROM schema_info;");
+            tx.executeSql(
+              "INSERT INTO schema_info (version) VALUES (?);",
+              [cloudVersion]
+            );
+          },
+          (error) => {
+            console.log("❌ Migration error:", error);
+            reject(error);
+          },
+          () => {
+            console.log("✅ Migration complete");
+            resolve(true);
+          }
+        );
+      });
+    } else {
+      console.log("✅ Local schema is up to date");
+    }
 
     return db;
   } catch (err) {
@@ -96,6 +203,7 @@ export const initDB = async () => {
     throw err;
   }
 };
+
 
 // Return database instance
 // export const getDB = async () => {
@@ -109,18 +217,18 @@ export const initDB = async () => {
 // Get local user
 // Get local authenticated user
 export const getLocalUser = async (authEmail = null) => {
-    let db = await getDB();
-    console.log('GET LOCAL USER')
+  let db = await getDB();
+  console.log('GET LOCAL USER')
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
       let query = 'SELECT * FROM users';
       const params = [];
 
-   if (authEmail) {
+      if (authEmail) {
         query += ' WHERE email = ? LIMIT 1';
         params.push(authEmail);
       }
-      
+
 
       tx.executeSql(
         query,
@@ -145,10 +253,10 @@ export const getLocalUser = async (authEmail = null) => {
 
 // Save or update user locally
 export const saveLocalUser = async (user) => {
-    let db = await getDB();
+  let db = await getDB();
 
   const configuration = JSON.stringify(user.configuration || []);
-    await api.createUser(user)
+  await api.createUser(user)
 };
 
 // Update local user device
@@ -224,6 +332,7 @@ export const get_local_bettings = async ({ owner_id, start_date, end_date, inclu
 // Get draws filtered by date
 export const get_local_draws = async ({ start_date, end_date }) => {
   let db = await getDB();
+  
 
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
@@ -332,42 +441,42 @@ export const fetchDraws = async (date) => {
   let db = await getDB();
 
 
-    try {
-        const startOfDay = moment(date).startOf('day').toISOString();
-        const endOfDay = moment(date).endOf('day').toISOString();
+  try {
+    const startOfDay = moment(date).startOf('day').toISOString();
+    const endOfDay = moment(date).endOf('day').toISOString();
 
-        const { data, error } = await supabase
-            .from('draws')
-            .select('*')
-            .gte('drawDate', startOfDay)
-            .lt('drawDate', endOfDay)
-            .order('gameTime', { ascending: true });
+    const { data, error } = await supabase
+      .from('draws')
+      .select('*')
+      .gte('drawDate', startOfDay)
+      .lt('drawDate', endOfDay)
+      .order('gameTime', { ascending: true });
 
-        if (error) throw error;
+    if (error) throw error;
 
-        // Cache locally
-        db.transaction(tx => {
-            data.forEach(draw => {
-                tx.executeSql(
-                    `INSERT OR REPLACE INTO draws (id, gameTime, drawDate, combination) VALUES (?, ?, ?, ?)`,
-                    [draw.id, draw.gameTime, draw.drawDate, draw.combination || null]
-                );
-            });
-        });
+    // Cache locally
+    db.transaction(tx => {
+      data.forEach(draw => {
+        tx.executeSql(
+          `INSERT OR REPLACE INTO draws (id, gameTime, drawDate, combination) VALUES (?, ?, ?, ?)`,
+          [draw.id, draw.gameTime, draw.drawDate, draw.combination || null]
+        );
+      });
+    });
 
-        return data;
-    } catch (err) {
-        console.log('Supabase fetchDraws error, fallback to local', err);
-        return new Promise(resolve => {
-            db.transaction(tx => {
-                tx.executeSql(
-                    `SELECT * FROM draws WHERE date(drawDate) = date(?) ORDER BY gameTime ASC`,
-                    [date],
-                    (_, { rows }) => resolve(rows._array)
-                );
-            });
-        });
-    }
+    return data;
+  } catch (err) {
+    console.log('Supabase fetchDraws error, fallback to local', err);
+    return new Promise(resolve => {
+      db.transaction(tx => {
+        tx.executeSql(
+          `SELECT * FROM draws WHERE date(drawDate) = date(?) ORDER BY gameTime ASC`,
+          [date],
+          (_, { rows }) => resolve(rows._array)
+        );
+      });
+    });
+  }
 };
 
 // -------------------- PLACE BET --------------------
@@ -376,42 +485,42 @@ export const placeBet = async (bet) => {
   let db = await getDB();
 
 
-console.log(bet, 'PLACE BEET')
+  console.log(bet, 'PLACE BEET')
   return new Promise((resolve, reject) => {
     const id = bet.id || Date.now().toString(); // fallback if no id
     const timestamp = new Date().toISOString();
-  
-    console.log(  [
-          id,
-          bet.isComplete ? 1 : 0,
-          bet.isDeleted ? 1 : 0,
-          bet.isValidated ? bet.isValidated.toISOString() : null,
-          timestamp,
-          bet.inputType || "normal",
-          bet.straight || 0,
-          bet.ramble || 0,
-          bet.gross || 0,
-          bet.net || 0,
-          bet.isPrint ? 1 : 0,
-          bet.isWinTo ? 1 : 0,
-          bet.collector || "",
-          bet.owner_id,
-          bet.printCopy || 1,
-          bet.drawId || null,
-          bet.user || null,
-          bet.fileUrl || null,
-          bet.note || null,
-          bet.contact || null,
-          bet.ticketNo || null,
-          bet.winning || 0,
-          bet.gameTime || "2pm",
-          JSON.stringify(bet.hits || []),
-          JSON.stringify(bet.commissions || []),
-          JSON.stringify(bet.combinations || []),
-          JSON.stringify(bet.uplines || []),
-          0 // synced flag
-        ], 'BETTING PLACE')
-  
+
+    console.log([
+      id,
+      bet.isComplete ? 1 : 0,
+      bet.isDeleted ? 1 : 0,
+      bet.isValidated ? bet.isValidated.toISOString() : null,
+      timestamp,
+      bet.inputType || "normal",
+      bet.straight || 0,
+      bet.ramble || 0,
+      bet.gross || 0,
+      bet.net || 0,
+      bet.isPrint ? 1 : 0,
+      bet.isWinTo ? 1 : 0,
+      bet.collector || "",
+      bet.owner_id,
+      bet.printCopy || 1,
+      bet.drawId || null,
+      bet.user || null,
+      bet.fileUrl || null,
+      bet.note || null,
+      bet.contact || null,
+      bet.ticketNo || null,
+      bet.winning || 0,
+      bet.gameTime || "2pm",
+      JSON.stringify(bet.hits || []),
+      JSON.stringify(bet.commissions || []),
+      JSON.stringify(bet.combinations || []),
+      JSON.stringify(bet.uplines || []),
+      0 // synced flag
+    ], 'BETTING PLACE')
+
     db.transaction(tx => {
       tx.executeSql(
         `INSERT INTO bettings (
@@ -478,19 +587,19 @@ console.log(bet, 'PLACE BEET')
 
 // -------------------- GET PENDING BETS --------------------
 export const getPendingBets = async () => {
-    let db = await getDB();
+  let db = await getDB();
 
 
-    return new Promise((resolve, reject) => {
-        db.transaction(tx => {
-            tx.executeSql(
-                `SELECT * FROM bettings WHERE synced = 0`,
-                [],
-                (_, { rows }) => resolve(rows),
-                (_, error) => reject(error)
-            );
-        });
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `SELECT * FROM bettings WHERE synced = 0`,
+        [],
+        (_, { rows }) => resolve(rows),
+        (_, error) => reject(error)
+      );
     });
+  });
 };
 
 // -------------------- SYNC PENDING BETS --------------------
@@ -531,7 +640,9 @@ export const syncPendingBets = async () => {
       hits: b.hits ? JSON.parse(b.hits) : [],
       commissions: b.commissions ? JSON.parse(b.commissions) : [],
       combinations: b.combinations ? JSON.parse(b.combinations) : [],
-      uplines: b.uplines ? JSON.parse(b.uplines) : []
+      uplines: b.uplines ? JSON.parse(b.uplines) : [],
+      created_at: b.created_at ?? moment().toDate(),
+      updated_at: moment(b.created_at).toDate()
     }));
 
     // Insert into Supabase/Postgres
@@ -555,18 +666,18 @@ export const syncPendingBets = async () => {
 // -------------------- GET ALL BETS --------------------
 export const getAllBets = async () => {
 
-    let db = await getDB();
+  let db = await getDB();
 
-    return new Promise((resolve, reject) => {
-        db.transaction(tx => {
-            tx.executeSql(
-                `SELECT * FROM bettings ORDER BY timestamp DESC`,
-                [],
-                (_, { rows }) => resolve(rows),
-                (_, error) => reject(error)
-            );
-        });
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `SELECT * FROM bettings ORDER BY timestamp DESC`,
+        [],
+        (_, { rows }) => resolve(rows),
+        (_, error) => reject(error)
+      );
     });
+  });
 };
 
 // -------------------- BIDIRECTIONAL SYNC --------------------
@@ -577,7 +688,7 @@ export const syncBettings = async () => {
     // 1️⃣ PUSH local unsynced bets
     const pendingBets = await getPendingBets();
 
-      console.log(pendingBets, 'PENDINNGGG')
+    // console.log(pendingBets, 'PENDINNGGG')
 
     if (pendingBets.length) {
       const formatted = pendingBets.map(b => ({
@@ -679,3 +790,103 @@ export const syncBettings = async () => {
   }
 };
 
+// 🔹 Get user by email
+export const getUserByEmail = async (email) => {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `SELECT * FROM users WHERE is_deleted = 0 AND email = ? LIMIT 1`,
+        [email],
+        (_, result) => resolve(result.rows.length ? result.rows.item(0) : null),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+// 🔹 Get tellers by referral ID
+export const getTellersByReferral = async (referralId) => {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `SELECT * FROM users WHERE is_deleted = 0 AND role = 'teller' AND referral = ? ORDER BY email ASC`,
+        [referralId],
+        (_, result) => {
+          const rows = [];
+          for (let i = 0; i < result.rows.length; i++) rows.push(result.rows.item(i));
+          resolve(rows);
+        },
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+// 🔹 Get first message between user and recipient
+export const getFirstMessage = async (recepientId, createdBy) => {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `SELECT * FROM messages 
+         WHERE is_deleted = 0 AND recepient = ? AND createdBy = ? LIMIT 1`,
+        [String(recepientId), String(createdBy)],
+        (_, result) => resolve(result.rows.length ? result.rows.item(0) : null),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+// Get bettings by filters using same transaction pattern
+export const getBettingsByFilters = async ({ includeAll, userNow, startOfDay, endOfDay }) => {
+  let db = await getDB();
+
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      let query = '';
+      let params = [];
+
+      if (includeAll) {
+        query = `
+          SELECT * FROM bettings 
+          WHERE uplines LIKE ? 
+          AND is_deleted = 0 
+          AND input_type = 'normal' 
+          AND timestamp BETWEEN ? AND ? 
+          ORDER BY timestamp DESC
+        `;
+        params = [userNow, startOfDay.toISOString(), endOfDay.toISOString()];
+      } else {
+        query = `
+          SELECT * FROM bettings 
+          WHERE is_deleted = 0 
+          AND input_type = 'normal' 
+          AND timestamp BETWEEN ? AND ? 
+          AND owner_id = ? 
+          ORDER BY timestamp DESC
+        `;
+        params = [startOfDay.toISOString(), endOfDay.toISOString(), userNow];
+      }
+
+      tx.executeSql(
+        query,
+        params,
+        (_, result) => {
+          const data = [];
+          for (let i = 0; i < result.rows.length; i++) {
+            const row = result.rows.item(i);
+            data.push({
+              ...row,
+              uplines: JSON.parse(row.uplines || '[]'),
+              is_deleted: row.is_deleted === 1,
+            });
+          }
+          resolve(data);
+        },
+        (_, error) => reject(error)
+      );
+    });
+  });
+};

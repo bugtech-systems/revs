@@ -41,7 +41,7 @@ export const App = () => {
   
       // Try fetching from local SQLite
       let localUser = await getLocalUser(email);
-      console.log(localUser, 'LOCAL USER');
+      // console.log(localUser, 'LOCAL USER');
   
       if (!localUser) {
         // Fetch from Supabase by email if not found locally

@@ -39,9 +39,9 @@ await deleteDB()
           {lastSync ? ` • Last: ${new Date(lastSync).toLocaleTimeString()}` : ''}
         </Text>
       )}
-                  <Button title="Delete DB" onPress={handleDelete} />
+                  {/* <Button title="Delete DB" onPress={handleDelete} />
             <Button title="Force Sync" onPress={forceSync} />
-            <Button title="Export Database" onPress={exportDatabase} />
+            <Button title="Export Database" onPress={exportDatabase} /> */}
     </View>
   );
 };

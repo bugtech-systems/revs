@@ -547,6 +547,9 @@ console.log('PUSH QUQU')
 
 // pull: fetch remote changes since lastPulledAt for each table and write to local
 async function pullFromSupabase(id) {
+
+  console.log(id, "THE ID IN PULLER")
+  
   for (const table of TABLES) {
     try {
       const key = `${id}:${LAST_PULLED_KEY}:${table}`;

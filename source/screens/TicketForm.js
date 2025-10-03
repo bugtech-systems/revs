@@ -655,7 +655,7 @@ export default function TicketForm({ navigation }) {
                     
                     console.log(placedBet, 'PLACEDD BETSS')
                     
-                    // await syncBettings()
+                    await syncBettings()
                 // await realm.write(async () => {
 
 

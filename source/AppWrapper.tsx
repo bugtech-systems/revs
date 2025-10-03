@@ -32,6 +32,11 @@ export const AppWrapper = () => {
   
     useEffect(() => {
       (async () => {
+
+
+        console.log(session, "THE SESYON@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+        
+        
         if(session?.user){
             let displayName = String(session.user.email).split('@')[0];
 

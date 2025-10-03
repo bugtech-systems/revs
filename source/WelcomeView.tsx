@@ -6,7 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import moment from 'moment-timezone';
 import { COLORS, icons } from './constants';
 import supabase  from './utils/supabaseClient'; // Your initialized Supabase client
-import { getLocalUser, saveLocalUser } from './utils/db'; // SQLite helper functions
+import { getLocalUser, initDB, saveLocalUser } from './utils/db'; // SQLite helper functions
 
 export function WelcomeView(): React.ReactElement {
   const [email, setEmail] = useState('');
@@ -17,6 +17,9 @@ export function WelcomeView(): React.ReactElement {
   // Try to load cached user on mount
   useEffect(() => {
     (async () => {
+
+      // await initDB();
+      
       const localUser = await getLocalUser();
       if (localUser?.email) setEmail(localUser.email.replace('@collector.com', ''));
     })();
@@ -34,10 +37,13 @@ export function WelcomeView(): React.ReactElement {
 
     // Save user locally for offline-first
     if (data.user) {
+
+      
       await saveLocalUser({
         id: data.user.id,
         email: fullEmail
       });
+      console.log(data.user, "THE USER DATA")
     }
   }, [email, password]);
 

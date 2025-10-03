@@ -1,144 +1,84 @@
 import { FlatList, Image, StyleSheet, Text, TextInput, Alert, TouchableOpacity, View, RefreshControl, Switch } from 'react-native'
 import React, { useEffect, useState } from 'react'
 import moment from 'moment-timezone'
-// import { realmContext } from '../RealmContext'
 import DateTimePicker from '@react-native-community/datetimepicker';
 import SelectDropdown from 'react-native-select-dropdown'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
-import { useSelector, useDispatch } from 'react-redux'
-import Animated, { BounceOutDown, FadeInDown, FadeOutDown } from 'react-native-reanimated';
-import { Betting, Draws, Users } from '../../Models'
+import { useSelector } from 'react-redux'
+import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { COLORS, icons } from '../../constants'
-import { SET_ACTIVE_USER } from '../../redux/actions/types';
-import { realmContext } from '../../RealmContext';
 import { formatNumberWithComma, getConfiguration } from '../../utils/helpers';
+import { getBettingsByFilters, getUserByEmail } from '../../utils/db';
 
-const { useRealm, useQuery } = realmContext;
 const drawTimes = [
-  {
-    id: 0,
-    name: 'All Time'
-  },
-  {
-    id: 1,
-    name: '2pm'
-  },
-  {
-    id: 2,
-    name: '5pm'
-  },
-  {
-    id: 3,
-    name: '9pm'
-  },
+  { id: 0, name: 'All Time' },
+  { id: 1, name: '2pm' },
+  { id: 2, name: '5pm' },
+  { id: 3, name: '9pm' },
 ];
 
-const itemSubscriptionName = 'items';
-const ownItemsSubscriptionName = 'ownItems';
-
 const Transactions = ({ navigation }) => {
-  const dispatch = useDispatch()
-  const realm = useRealm()
   const { collector, user, selectedUser } = useSelector(({ user }) => user);
-  const [date, setDate] = useState(new Date())
-  const [drawTime, setDrawTime] = useState('')
-  const [searchString, setSearchString] = useState('');
-  const [grandTotal, setGrandTotal] = useState(0);
-  const [show, setShowDate] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(Number(10));
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [refreshing, setRefreshing] = React.useState(false);
-  const [filterTime, setFilterTime] = useState(drawTimes[0].name)
-  const [showTime, setShowTime] = useState(false);
+  const [date, setDate] = useState(new Date());
   const [searchQuery, setSearchQuery] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const [filterTime, setFilterTime] = useState(drawTimes[0].name);
   const [includeAll, setIncludeAll] = useState(false);
+  const [items, setItems] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [updateTickets, setUpdateTickets] = useState(false);
+  const [show, setShowDate] = useState(false);
 
   let startOfDay = moment(date).startOf('day').toDate();
   let endOfDay = moment(date).endOf('day').toDate();
-
   let collectorName = selectedUser ? selectedUser : collector;
 
+  // 🔹 Fetch User + Betting Data
+  useEffect(() => {
+    const loadData = async () => {
+      const u = await getUserByEmail(collectorName);
+      setUsers(u);
 
-  const users = useQuery(Users, user => {
-    return user.filtered(
-      'email == $0',
-      collectorName,
-    );
-  }, [collectorName]);
+      const updateTicketsFlag = getConfiguration(u[0], 'updateTickets')?.isCheck;
+      setUpdateTickets(updateTicketsFlag);
 
+      const data = await getBettingsByFilters({
+        includeAll,
+        userNow: u[0]?._id || '',
+        startOfDay,
+        endOfDay,
+      });
+      setItems(data);
+    };
+    loadData();
+  }, [date, collectorName, includeAll, refreshing]);
 
-  const updateTickets =  getConfiguration(users[0], 'updateTickets')?.isCheck;
-
-  console.log(updateTickets, "CAN EDIT?")
-
-
-  const items = useQuery(Betting, data => {
-    let userNow = users[0] ? users[0]._id : "";
-    if (includeAll) {
-      return data.filtered('ANY uplines == $0 &&  isDeleted == false && inputType == "normal" && timestamp >= $1 && timestamp <= $2', String(userNow), startOfDay, endOfDay).sorted('timestamp');
-    } else {
-      if (new Date(date) <= new Date(user?.lastSummary)) {
-        startOfDay = moment().add(1, 'd').endOf('day').toDate();
-        endOfDay = moment().add(1, 'd').endOf('day').toDate();
-      }
-      return data.filtered('isDeleted == false && inputType == "normal" && timestamp >= $0 && timestamp < $1 && owner_id == $2', startOfDay, endOfDay, String(userNow)).sorted('timestamp', true)
-    }
-  }, [date, users, selectedUser, includeAll]);
-
-
-  // DATE
+  // 🔹 Date Change
   const onChangeDate = (event, selectedDate) => {
     const currentDate = selectedDate || date;
-    console.log(event?.type, "THE EVENT")
-    if (event?.type == 'neutralButtonPressed') {
-      setShowDate(Platform.OS === 'ios');
-      // setFilterDate(false)
-      setDate(moment().toDate());
-      // return
-    } else if (event?.type == 'set') {
-      setShowDate(Platform.OS === 'ios');
+    if (event?.type === 'set') {
       setDate(currentDate);
-      // setFilterDate(true);
-    } else if (event?.type == 'dismissed') {
-      setShowDate(Platform.OS === 'ios');
-      setDate(date);
-      // setFilterDate(false)
+    } else if (event?.type === 'neutralButtonPressed') {
+      setDate(moment().toDate());
     }
   };
 
-  const showDatePicker = () => {
+    const showDatePicker = () => {
     setShowDate(true);
   };
 
-  const handleTimeSelect = (item) => {
-    setShowTime(false)
-    setFilterTime(item);
-    // toggleModal();
-  };
-
-
-  const onRefresh = React.useCallback(() => {
-    let rnd = Math.floor(100 + Math.random() * 900);
-    setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-      setRefreshTrigger(rnd);
-      setSearchQuery('');
-      setCurrentPage(1)
-      // setFilteredData(items)
-    }, 2000);
-  }, []);
-
-
-  const handleSearch = (query) => {
+    const handleSearch = (query) => {
     setSearchQuery(query);
   };
 
+  const onRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 1500);
+  };
+
   const handleLongPress = (item) => {
-    navigation.navigate('UpdateTicket', JSON.stringify(item))
-  }
+    navigation.navigate('UpdateTicket', JSON.stringify(item));
+  };
 
   function renderHeader() {
     return (
@@ -323,68 +263,11 @@ const Transactions = ({ navigation }) => {
     )
   }
 
-  // useEffect(() => {
-  // let cur = users[0] ? users[0]._id : "";
-  // let filterString = `owner_id == "${cur}"`;
-
-
-  // let data =  realm.objects(Betting).filtered(filterString);
-
-  //   realm.subscriptions.update(mutableSubs => {
-  //     mutableSubs.removeByName(itemSubscriptionName);
-  //     mutableSubs.add(data, { name: ownItemsSubscriptionName });
-  //   });
-
-  // realm.subscriptions.update(mutableSubs => {
-  // mutableSubs.add(userData, {name: 'items3'});
-  // mutableSubs.add(drawsDataArray, { name: drawsSubscriptionName });
-  // });		
-
-
-
-  // }, [realm, users])
-
-
-  // console.log(items, "WEWds")
-  // console.log(collector, "WEWdsasdasdasdasdasda")
-
-  const toggleModal = () => {
-    setIsModalVisible(false);
-  };
-  const handleSelect = (item) => {
-    setItemsPerPage(item.value);
-    toggleModal();
-  };
-
-  function getCircularReplacer() {
-    const ancestors = [];
-    return function (key, value) {
-      if (typeof value !== "object" || value === null) {
-        return value;
-      }
-      // `this` is the object that value is contained in,
-      // i.e., its direct parent.
-      while (ancestors.length > 0 && ancestors.at(-1) !== this) {
-        ancestors.pop();
-      }
-      if (ancestors.includes(value)) {
-        return "[Circular]";
-      }
-      ancestors.push(value);
-      return value;
-    };
-  }
-
-
-
-
-  let filteredList = filterTime == 'All Time' ? items : items.filter(a => a.gameTime == filterTime);
-  filteredList = searchQuery ? items.filter(a => String(a.ticketNo).includes(String(searchQuery))) : filteredList
-
+  let filteredList = filterTime === 'All Time' ? items : items.filter((a) => a.gameTime === filterTime);
+  filteredList = searchQuery ? items.filter((a) => String(a.ticketNo).includes(searchQuery)) : filteredList;
   let totalGross = filteredList.reduce((n, { gross }) => n + gross, 0);
 
-
-  return (
+    return (
     <SafeAreaProvider style={styles.wrapper}>
       <View style={{ flex: 1, width: '100%' }}>
         {renderHeader()}
@@ -438,8 +321,7 @@ const Transactions = ({ navigation }) => {
       </View>
     </SafeAreaProvider>
   )
-}
-
+};
 export default Transactions
 
 const styles = StyleSheet.create({

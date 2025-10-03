@@ -3,109 +3,131 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { COLORS, SIZES } from '../../constants/theme';
 import icons from '../../constants/icons';
 import moment from 'moment-timezone';
-import { realmContext } from '../../RealmContext';
-import { useUser, useApp } from '@realm/react';
-import { Betting, Users } from '../../Models';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import Animated, { ZoomIn } from 'react-native-reanimated';
 import { formatNumber, getConfiguration } from '../../utils/helpers';
+import SQLite from 'react-native-sqlite-storage';
+import supabase from '../../utils/supabaseClient';
 
-const { useRealm, useQuery } = realmContext;
-const ownItemsSubscriptionName = 'bettings';
+const db = SQLite.openDatabase('localDB.db');
 
 const SummaryReport = ({ navigation }) => {
   const { collector } = useSelector(({ user }) => user);
-  const realm = useRealm();
+
   const [includeAll, setIncludeAll] = useState(false);
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState(new Date());
   const [show, setShowDate] = useState(null);
 
-  // Query users
-  const users = useQuery(Users, user =>
-    user.filtered('email == $0', collector), [collector]
-  );
-  const user = users[0];
-  const userNow = user ? user._id : "";
+  const [user, setUser] = useState(null);
+  const [items, setItems] = useState([]);
 
-  // Memoize config values
+  // Fetch user from SQLite or Supabase
+  useEffect(() => {
+    const fetchUser = async () => {
+      // First, check local SQLite
+      db.transaction(tx => {
+        tx.executeSql(
+          `SELECT * FROM Users WHERE email = ? LIMIT 1`,
+          [collector],
+          (_, { rows }) => {
+            if (rows.length > 0) setUser(rows._array[0]);
+          },
+          (_, error) => console.log('SQLite user fetch error:', error)
+        );
+      });
+
+      // Optionally, sync from Supabase
+      const { data: userData, error } = await supabase
+        .from('Users')
+        .select('*')
+        .eq('email', collector)
+        .limit(1)
+        .single();
+      if (userData) setUser(userData);
+    };
+    fetchUser();
+  }, [collector]);
+
+  // Memoized config values
   const isWin200 = useMemo(() => getConfiguration(user, 'withWin200')?.isCheck, [user]);
   const win200Value = useMemo(() => getConfiguration(user, 'withWin200')?.value, [user]);
   const winStraightValue = useMemo(() => getConfiguration(user, 'winStraight')?.value, [user]);
   const comRate = user?.comRate || 0;
 
-  // Query bettings
-  // const items = useQuery(Betting, data => {
-  //   let startOfDay = moment(startDate).startOf('day').toDate();
-  //   let endOfDay = moment(endDate).endOf('day').toDate();
+  // Fetch bettings from SQLite
+  const fetchItems = useCallback(async () => {
+    if (!user) return;
+    const userNow = user._id;
 
-  //   if (new Date(startOfDay) <= new Date(user?.lastSummary)) {
-  //     startOfDay = moment(user?.lastSummary).endOf('day').toDate();
-  //   }
-  //   if (new Date(endOfDay) <= new Date(user?.lastSummary)) {
-  //     startOfDay = moment().add(1, 'd').endOf('day').toDate();
-  //     endOfDay = moment().add(1, 'd').endOf('day').toDate();
-  //   }
-  //   if (includeAll) {
-	// 		return data.filtered('ANY uplines == $0 && isDeleted == false && inputType == "normal" && timestamp >= $1 && timestamp < $2', String(userNow), startOfDay, endOfDay)
-  //   } else {
-  //       return data.filtered(
-  //         'isDeleted == false && inputType == "normal" && timestamp >= $0 && timestamp < $1',
-  //         startOfDay, endOfDay
-  //       ).sorted('timestamp', true);
-  //     }
-  // }, [startDate, endDate, userNow, user]);
+    let startOfDay = moment(startDate).startOf('day').toISOString();
+    let endOfDay = moment(endDate).endOf('day').toISOString();
 
-
-    const items = useQuery(Betting, data => {
-      
-      let startOfDay = moment(startDate).startOf('day').toDate();
-      let endOfDay = moment(endDate).endOf('day').toDate();
-    
-      // if (new Date(date) <= new Date(users[0]?.lastSummary)) {
-      //   startOfDay = moment().add(1, 'd').endOf('day').toDate();
-      //   endOfDay = moment().add(1, 'd').endOf('day').toDate();
-      // }
-
-      if (new Date(startOfDay) <= new Date(user?.lastSummary)) {
-      startOfDay = moment(user?.lastSummary).endOf('day').toDate();
+    if (new Date(startOfDay) <= new Date(user?.lastSummary)) {
+      startOfDay = moment(user?.lastSummary).endOf('day').toISOString();
     }
     if (new Date(endOfDay) <= new Date(user?.lastSummary)) {
-      startOfDay = moment().add(1, 'd').endOf('day').toDate();
-      endOfDay = moment().add(1, 'd').endOf('day').toDate();
+      startOfDay = moment().add(1, 'd').endOf('day').toISOString();
+      endOfDay = moment().add(1, 'd').endOf('day').toISOString();
     }
-  
+
+    // Query SQLite
+    db.transaction(tx => {
+      let query = `SELECT * FROM Betting WHERE isDeleted = 0 AND inputType = 'normal' AND owner_id = ? AND timestamp >= ? AND timestamp < ?`;
+      let params = [String(userNow), startOfDay, endOfDay];
+
       if (includeAll) {
-        return data.filtered('ANY uplines == $0 && isDeleted == false && inputType == "normal" && timestamp >= $1 && timestamp < $2', String(userNow), startOfDay, endOfDay)
-      } else {
-        return data.filtered('isDeleted == false && inputType == "normal" && owner_id == $0 && timestamp >= $1 && timestamp < $2', String(userNow), startOfDay, endOfDay)
+        query = `SELECT * FROM Betting WHERE isDeleted = 0 AND inputType = 'normal' AND ? IN (uplines) AND timestamp >= ? AND timestamp < ?`;
+        params = [String(userNow), startOfDay, endOfDay];
       }
-  
-      // return data;
-    }, [startDate, endDate, includeAll, users, realm]);
+
+      query += ` ORDER BY timestamp DESC`;
+
+      tx.executeSql(
+        query,
+        params,
+        (_, { rows }) => setItems(rows._array),
+        (_, error) => console.log('SQLite fetchItems error:', error)
+      );
+    });
+
+    // Optionally, sync from Supabase and merge
+    const { data: supItems, error } = await supabase
+      .from('Betting')
+      .select('*')
+      .eq('isDeleted', false)
+      .gte('timestamp', startOfDay)
+      .lt('timestamp', endOfDay);
+
+    if (supItems) setItems(prev => [...prev.filter(i => !supItems.find(s => s.id === i.id)), ...supItems]);
+  }, [startDate, endDate, includeAll, user]);
+
+  useEffect(() => {
+    fetchItems();
+  }, [fetchItems]);
+
   // Date picker logic
   const onChangeDate = (event, selectedDate) => {
     const currentDate = selectedDate || (show === 'start' ? startDate : endDate);
     if (show === 'start') {
       if (event?.type === 'neutralButtonPressed') {
-        setShowDate(null); // <-- Always close the modal
+        setShowDate(null);
         setStartDate(moment().toDate());
       } else if (event?.type === 'set') {
-        setShowDate(null); // <-- Always close the modal
+        setShowDate(null);
         setStartDate(currentDate);
       }
     } else {
       if (event?.type === 'neutralButtonPressed') {
-        setShowDate(null); // <-- Always close the modal
+        setShowDate(null);
         setEndDate(moment().toDate());
       } else if (event?.type === 'set') {
-        setShowDate(null); // <-- Always close the modal
+        setShowDate(null);
         setEndDate(currentDate);
       }
     }
-    // setShowDate(Platform.OS === 'ios');
   };
 
   const showDatePicker = val => setShowDate(val);
@@ -160,30 +182,10 @@ const SummaryReport = ({ navigation }) => {
       acc[date].push(item);
       return acc;
     }, {});
-    // Sort dates descending
     return Object.keys(groups)
       .sort((a, b) => moment(b).valueOf() - moment(a).valueOf())
       .map(date => ({ date, bets: groups[date] }));
   }, [items]);
-
-  // Realm subscription effect
-  // useEffect(() => {
-  //   if (!user) return;
-  //   let lastDate = user?.lastSummary ? moment(user.lastSummary).startOf('day').toDate() : moment().startOf('day').toDate();
-  //   let data = realm.objects(Betting).filtered('isDeleted == false && ANY uplines == $0 && timestamp > $1', String(user?._id), lastDate);
-
-  //   // Only update subscription when toggle changes
-  //   realm.subscriptions.update(mutableSubs => {
-  //     mutableSubs.removeByName(ownItemsSubscriptionName);
-  //     mutableSubs.add(
-  //       includeAll
-  //         ? data
-  //         : realm.objects(Betting).filtered('owner_id == $0 && isDeleted == false', String(user?._id)),
-  //       { name: ownItemsSubscriptionName }
-  //     );
-  //   });
-  // }, [includeAll, realm, user]);
-
 
   return (
     <SafeAreaProvider style={styles.wrapper}>
@@ -201,21 +203,13 @@ const SummaryReport = ({ navigation }) => {
         />
       )}
       <View style={styles.dateRow}>
-        <TouchableOpacity
-          onPress={() => showDatePicker('start')}
-          activeOpacity={0.9}
-          style={styles.dateBtn}
-        >
+        <TouchableOpacity onPress={() => showDatePicker('start')} activeOpacity={0.9} style={styles.dateBtn}>
           <View style={styles.dateBtnInner}>
             <Text style={styles.dateText}>{moment(startDate).format('MM/DD/YYYY')}</Text>
             <Image source={icons.calendar} style={styles.calendarIcon} />
           </View>
         </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => showDatePicker('end')}
-          activeOpacity={0.9}
-          style={styles.dateBtn}
-        >
+        <TouchableOpacity onPress={() => showDatePicker('end')} activeOpacity={0.9} style={styles.dateBtn}>
           <View style={styles.dateBtnInner}>
             <Text style={styles.dateText}>{moment(endDate).format('MM/DD/YYYY')}</Text>
             <Image source={icons.calendar} style={styles.calendarIcon} />
@@ -227,12 +221,7 @@ const SummaryReport = ({ navigation }) => {
         <View style={styles.toggleRow}>
           <Switch
             trackColor={{ true: '#00ED64' }}
-            onValueChange={() => {
-              if (realm.syncSession?.state !== 'active') {
-                Alert.alert('Switching subscriptions does not affect Realm data when the sync is offline.');
-              }
-              setIncludeAll(!includeAll);
-            }}
+            onValueChange={() => setIncludeAll(!includeAll)}
             value={includeAll}
           />
           <Text style={styles.toggleText}>Show All</Text>
@@ -241,7 +230,6 @@ const SummaryReport = ({ navigation }) => {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ marginHorizontal: 10 }}>
         {groupArrays.map((item, index) => {
           const { date, bets } = item;
-          // Calculate per-day and per-game-time stats
           const grandGross = bets.reduce((n, { gross }) => n + gross, 0);
           const grandCommsTotal = grandGross * comRate / 100;
           const grandComm = bets.reduce((total, bet) =>
@@ -272,40 +260,60 @@ const SummaryReport = ({ navigation }) => {
           });
 
           return (
-            <Animated.View
-              entering={ZoomIn.delay(index * 100).duration(500)}
-              key={date}
-              style={styles.dayCard}
-            >
+            <Animated.View entering={ZoomIn.delay(index * 100).duration(500)} key={date} style={styles.dayCard}>
               <View style={styles.dayHeader}>
                 <Text style={styles.dayHeaderText}>{moment(date).format('MMM DD, YYYY')}</Text>
               </View>
               <View style={styles.dayTotalsRow}>
-                <View style={{...styles.dayTotalsCol, borderRightWidth: .5, borderLeftColor: COLORS.white }}><Text style={styles.textRow}>GROSS</Text><Text style={styles.textRowValue}>{formatNumber(grandGross)}</Text></View>
-                <View style={{...styles.dayTotalsCol, borderRightWidth: .5, borderLeftColor: COLORS.white }}><Text style={styles.textRow}>HITS</Text><Text style={styles.textRowValue}>{formatNumber(grandHits)}</Text></View>
-                <View style={{...styles.dayTotalsCol, borderRightWidth: .5, borderLeftColor: COLORS.white }}><Text style={styles.textRow}>COMM</Text><Text style={styles.textRowValue}>{formatNumber(grandComm)}</Text></View>
-                <View style={styles.dayTotalsCol}><Text style={styles.textRow}>NET</Text><Text style={{ fontWeight: 'bold', color: Math.sign(net) === -1 ? COLORS.red : COLORS.black, paddingTop: 10 }}>{formatNumber(net)}</Text></View>
+                <View style={{ ...styles.dayTotalsCol, borderRightWidth: 0.5, borderLeftColor: COLORS.white }}>
+                  <Text style={styles.textRow}>GROSS</Text>
+                  <Text style={styles.textRowValue}>{formatNumber(grandGross)}</Text>
+                </View>
+                <View style={{ ...styles.dayTotalsCol, borderRightWidth: 0.5, borderLeftColor: COLORS.white }}>
+                  <Text style={styles.textRow}>HITS</Text>
+                  <Text style={styles.textRowValue}>{formatNumber(grandHits)}</Text>
+                </View>
+                <View style={{ ...styles.dayTotalsCol, borderRightWidth: 0.5, borderLeftColor: COLORS.white }}>
+                  <Text style={styles.textRow}>COMM</Text>
+                  <Text style={styles.textRowValue}>{formatNumber(grandComm)}</Text>
+                </View>
+                <View style={styles.dayTotalsCol}>
+                  <Text style={styles.textRow}>NET</Text>
+                  <Text style={{ fontWeight: 'bold', color: Math.sign(net) === -1 ? COLORS.red : COLORS.black, paddingTop: 10 }}>
+                    {formatNumber(net)}
+                  </Text>
+                </View>
               </View>
               {gameTimes.map((time, i) => (
                 <View key={time} style={styles.gameTimeRow}>
                   <Text style={{ ...styles.gameTimeLabel, textAlign: i === 0 ? 'left' : i === 1 ? 'center' : 'right' }}>
                     {time === '2pm' ? '2:00 PM' : time === '5pm' ? '5:00 PM' : '9:00 PM'}
                   </Text>
-                  <View style={{...styles.gameTimeCol, borderRightWidth: .5, borderLeftColor: COLORS.white }}><Text style={styles.gameTimeValue}>{formatNumber(gameStats[i].gross)}</Text></View>
-                  <View style={{...styles.gameTimeCol, borderRightWidth: .5, borderLeftColor: COLORS.white }}><Text style={styles.gameTimeValue}>{formatNumber(gameStats[i].hits)}</Text></View>
-                  <View style={{...styles.gameTimeCol, borderRightWidth: .5, borderLeftColor: COLORS.white }}><Text style={styles.gameTimeValue}>{formatNumber(gameStats[i].comm)}</Text></View>
-                  <View style={styles.gameTimeCol}><Text style={{ color: Math.sign(gameStats[i].net) === -1 ? COLORS.red : COLORS.black }}>{formatNumber(gameStats[i].net)}</Text></View>
+                  <View style={{ ...styles.gameTimeCol, borderRightWidth: 0.5, borderLeftColor: COLORS.white }}>
+                    <Text style={styles.gameTimeValue}>{formatNumber(gameStats[i].gross)}</Text>
+                  </View>
+                  <View style={{ ...styles.gameTimeCol, borderRightWidth: 0.5, borderLeftColor: COLORS.white }}>
+                    <Text style={styles.gameTimeValue}>{formatNumber(gameStats[i].hits)}</Text>
+                  </View>
+                  <View style={{ ...styles.gameTimeCol, borderRightWidth: 0.5, borderLeftColor: COLORS.white }}>
+                    <Text style={styles.gameTimeValue}>{formatNumber(gameStats[i].comm)}</Text>
+                  </View>
+                  <View style={styles.gameTimeCol}>
+                    <Text style={{ color: Math.sign(gameStats[i].net) === -1 ? COLORS.red : COLORS.black }}>
+                      {formatNumber(gameStats[i].net)}
+                    </Text>
+                  </View>
                 </View>
               ))}
             </Animated.View>
           );
         })}
-        {groupArrays.length > 0 &&
+        {groupArrays.length > 0 && (
           <View style={styles.footer}><Text style={styles.footerText}>End of results.</Text></View>
-        }
-        {groupArrays.length === 0 &&
+        )}
+        {groupArrays.length === 0 && (
           <View style={styles.empty}><Text style={styles.emptyText}>No records found.</Text></View>
-        }
+        )}
       </ScrollView>
     </SafeAreaProvider>
   );
