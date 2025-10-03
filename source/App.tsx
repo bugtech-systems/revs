@@ -68,19 +68,15 @@ export const App = () => {
       }
   
 
-  
-        const list = await api.listUsers();
-        setUsers(list);
-
-
+  console.log('SET LOADING')
       setLoading(false);
-    };
+      };
   
     initUser(session?.user?.email);
-  }, [dispatch, session?.user?.email]);
+  }, [dispatch, session]);
 
 
-
+console.log(loading, session, 'loaad')
   if (loading) return <LoadingIndicator />;
 
   return (

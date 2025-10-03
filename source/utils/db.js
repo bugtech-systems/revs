@@ -4,7 +4,7 @@ import supabase from "./supabaseClient";
 import { api, getDB } from "./offlineSync";
 
 // Enable debug (optional for development)
-SQLite.DEBUG(true);
+// SQLite.DEBUG(true);
 // SQLite.enablePromise(true);
 
 
@@ -145,9 +145,6 @@ export const getLocalUser = async (authEmail = null) => {
 
 // Save or update user locally
 export const saveLocalUser = async (user) => {
-    let db = await getDB();
-
-  const configuration = JSON.stringify(user.configuration || []);
     await api.createUser(user)
 };
 
@@ -272,7 +269,7 @@ export const fetchUser = async (email) => {
       const { data: uplineData, error: uplineError } = await supabase
         .from('users')
         .select('*')
-        .in('user_id', data.uplines);
+        .in('id', data.uplines);
 
       if (uplineError) throw uplineError;
 

@@ -6,14 +6,13 @@ import { useSelector, useDispatch } from 'react-redux';
 import { COLORS, SIZES } from '../constants/theme';
 import icons from '../constants/icons';
 import { formatNumber, getConfiguration } from '../utils/helpers';
-import { getLocalUser, get_local_bettings, get_local_draws } from '../utils/db'; // Your SQLite helpers
+import { fetchUser, getLocalUser, get_local_bettings, get_local_draws } from '../utils/db'; // Your SQLite helpers
 import  supabase  from '../utils/supabaseClient';
 import { init, api, forceSync, startAutoSyncOnReconnect } from '../utils/offlineSync';
 
 
 const Dashboard = ({ navigation }) => {
-  const dispatch = useDispatch();
-  const { user } = useSelector(({ user }) => user);
+  const { user, collector, selectedUser } = useSelector(({user}) => user);
 
   const [date, setDate] = useState(new Date());
   const [show, setShow] = useState(false);
@@ -26,63 +25,10 @@ const Dashboard = ({ navigation }) => {
 
 
   const able_to_set_last_summary = getConfiguration(user ? user : { isAdmin: false, role: 'teller', configurations: [] }, 'last_summary_report')?.isCheck;
-  // Load local user (offline-first)
-  useEffect(() => {
-    (async () => {
-      let localUser = await getLocalUser(user?.email);
-      if (!localUser) {
-        // Fallback: fetch from Supabase
-        const { data, error } = await supabase.from('users').select('*').eq('id', user?.id).single();
-        if (data) localUser = data;
-      
-      }
-      
-      
-      if (localUser) setOwnUser(localUser);
-    })();
-  }, [user]);
+
 
   // Load bettings & draws offline-first
-  useEffect(() => {
-    (async () => {
-      if (!own_user) return;
 
-      const start_of_day = moment(date).startOf('day').format('YYYY-MM-DD');
-      const end_of_day = moment(date).endOf('day').format('YYYY-MM-DD');
-
-      let localBettings = await api.listBettings({
-        filters: { 
-        owner_id: own_user.id,
-        // is_deleted: 0, 
-        // timestamp:  { 
-        //    op: "between",
-	    //   from: start_of_day,
-	    //   to: end_of_day,
-        // }
-        },
-        orderBy: 'updated_at DESC',
-        limit: 20,
-      });
-
-    
-
-      let localDraws = await api.listDraws({
-       filters: { 
-        draw_date:  { 
-           op: "between",
-	      from: start_of_day,
-	      to: end_of_day,
-        }}
-      });
-      
-      
-      
-      console.log(localBettings[0], 'BEETSS')
-
-      setBettings(localBettings);
-      setDraws(localDraws);
-    })();
-  }, [date, includeAll, own_user]);
 
   const onChange = (event, selected_date) => {
     if (event?.type === 'neutralButtonPressed') {
@@ -151,7 +97,7 @@ const Dashboard = ({ navigation }) => {
     </View>
   );
 
-  const renderList = () => {
+  const renderList = (bettings) => {
     let grand_gross = 0;
     let grand_hits = 0;
     let grand_comm = 0;
@@ -336,7 +282,55 @@ console.log(grand_gross, 'GRAAND')
   useEffect(() => {
     request_notification_permission();
   }, []);
+  
+  useEffect(() => {
+    (async () => {
+      if (!collector) return;
+		let selectedCollector = await fetchUser(collector);
 
+		console.log(selectedCollector, 'SELECTED')
+
+
+      const start_of_day = moment(date).startOf('day').format('YYYY-MM-DD');
+      const end_of_day = moment(date).endOf('day').format('YYYY-MM-DD');
+	  let filters = {};
+	  
+	  if(includeAll){
+	   filters = { ...filters, uplines: { op: "contains", value: selectedCollector.id }}
+	  } else {
+	    filters = { ...filters, owner_id: selectedCollector.id }
+	  }
+
+
+
+      let localBettings = await api.listBettings({
+        filters: filters,
+        orderBy: 'timestamp DESC',
+        // limit: 20,
+      });
+
+
+    
+
+      let localDraws = await api.listDraws({
+       filters: { 
+        draw_date:  { 
+           op: "between",
+	      from: start_of_day,
+	      to: end_of_day,
+        }}
+      });
+      
+      
+      
+
+      setBettings(localBettings);
+      setDraws(localDraws);
+    })();
+  }, [date, includeAll, collector]);
+
+
+console.log(bettings.length, includeAll, 'dass', user.id, collector)
 
   return (
   	<SafeAreaView style={{ ...styles.wrapper }}>
@@ -360,7 +354,7 @@ console.log(grand_gross, 'GRAAND')
 							<Text style={{ ...styles.toggleText, color: COLORS.black, fontWeight: '500' }}>Show All</Text>
 						</View>
 					}
-					{renderList()}
+					{renderList(bettings)}
 				</View>
 				{show ?
 					<DateTimePicker

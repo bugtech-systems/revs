@@ -5,47 +5,34 @@ import { getLocalUser } from '../utils/db'; // SQLite helper for offline-first
 import { COLORS, icons } from '../constants';
 import { useSelector } from 'react-redux';
 
-const CustomDrawerIcon = ({ route, navigation, navType, selectedUser, headerTitle }) => {
+const CustomDrawerIcon = ({ route, navigation, navType, headerTitle }) => {
   const [ownUser, setOwnUser] = useState(null);
   const [displayName, setDisplayName] = useState('');
-  const collector = useSelector(state => state.user.collector);
+  const {user, selectedUser, collector} = useSelector(({user}) => user);
 
-  // Load local user first (offline-first)
+  // // Load local user first (offline-first)
   useEffect(() => {
     (async () => {
-      let localUser = await getLocalUser(collector);
+      let localUser = await getLocalUser(user?.email);
 
       if (!localUser) {
         // Fallback: fetch from Supabase online
         const { data, error } = await supabase
           .from('users')
           .select('*')
-          .eq('email', collector)
+          .eq('email', user?.email)
           .single();
         if (!error && data) localUser = data;
       }
 
       if (localUser) {
         setOwnUser(localUser);
-        setDisplayName(localUser.email.split('@')[0]);
+        setDisplayName(String(user?.email).split('@')[0].toUpperCase());
       }
     })();
-  }, [collector]);
+  }, [user]);
 
-  // Subscribe to Supabase realtime updates (offline-first sync)
-  useEffect(() => {
-    if (!collector) return;
-
-    const channel = supabase
-      .channel(`users:email=eq.${collector}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users', filter: `email=eq.${collector}` }, payload => {
-        setOwnUser(payload.new);
-        setDisplayName(payload.new.email.split('@')[0]);
-      })
-      .subscribe();
-
-    return () => supabase.removeChannel(channel);
-  }, [collector]);
+  // // Subscribe to Supabase realtime updates (offline-first sync)
 
   const onHeaderPress = () => {
     if (!ownUser) return;
@@ -60,6 +47,9 @@ const CustomDrawerIcon = ({ route, navigation, navType, selectedUser, headerTitl
   };
 
 
+
+
+console.log(selectedUser,  user, 'ssuuuu')
 
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
@@ -84,8 +74,8 @@ const CustomDrawerIcon = ({ route, navigation, navType, selectedUser, headerTitl
 
         <TouchableOpacity
           onLongPress={() => {
-            if (ownUser?.is_admin) {
-              Alert.alert('Admin', `View user: ${JSON.stringify(ownUser)}`);
+            if (user?.is_admin) {
+              Alert.alert('Admin', `View user: ${JSON.stringify(selectedUser)}`);
             } else {
               console.log('Not admin');
             }
@@ -94,12 +84,12 @@ const CustomDrawerIcon = ({ route, navigation, navType, selectedUser, headerTitl
           style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
         >
           <Text style={{ fontSize: 13, fontWeight: 'bold', color: route ? COLORS.white : COLORS.primary }}>
-            {String(displayName).toUpperCase()}
+            {displayName}
           </Text>
 
-          {selectedUser && (
+          {(collector && user.email != collector) && (
             <Text style={{ fontSize: 13, fontWeight: 'bold', color: COLORS.primary }}>
-              {' / ' + String(selectedUser).split('@')[0].toUpperCase()}
+              {' / ' + String(collector).split('@')[0].toUpperCase()}
             </Text>
           )}
         </TouchableOpacity>

@@ -14,13 +14,7 @@ export function WelcomeView(): React.ReactElement {
   const [loading, setLoading] = useState(false);
   const [passwordHidden, setPasswordHidden] = useState(true);
 
-  // Try to load cached user on mount
-  useEffect(() => {
-    (async () => {
-      const localUser = await getLocalUser();
-      if (localUser?.email) setEmail(localUser.email.replace('@collector.com', ''));
-    })();
-  }, []);
+ 
 
   // Sign in with Supabase
   const signIn = useCallback(async () => {
@@ -33,11 +27,9 @@ export function WelcomeView(): React.ReactElement {
     if (error) throw error;
 
     // Save user locally for offline-first
-    if (data.user) {
-      await saveLocalUser({
-        id: data.user.id,
-        email: fullEmail
-      });
+    if (data?.user?.email) {
+          let localUser = await getLocalUser(data?.user?.email);
+          await saveLocalUser(localUser);
     }
   }, [email, password]);
 

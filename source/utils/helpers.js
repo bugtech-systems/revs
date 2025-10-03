@@ -57,7 +57,7 @@ export const generateRandomCombination = () => {
 
 export const getConfiguration = (user, type) => {
   // Convert the number to a string to manipulate individual digits
-  let configs = user && user.configuration ? user.configuration : [];
+  let configs = user?.configuration ? user.configuration : [];
 
   let current = {}
 

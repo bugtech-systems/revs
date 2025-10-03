@@ -25,6 +25,10 @@ import { schema } from './schema';
 import { generateObjectId } from './helpers';
 // SQLite.enablePromise(true); // optional, to use promises
 
+// Enable debug (optional for development)
+// SQLite.DEBUG(true);
+
+
 const DB_NAME = 'app.db';
 let db = SQLite.openDatabase({ name: DB_NAME, location: 'default' });
 
@@ -40,7 +44,10 @@ const TABLES = [
 
 // ---------- UTIL ----------
 const runSql = (sql, params = []) => {
- 
+  db = SQLite.openDatabase({ name: DB_NAME, location: 'default' });
+  if (!db) {
+   db = SQLite.openDatabase({ name: "app.db", location: "default" });
+  }
  return new Promise((resolve, reject) => {
     db.transaction((tx) => {
       tx.executeSql(
@@ -240,7 +247,6 @@ async function fetchSyncQueue() {
   const rows = [];
   
   for (let i = 0; i < res.rows.length; i++) rows.push(res.rows.item(i));
-  console.log(rows, 'RESS')
   return rows;
 }
 
@@ -464,6 +470,7 @@ async function localQuery(tableName, query = {}) {
   // WHERE (dynamic)
   const { whereSql, values } = buildWhereClause(filters);
 
+
   // ORDER BY
   const orderSql = orderBy ? `ORDER BY ${orderBy}` : "";
 
@@ -503,7 +510,6 @@ async function localQuery(tableName, query = {}) {
 // push: process queue and apply to Supabase
 async function pushQueueToSupabase() {
 
-console.log('PUSH QUQU')
   const queue = await fetchSyncQueue();
   for (const q of queue) {
     try {
@@ -518,7 +524,6 @@ console.log('PUSH QUQU')
         
         
         // Remove local-only fields if necessary
-        console.log(insertPayload, 'INSERT PAAAY', payloadObj, 'PAAY')
         const { data, error } = await supabase.from(tableName).upsert(insertPayload, { onConflict: 'id' }).select().limit(1);
         if (error) throw error;
         // Remove queue entry
@@ -546,16 +551,17 @@ console.log('PUSH QUQU')
 }
 
 // pull: fetch remote changes since lastPulledAt for each table and write to local
-async function pullFromSupabase(id) {
+// ---------- PULL FROM SUPABASE (always source of truth) ----------
+async function pullFromSupabase(userId) {
   for (const table of TABLES) {
     try {
-      const key = `${id}:${LAST_PULLED_KEY}:${table}`;
+      const key = `${userId}:${LAST_PULLED_KEY}:${table}`;
       const lastPulledAt = (await AsyncStorage.getItem(key)) || null;
 
-      // ✅ Step 1: get all local ids
+      // ✅ Step 1: get all local IDs
       const localIds = await getAllLocalIds(table);
 
-      // ✅ Step 2: fetch all Supabase rows updated since lastPulledAt
+      // ✅ Step 2: fetch remote rows (always Supabase-first)
       let query = supabase.from(table).select('*');
       if (lastPulledAt) {
         query = query.gte('updated_at', lastPulledAt);
@@ -568,32 +574,32 @@ async function pullFromSupabase(id) {
       }
 
       // ✅ Step 3: build a map of Supabase IDs
-      const remoteIds = new Set(remoteData.map((row) => row.id));
+      const remoteIds = new Set(remoteData.map(r => r.id));
 
-      // ✅ Step 4: handle Supabase rows
+      // ✅ Step 4: sync Supabase rows into local
       for (const remoteRow of remoteData) {
-        const local = await localGet(table, remoteRow.id);
-        const remoteUpdatedAt = remoteRow.updated_at || nowISO();
-        const localUpdatedAt = local ? local.updated_at || null : null;
-
         if (remoteRow.is_deleted) {
-          // case 2: deleted in supabase → delete locally
+          // delete locally if remote says deleted
           await runSql(`DELETE FROM ${table} WHERE id = ?`, [remoteRow.id]);
           continue;
         }
 
+        const local = await localGet(table, remoteRow.id);
+        const remoteUpdatedAt = remoteRow.updated_at || nowISO();
+        const localUpdatedAt = local ? local.updated_at || null : null;
+
         if (!local) {
-          // case 3a: supabase row doesn’t exist locally → insert
+          // new in supabase → insert
           const toInsert = normalizeForSQLite(table, remoteRow);
           await insertOrReplace(table, toInsert);
         } else if (!localUpdatedAt || remoteUpdatedAt > localUpdatedAt) {
-          // case 1: supabase row is newer → update
+          // newer in supabase → replace local
           const toInsert = normalizeForSQLite(table, remoteRow);
           await insertOrReplace(table, toInsert);
         }
       }
 
-      // ✅ Step 5: handle local rows that don’t exist in Supabase
+      // ✅ Step 5: remove local rows not present in Supabase
       for (const localId of localIds) {
         if (!remoteIds.has(localId)) {
           await runSql(`DELETE FROM ${table} WHERE id = ?`, [localId]);
@@ -607,6 +613,38 @@ async function pullFromSupabase(id) {
     }
   }
 }
+
+// ---------- FETCH HELPER (Supabase first, fallback local) ----------
+export async function fetchWithFallback(table, query = {}) {
+  const state = await NetInfo.fetch();
+  if (state.isConnected) {
+    try {
+      // fetch remote
+      const { data, error } = await supabase.from(table).select('*');
+      if (error) throw error;
+
+      // replace local with remote snapshot
+      for (const row of data) {
+        if (row.is_deleted) {
+          await runSql(`DELETE FROM ${table} WHERE id = ?`, [row.id]);
+        } else {
+          const normalized = normalizeForSQLite(table, row);
+          await insertOrReplace(table, normalized);
+        }
+      }
+
+      // return supabase data
+      return await localQuery(table, query);;
+    } catch (err) {
+      console.warn(`Fetch from Supabase failed for ${table}`, err);
+      return await localQuery(table, query); // fallback to local
+    }
+  } else {
+    // offline → use local only
+    return await localQuery(table, query);
+  }
+}
+
 
 
 
@@ -638,7 +676,12 @@ export async function init(id) {
   const state = await NetInfo.fetch();
   if (state.isConnected) {
     // Run sync but do not block init
+    if(id){
     syncWithSupabase(id).catch((e) => console.warn('Initial sync failed', e));
+    } else {
+      console.log('No id to sync')
+    }
+  
   }
 }
 
@@ -656,7 +699,7 @@ export const api = {
   updateUser: async (id, patch) => localUpdate('users', id, patch),
   deleteUser: async (id) => localDelete('users', id),
   getUser: async (id) => localGet('users', id),
-  listUsers: async () => localList('users'),
+  listUsers: async (params) => fetchWithFallback('users', params),
 
   // draws
   createDraw: async (draw) => localInsert('draws', { ...draw }),
@@ -670,7 +713,7 @@ export const api = {
   updateBetting: async (id, patch) => localUpdate('bettings', id, patch),
   deleteBetting: async (id) => localDelete('bettings', id),
   getBetting: async (id) => localGet('bettings', id),
-  listBettings: async (params) => localQuery('bettings', params),
+  listBettings: async (params) => fetchWithFallback('bettings', params),
 
   // master_combinations
   createMasterCombination: async (m) => localInsert('master_combinations', { ...m }),
@@ -783,7 +826,12 @@ function buildWhereClause(filters = {}) {
       case "notnull":
         whereClauses.push(`${key} IS NOT NULL`);
         break;
-
+        case "contains":
+          // For arrays stored as JSON string, e.g. '["apple","banana"]'
+          // Use LIKE with wildcards to match inside
+          whereClauses.push(`${key} LIKE ?`);
+          values.push(`%${filter.value}%`);
+          break;
       default:
         throw new Error(`Unsupported operator: ${filter.op}`);
     }
@@ -813,3 +861,12 @@ async function insertOrReplace(table, row) {
   await runSql(sql, values);
 }
 
+
+export async function clearAllStorage() {
+  try {
+    await AsyncStorage.clear();
+    console.log("✅ AsyncStorage cleared");
+  } catch (e) {
+    console.error("❌ Failed to clear AsyncStorage", e);
+  }
+}

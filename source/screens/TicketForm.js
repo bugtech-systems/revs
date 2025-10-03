@@ -561,11 +561,11 @@ export default function TicketForm({ navigation }) {
 
                 uplines.forEach(line => {
                     newUps.push(line)
-                    newUplines.push(String(line.user_id))
+                    newUplines.push(line.id)
                 });
 
                 newUps.push(selectedUser)
-                newUplines.push(String(selectedUser?.id));
+                newUplines.push(selectedUser?.id);
 
 
                 for (let i = 0; i < newUps.length; i++) {

@@ -32,18 +32,17 @@ export const AppWrapper = () => {
   
     useEffect(() => {
       (async () => {
+            await init();
+      
         if(session?.user){
             let displayName = String(session.user.email).split('@')[0];
 
         console.log(session.user.email, 'sssss')
-             await init(displayName);
-        await startAutoSyncOnReconnect(displayName);
+             await startAutoSyncOnReconnect(displayName);
 
         }
       })();
     }, [session]);
-  
-  
   
 
   return (

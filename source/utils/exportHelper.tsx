@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import RNFS from 'react-native-fs';
 import Share from 'react-native-share';
+import { PermissionsAndroid } from 'react-native';
 
 const DB_NAME = 'app.db';
 
@@ -10,24 +11,46 @@ function getDbPath() {
     // iOS default = Library/LocalDatabase/
     return `${RNFS.LibraryDirectoryPath}/LocalDatabase/${DB_NAME}`;
   } else {
+  const path = `${RNFS.DocumentDirectoryPath}/app.db`;
+
     // Android default = /data/data/<package-name>/databases/
     return `/data/data/com.rev/databases/${DB_NAME}`;
   }
 }
 
+
+
+
+
 export async function exportDatabase() {
   try {
+  
+  //   const granted = await PermissionsAndroid.request(
+  //   PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE
+  // );
+
+  // if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+  //   throw new Error("Storage permission denied");
+  // }
+  
+  
     const dbPath = getDbPath();
+    
     const destPath =
       Platform.OS === 'ios'
         ? `${RNFS.DocumentDirectoryPath}/${DB_NAME}`
         : `${RNFS.DownloadDirectoryPath}/${DB_NAME}`;
+
+
+console.log(dbPath, destPath, 'COPY FILE')
+
 
     const exists = await RNFS.exists(dbPath);
     if (!exists) {
       console.log('❌ Database file not found at:', dbPath);
       return;
     }
+
 
     // Copy DB to public directory
     await RNFS.copyFile(dbPath, destPath);

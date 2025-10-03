@@ -25,8 +25,11 @@ const Stack = createStackNavigator();
 const Drawer = createDrawerNavigator();
 
 const DrawerNavigation = () => {
-  const { user, collector, selectedUser } = useSelector(state => state.user);
+  const { user,  selectedUser } = useSelector(({user}) => user);
   const curUser = selectedUser ? selectedUser : user;
+  
+  
+  
   
   const generateDrawerScreenOptions = (label, icon, headerTitle, navigation) => ({
     headerTitle: '',
@@ -36,7 +39,7 @@ const DrawerNavigation = () => {
     drawerLabel: label,
     drawerLabelStyle: { fontSize: 16, fontWeight: 'bold' },
     headerLeft: () => (
-      <CustomDrawerIcon route={null} navigation={navigation} navType={'drawer'} selectedUser={selectedUser} headerTitle={headerTitle} />
+      <CustomDrawerIcon route={null} navigation={navigation} navType={'drawer'}  headerTitle={headerTitle} />
     ),
     headerRight: () => <SyncComponent />,
     drawerIcon: ({ focused }) => (
