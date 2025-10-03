@@ -19,7 +19,6 @@
 import SQLite from 'react-native-sqlite-storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
-import { v4 as uuidv4 } from 'uuid';
 import supabase from './supabaseClient';
 import { schema } from './schema';
 import { generateObjectId } from './helpers';
@@ -29,7 +28,7 @@ import { generateObjectId } from './helpers';
 // SQLite.DEBUG(true);
 
 
-const DB_NAME = 'app.db';
+const DB_NAME = 'leo.db';
 let db = SQLite.openDatabase({ name: DB_NAME, location: 'default' });
 
 // local metadata key to store lastPulledAt timestamp per table
@@ -73,6 +72,81 @@ const runSql = (sql, params = []) => {
 //     return null;
 //   }
 // };
+
+export const fetchUser = async (email) => {
+  let db = await getDB();
+
+
+  try {
+    // Fetch main user from Supabase
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .single();
+
+    if (error) throw error;
+
+    let populatedUplines = [];
+
+    if (data.uplines?.length) {
+      // Fetch all uplines as user objects
+      const { data: uplineData, error: uplineError } = await supabase
+        .from('users')
+        .select('*')
+        .in('id', data.uplines);
+
+      if (uplineError) throw uplineError;
+
+      populatedUplines = uplineData || [];
+    }
+
+    const userWithUplines = { ...data, uplines: populatedUplines };
+
+
+
+    return userWithUplines;
+  } catch (err) {
+    console.log('Supabase fetchUser error, falling back to local', err);
+
+    // Fallback to SQLite
+    return new Promise(resolve => {
+      db.transaction(tx => {
+        tx.executeSql(
+          `SELECT * FROM users WHERE email = ?`,
+          [email],
+          async (_, { rows }) => {
+            if (!rows.length) return resolve(null);
+
+            const user = rows._array[0];
+
+            // Parse uplines from JSON and fetch each locally
+            if (user.uplines) {
+              const uplineIds = JSON.parse(user.uplines);
+              if (uplineIds.length) {
+                const placeholders = uplineIds.map(() => '?').join(',');
+                tx.executeSql(
+                  `SELECT * FROM users WHERE id IN (${placeholders})`,
+                  uplineIds,
+                  (_, { rows: uplineRows }) => {
+                    user.uplines = uplineRows._array;
+                    resolve(user);
+                  }
+                );
+              } else {
+                user.uplines = [];
+                resolve(user);
+              }
+            } else {
+              user.uplines = [];
+              resolve(user);
+            }
+          }
+        );
+      });
+    });
+  }
+};
 
 // // get timestamp string in ISO format
 // const nowISO = () => new Date().toISOString();
@@ -553,19 +627,24 @@ async function pushQueueToSupabase() {
 // pull: fetch remote changes since lastPulledAt for each table and write to local
 // ---------- PULL FROM SUPABASE (always source of truth) ----------
 async function pullFromSupabase(userId) {
+
+
   for (const table of TABLES) {
     try {
-      const key = `${userId}:${LAST_PULLED_KEY}:${table}`;
+      const key = `${LAST_PULLED_KEY}:${table}`;
       const lastPulledAt = (await AsyncStorage.getItem(key)) || null;
 
       // ✅ Step 1: get all local IDs
       const localIds = await getAllLocalIds(table);
 
       // ✅ Step 2: fetch remote rows (always Supabase-first)
-      let query = supabase.from(table).select('*');
+      let query = supabase.from(table).select('*').limit(10000);
       if (lastPulledAt) {
         query = query.gte('updated_at', lastPulledAt);
       }
+      
+      
+      
 
       const { data: remoteData, error } = await query;
       if (error) {
@@ -575,9 +654,11 @@ async function pullFromSupabase(userId) {
 
       // ✅ Step 3: build a map of Supabase IDs
       const remoteIds = new Set(remoteData.map(r => r.id));
+      console.log(localIds.length, lastPulledAt, table,  'pulllling', 'existing', remoteData.length)
 
       // ✅ Step 4: sync Supabase rows into local
       for (const remoteRow of remoteData) {
+      
         if (remoteRow.is_deleted) {
           // delete locally if remote says deleted
           await runSql(`DELETE FROM ${table} WHERE id = ?`, [remoteRow.id]);
@@ -597,6 +678,7 @@ async function pullFromSupabase(userId) {
           const toInsert = normalizeForSQLite(table, remoteRow);
           await insertOrReplace(table, toInsert);
         }
+             await AsyncStorage.setItem(key, nowISO());
       }
 
       // ✅ Step 5: remove local rows not present in Supabase
@@ -607,7 +689,6 @@ async function pullFromSupabase(userId) {
       }
 
       // ✅ Step 6: update lastPulledAt
-      await AsyncStorage.setItem(key, nowISO());
     } catch (err) {
       console.warn('Pull error', err);
     }
@@ -713,7 +794,7 @@ export const api = {
   updateBetting: async (id, patch) => localUpdate('bettings', id, patch),
   deleteBetting: async (id) => localDelete('bettings', id),
   getBetting: async (id) => localGet('bettings', id),
-  listBettings: async (params) => fetchWithFallback('bettings', params),
+  listBettings: async (params) => localQuery('bettings', params),
 
   // master_combinations
   createMasterCombination: async (m) => localInsert('master_combinations', { ...m }),
@@ -864,7 +945,11 @@ async function insertOrReplace(table, row) {
 
 export async function clearAllStorage() {
   try {
-    await AsyncStorage.clear();
+  
+     const key = `${LAST_PULLED_KEY}:bettings`;
+
+  
+    await AsyncStorage.removeItem(key);
     console.log("✅ AsyncStorage cleared");
   } catch (e) {
     console.error("❌ Failed to clear AsyncStorage", e);

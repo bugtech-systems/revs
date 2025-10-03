@@ -106,16 +106,17 @@ const Dashboard = ({ navigation }) => {
     const grouped_bettings = ['2pm', '5pm', '9pm'].map((game_time) => {
       const bets = bettings.filter(b => b.game_time === game_time);
 
-      let gross = bets.reduce((sum, b) => sum + Number(b.gross), 0);
-      let hits = bets.reduce((sum, b) => sum + (b.winning || 0), 0);
-      let comm = bets.reduce((sum, b) => sum + (b.commission || 0), 0);
+      let gross = bets.reduce((sum, b) => Number(sum) + Number(b.gross), 0);
+      let hits = bets.reduce((sum, b) => Number(sum) + Number(b.winning || 0), 0);
+      let comm = bets.reduce((sum, b) => Number(sum) + Number(b.commission || 0), 0);
       let net = gross - hits - comm;
+	
+			// let winning = bettings.reduce((n, { winning }) => n + (winning * winPrize), 0);
 
       grand_gross += Number(gross);
-      grand_hits += hits;
-      grand_comm += comm;
-      grand_net += net;
-		console.log(grand_gross, 'GRAAND', typeof gross)
+    //   grand_hits += hits;
+    //   grand_comm += comm;
+    //   grand_net += net;
       return { gameTime: game_time, bettings: bets, gross, hits, comm, net };
     });
 
@@ -124,15 +125,13 @@ const Dashboard = ({ navigation }) => {
 
 
 	let grossCards = grouped_bettings.map((a, index) => {
-			let { gameTime, bettings } = a;
-			let gross = bettings.reduce((n, { gross }) => Number(n) + Number(gross), 0);
+			let { gameTime, bettings, gross, hits, comm } = a;
 			let currentDraw = draws.filter(dr => dr.game_time == gameTime)[0];
-				console.log(a.gameTime, a.game_time, 'BEEET')
 			
 			let isWin200 = currentDraw?.is_win_to ? getConfiguration(user, 'withWin200')?.isCheck : false;
 			let winPrize = isWin200 ? getConfiguration(user, 'withWin200').value : getConfiguration(user, 'winStraight').value
 				
-			grand_gross = Number(grand_gross) + Number(gross);
+			// grand_gross = Number(grand_gross) + Number(gross);
 			let commsTotal = 0
 			let genCommsTotal = 0;
 
@@ -142,12 +141,12 @@ const Dashboard = ({ navigation }) => {
 			genCommsTotal += gross * (user?.com_rate / 100);
 			let comms = commsTotal ? commsTotal : 0;
 			grand_comm = grand_comm + comms;
-			let winning = bettings.reduce((n, { winning }) => n + (winning * winPrize), 0);
+			let winning = hits * winPrize;
 
 			let net = gross - winning - genCommsTotal;
 			grand_hits = grand_hits + winning;
 			grand_net = grand_net + net;
-console.log(gameTime, 'ggg')
+// console.log(gameTime, 'ggg')
 			return (
 				<View
 					key={gameTime}
@@ -212,8 +211,6 @@ console.log(gameTime, 'ggg')
 		})
 
 
-
-console.log(grand_gross, 'GRAAND')
 
     return (
       <>
@@ -344,7 +341,6 @@ if (includeAll) {
   }, [date, includeAll, collector]);
 
 
-console.log(bettings.length, draws, includeAll, 'dass', user.id, collector)
 
   return (
   	<SafeAreaView style={{ ...styles.wrapper }}>

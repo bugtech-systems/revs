@@ -16,7 +16,7 @@ import { api, getDB } from "./offlineSync";
 // Initialize DB and create tables
 export const initDB = async () => {
   try {
-  let db = await SQLite.openDatabase({ name: "app.db", location: "default" });
+  let db = await SQLite.openDatabase({ name: "leo.db", location: "default" });
 
     await new Promise((resolve, reject) => {
       db.transaction(

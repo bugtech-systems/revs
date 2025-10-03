@@ -7,6 +7,7 @@ import moment from 'moment-timezone';
 import { COLORS, icons } from './constants';
 import supabase  from './utils/supabaseClient'; // Your initialized Supabase client
 import { getLocalUser, saveLocalUser } from './utils/db'; // SQLite helper functions
+import { fetchUser } from './utils/offlineSync';
 
 export function WelcomeView(): React.ReactElement {
   const [email, setEmail] = useState('');
@@ -15,6 +16,8 @@ export function WelcomeView(): React.ReactElement {
   const [passwordHidden, setPasswordHidden] = useState(true);
 
  
+
+
 
   // Sign in with Supabase
   const signIn = useCallback(async () => {
@@ -28,7 +31,8 @@ export function WelcomeView(): React.ReactElement {
 
     // Save user locally for offline-first
     if (data?.user?.email) {
-          let localUser = await getLocalUser(data?.user?.email);
+          let localUser = await fetchUser(data?.user?.email);
+          
           await saveLocalUser(localUser);
     }
   }, [email, password]);

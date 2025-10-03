@@ -5,13 +5,11 @@ import { StackNavigator } from './StackNavigator2';
 // import { AppInitializer } from './AppInitializer';
 import NotifService from './utils/NotificationService';
 import { COLORS } from './constants';
-import { getLocalUser, initDB, saveLocalUser } from './utils/db';
+import { fetchUser, getLocalUser, initDB, saveLocalUser } from './utils/db';
 import  supabase  from './utils/supabaseClient';
 import { useDispatch } from 'react-redux';
 import { SET_USER } from './redux/actions/types';
 import { SessionContext } from './context/SessionContext';
-import { SyncProvider } from './context/SyncContext';
-import { init, api, forceSync, startAutoSyncOnReconnect } from './utils/offlineSync';
 
 const LoadingIndicator = () => (
   <View style={{ ...styles.activityContainer, backgroundColor: COLORS.transparentBlack7 }}>
@@ -20,15 +18,13 @@ const LoadingIndicator = () => (
 );
 
 export const App = () => {
-  const [loading, setLoading] = useState(true);
- const [users, setUsers] = useState([]);
-    const { session } = useContext(SessionContext);
   const dispatch = useDispatch();
+  const [loading, setLoading] = useState(true);
+    const { session } = useContext(SessionContext);
 
   const notif = new NotifService((reg) => console.log('Push registered:', reg));
 
   useEffect(() => {
-
     notif.createDefaultChannels();
   }, []);
   
@@ -40,7 +36,7 @@ export const App = () => {
       console.log(email, 'EMAIL');
   
       // Try fetching from local SQLite
-      let localUser = await getLocalUser(email);
+      let localUser = await fetchUser(email);
       console.log(localUser, 'LOCAL USER');
   
       if (!localUser) {
@@ -71,8 +67,10 @@ export const App = () => {
   console.log('SET LOADING')
       setLoading(false);
       };
-  
+    
+    if(session?.user?.email){
     initUser(session?.user?.email);
+    }
   }, [dispatch, session]);
 
 

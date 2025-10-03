@@ -5,7 +5,7 @@ import { App } from './App';
 import { WelcomeView } from './WelcomeView';
 import supabase from './utils/supabaseClient';
 import { SessionContext } from './context/SessionContext';
-import { init, api, forceSync, startAutoSyncOnReconnect } from './utils/offlineSync';
+import { init, api, forceSync, startAutoSyncOnReconnect, stopAutoSyncOnReconnect } from './utils/offlineSync';
 
 
 export const AppWrapper = () => {
@@ -14,13 +14,11 @@ export const AppWrapper = () => {
 
 
   useEffect(() => {
-  
     const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
      
        
     });
-  console.log(listener, 'sesssss')
 
     return () => {
       listener.subscription.unsubscribe();
@@ -32,16 +30,12 @@ export const AppWrapper = () => {
   
     useEffect(() => {
       (async () => {
-            await init();
-      
-        if(session?.user){
-            let displayName = String(session.user.email).split('@')[0];
-
-        console.log(session.user.email, 'sssss')
-             await startAutoSyncOnReconnect(displayName);
-
-        }
+        await init();
+        await startAutoSyncOnReconnect(session?.user?.email);
       })();
+      return async () => {
+         stopAutoSyncOnReconnect(session?.user?.email)
+    };
     }, [session]);
   
 

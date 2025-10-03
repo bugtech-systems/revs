@@ -27,6 +27,7 @@ import {
 import { getLocalUsers, saveLocalUsers } from '../../utils/db';
 import { useScreenSize, getConfiguration } from '../../utils/helpers';
 import { api, clearAllStorage, deleteDB, forceSync } from '../../utils/offlineSync';
+import { exportDatabase } from '../../utils/exportHelper';
 
 
 const SettingsScreen = ({ navigation }) => {
@@ -156,7 +157,6 @@ const signOut = useCallback(async () => {
 
 
 
-console.log(selUser.email, selUser.configuration, ableToViewAppUsers, ableToViewMap, 'sss userss')
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.gray300 }}>
@@ -393,6 +393,16 @@ console.log(selUser.email, selUser.configuration, ableToViewAppUsers, ableToView
           <TouchableOpacity onPress={forceSync} style={{ marginBottom: 10 }}>
           <View style={{ backgroundColor: COLORS.gray400, paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
             <Text style={{ fontSize: 16, fontWeight: 'bold', color: COLORS.secondary }}>Force Sync</Text>
+          </View>
+        </TouchableOpacity>
+                  <TouchableOpacity onPress={exportDatabase} style={{ marginBottom: 10 }}>
+          <View style={{ backgroundColor: COLORS.gray400, paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', color: COLORS.secondary }}>Export DB</Text>
+          </View>
+        </TouchableOpacity>
+                <TouchableOpacity onPress={clearAllStorage} style={{ marginBottom: 10 }}>
+          <View style={{ backgroundColor: COLORS.gray400, paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', color: COLORS.secondary }}>Clear Async Storage</Text>
           </View>
         </TouchableOpacity>
         <TouchableOpacity onPress={handleDelete} style={{ marginBottom: 10 }}>

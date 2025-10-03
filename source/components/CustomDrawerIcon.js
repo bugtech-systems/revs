@@ -1,19 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, Image, Alert } from 'react-native';
-import supabase from '../utils/supabaseClient';
-import { getLocalUser } from '../utils/db'; // SQLite helper for offline-first
 import { COLORS, icons } from '../constants';
 import { useSelector } from 'react-redux';
+import { fetchUser } from '../utils/offlineSync';
+import supabase from '../utils/supabaseClient';
 
 const CustomDrawerIcon = ({ route, navigation, navType, headerTitle }) => {
+  const {user, selectedUser, collector} = useSelector(({user}) => user);
   const [ownUser, setOwnUser] = useState(null);
   const [displayName, setDisplayName] = useState('');
-  const {user, selectedUser, collector} = useSelector(({user}) => user);
 
   // // Load local user first (offline-first)
   useEffect(() => {
     (async () => {
-      let localUser = await getLocalUser(user?.email);
+      let localUser = await fetchUser(user?.email);
 
       if (!localUser) {
         // Fallback: fetch from Supabase online
@@ -49,7 +49,7 @@ const CustomDrawerIcon = ({ route, navigation, navType, headerTitle }) => {
 
 
 
-console.log(selectedUser,  user, 'ssuuuu')
+console.log(selectedUser?.id,  user?.id, 'ssuuuu')
 
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
