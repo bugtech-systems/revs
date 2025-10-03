@@ -11,6 +11,7 @@ import { useDispatch } from 'react-redux';
 import { SET_USER } from './redux/actions/types';
 import { SessionContext } from './context/SessionContext';
 import { SyncProvider } from './context/SyncContext';
+import { init, api, forceSync, startAutoSyncOnReconnect } from './utils/offlineSync';
 
 const LoadingIndicator = () => (
   <View style={{ ...styles.activityContainer, backgroundColor: COLORS.transparentBlack7 }}>
@@ -20,6 +21,7 @@ const LoadingIndicator = () => (
 
 export const App = () => {
   const [loading, setLoading] = useState(true);
+ const [users, setUsers] = useState([]);
     const { session } = useContext(SessionContext);
   const dispatch = useDispatch();
 
@@ -29,50 +31,54 @@ export const App = () => {
 
     notif.createDefaultChannels();
   }, []);
-
-useEffect(() => {
-  const initUser = async (email) => {
-    if (!email) return;
-
-    console.log(email, 'EMAIL');
-
-    // Try fetching from local SQLite
-    let localUser = await getLocalUser(email);
-    console.log(localUser, 'LOCAL USER');
-
-    if (!localUser) {
-      // Fetch from Supabase by email if not found locally
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('email', email) // filter by email
-        .limit(1)
-        .single();
-
-      if (error) {
-        console.error('Supabase fetch error:', error);
+  
+  
+  useEffect(() => {
+    const initUser = async (email) => {
+      if (!email) return;
+  
+      console.log(email, 'EMAIL');
+  
+      // Try fetching from local SQLite
+      let localUser = await getLocalUser(email);
+      console.log(localUser, 'LOCAL USER');
+  
+      if (!localUser) {
+        // Fetch from Supabase by email if not found locally
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', email) // filter by email
+          .limit(1)
+          .single();
+    console.log(data, 'DATAA USER')
+        if (error) {
+          console.error('Supabase fetch error:', error);
+        }
+  
+        if (data) {
+          // Save fetched user to local SQLite
+          await saveLocalUser(data);
+          localUser = data;
+        }
       }
-
-      if (data) {
-        // Save fetched user to local SQLite
-        await saveLocalUser(data);
-        localUser = data;
+  
+      if (localUser) {
+        dispatch({ type: SET_USER, payload: localUser });
       }
-    }
+  
 
-    if (localUser) {
-      dispatch({ type: SET_USER, payload: localUser });
-    }
-
-    setLoading(false);
-  };
-
-  initUser(session?.user?.email);
-}, [dispatch, session?.user?.email]);
+  
+        const list = await api.listUsers();
+        setUsers(list);
 
 
+      setLoading(false);
+    };
+  
+    initUser(session?.user?.email);
+  }, [dispatch, session?.user?.email]);
 
-console.log(session?.user?.email, 'APP SESSION')
 
 
   if (loading) return <LoadingIndicator />;
@@ -80,9 +86,9 @@ console.log(session?.user?.email, 'APP SESSION')
   return (
     <>
       {/* <AppInitializer /> */}
-      <SyncProvider>
+      {/* <SyncProvider> */}
       <StackNavigator />
-      </SyncProvider>
+      {/* </SyncProvider> */}
     </>
   );
 };

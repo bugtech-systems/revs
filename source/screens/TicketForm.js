@@ -15,6 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, icons } from '../constants';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { fetchUser, getLocalUser, initDB, placeBet, syncBettings, syncPendingBets } from '../utils/db';
+import { init, api, forceSync, startAutoSyncOnReconnect } from '../utils/offlineSync';
 
 
 let keyPad = [
@@ -516,6 +517,9 @@ export default function TicketForm({ navigation }) {
             // 	Alert.alert('Set Timezone Properly!');
             // 	return;
             // }
+            
+            console.log(selectedUser, 'SELECTED USER')
+            
 
             if (data?.length > 0) {
                 let combinations = [];
@@ -560,8 +564,8 @@ export default function TicketForm({ navigation }) {
                     newUplines.push(String(line.user_id))
                 });
 
-                // newUps.push(selectedUser)
-                // newUplines.push(String(selectedUser?.id));
+                newUps.push(selectedUser)
+                newUplines.push(String(selectedUser?.id));
 
 
                 for (let i = 0; i < newUps.length; i++) {
@@ -622,33 +626,36 @@ export default function TicketForm({ navigation }) {
 
        
 
-
-                    let placedBet = await placeBet({
+                    
+                    let placedBet = await api.createBetting({
                         ramble: Number(totalRamble),
                         straight: Number(totalStraight),
-                        isComplete: false,
+                        is_complete: false,
                         owner_id: String(selectedUser?.id),
                         gross: Number(gross),
                         net: Number(netTotal),
-                        ticketNo: `${generateTicketNumber()}`,
+                        ticket_no: `${generateTicketNumber()}`,
                         collector: selectedUser.first_name,
-                        isWinTo: false,
-                        isPrint: false,
-                        isDeleted: false,
+                        is_win_to: false,
+                        is_print: false,
+                        is_deleted: false,
                         timestamp: date,
-                        gameTime: time,
-                        printCopy: 0,
+                        game_time: time,
+                        print_copy: 0,
+                        input_type: 'normal',
                         contact: selectedUser.mobile,
                         winning: 0,
                         combinations: combinations,
                         commissions: newComms,
-                        uplines: newUplines
+                        uplines: newUplines,
+                        created_at: new Date(),
+                        updated_at: new Date()
                     })
                     
                     
                     console.log(placedBet, 'PLACEDD BETSS')
                     
-                    await syncBettings()
+                    // await syncBettings()
                 // await realm.write(async () => {
 
 
@@ -879,7 +886,6 @@ export default function TicketForm({ navigation }) {
     // }, [draws])
 
     useEffect(() => {
-        initDB()
         return () => {
             setIs2pmDisabled(false)
             setIs5pmDisabled(false)

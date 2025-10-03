@@ -19,6 +19,8 @@ import SyncComponent from './SyncComponent';
 import CustomDrawerIcon from './components/CustomDrawerIcon';
 import { getConfiguration } from './utils/helpers';
 
+
+
 const Stack = createStackNavigator();
 const Drawer = createDrawerNavigator();
 

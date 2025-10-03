@@ -8,6 +8,8 @@ import icons from '../constants/icons';
 import { formatNumber, getConfiguration } from '../utils/helpers';
 import { getLocalUser, get_local_bettings, get_local_draws } from '../utils/db'; // Your SQLite helpers
 import  supabase  from '../utils/supabaseClient';
+import { init, api, forceSync, startAutoSyncOnReconnect } from '../utils/offlineSync';
+
 
 const Dashboard = ({ navigation }) => {
   const dispatch = useDispatch();
@@ -45,20 +47,37 @@ const Dashboard = ({ navigation }) => {
     (async () => {
       if (!own_user) return;
 
-      const start_of_day = moment(date).startOf('day').toDate();
-      const end_of_day = moment(date).endOf('day').toDate();
+      const start_of_day = moment(date).startOf('day').format('YYYY-MM-DD');
+      const end_of_day = moment(date).endOf('day').format('YYYY-MM-DD');
 
-      let localBettings = await get_local_bettings({
+      let localBettings = await api.listBettings({
+        filters: { 
         owner_id: own_user.id,
-        start_date: start_of_day,
-        end_date: end_of_day,
-        includeAll,
+        // is_deleted: 0, 
+        // timestamp:  { 
+        //    op: "between",
+	    //   from: start_of_day,
+	    //   to: end_of_day,
+        // }
+        },
+        orderBy: 'updated_at DESC',
+        limit: 20,
       });
 
-      let localDraws = await get_local_draws({
-        start_date: start_of_day,
-        end_date: end_of_day,
+    
+
+      let localDraws = await api.listDraws({
+       filters: { 
+        draw_date:  { 
+           op: "between",
+	      from: start_of_day,
+	      to: end_of_day,
+        }}
       });
+      
+      
+      
+      console.log(localBettings[0], 'BEETSS')
 
       setBettings(localBettings);
       setDraws(localDraws);
@@ -141,16 +160,16 @@ const Dashboard = ({ navigation }) => {
     const grouped_bettings = ['2pm', '5pm', '9pm'].map((game_time) => {
       const bets = bettings.filter(b => b.game_time === game_time);
 
-      let gross = bets.reduce((sum, b) => sum + b.gross, 0);
+      let gross = bets.reduce((sum, b) => sum + Number(b.gross), 0);
       let hits = bets.reduce((sum, b) => sum + (b.winning || 0), 0);
       let comm = bets.reduce((sum, b) => sum + (b.commission || 0), 0);
       let net = gross - hits - comm;
 
-      grand_gross += gross;
+      grand_gross += Number(gross);
       grand_hits += hits;
       grand_comm += comm;
       grand_net += net;
-
+		console.log(grand_gross, 'GRAAND', typeof gross)
       return { gameTime: game_time, bettings: bets, gross, hits, comm, net };
     });
 
@@ -160,14 +179,14 @@ const Dashboard = ({ navigation }) => {
 
 	let grossCards = grouped_bettings.map((a, index) => {
 			let { gameTime, bettings } = a;
-			let gross = bettings.reduce((n, { gross }) => n + gross, 0);
+			let gross = bettings.reduce((n, { gross }) => Number(n) + Number(gross), 0);
 			let currentDraw = draws.filter(dr => dr.gameTime == gameTime)[0];
 
 			
 			let isWin200 = currentDraw?.isWinTo ? getConfiguration(user, 'withWin200')?.isCheck : false;
 			let winPrize = isWin200 ? getConfiguration(user, 'withWin200').value : getConfiguration(user, 'winStraight').value
-
-			grand_gross = grand_gross + gross;
+				
+			grand_gross = Number(grand_gross) + Number(gross);
 			let commsTotal = 0
 			let genCommsTotal = 0;
 
@@ -248,7 +267,7 @@ const Dashboard = ({ navigation }) => {
 
 
 
-
+console.log(grand_gross, 'GRAAND')
 
     return (
       <>
@@ -317,7 +336,6 @@ const Dashboard = ({ navigation }) => {
   useEffect(() => {
     request_notification_permission();
   }, []);
-
 
 
   return (

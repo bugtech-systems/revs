@@ -1,15 +1,23 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet, Button } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
+import { init, api, forceSync, startAutoSyncOnReconnect, deleteDB } from './utils/offlineSync';
+import { exportDatabase } from './utils/exportHelper';
+
+
 
 const SyncComponent = () => {
-  const [isOnline, setIsOnline] = useState(true);
+  const [isOnline, setIsOnline] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState(null);
 
+  const handleDelete = async () => {
+await deleteDB()
+  }
 
 
   useEffect(() => {
+    init()
     // Listen to network status
     const unsubscribe = NetInfo.addEventListener(state => {
       setIsOnline(state.isConnected && state.isInternetReachable);
@@ -31,6 +39,9 @@ const SyncComponent = () => {
           {lastSync ? ` • Last: ${new Date(lastSync).toLocaleTimeString()}` : ''}
         </Text>
       )}
+                  <Button title="Delete DB" onPress={handleDelete} />
+            <Button title="Force Sync" onPress={forceSync} />
+            <Button title="Export Database" onPress={exportDatabase} />
     </View>
   );
 };

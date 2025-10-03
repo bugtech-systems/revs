@@ -1,11 +1,11 @@
 // db.js
 import SQLite from "react-native-sqlite-storage";
 import supabase from "./supabaseClient";
-
+import { api, getDB } from "./offlineSync";
 
 // Enable debug (optional for development)
 SQLite.DEBUG(true);
-SQLite.enablePromise(true);
+// SQLite.enablePromise(true);
 
 
 
@@ -98,19 +98,19 @@ export const initDB = async () => {
 };
 
 // Return database instance
-export const getDB = async () => {
-  let db = await SQLite.openDatabase({ name: "app.db", location: "default" });
+// export const getDB = async () => {
+//   let db = await SQLite.openDatabase({ name: "app.db", location: "default" });
 
-  if (!db) throw new Error("DB not initialized. Call initDB() first.");
-  return db;
-};
+//   if (!db) throw new Error("DB not initialized. Call initDB() first.");
+//   return db;
+// };
 
 
 // Get local user
 // Get local authenticated user
 export const getLocalUser = async (authEmail = null) => {
     let db = await getDB();
-    
+    console.log('GET LOCAL USER')
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
       let query = 'SELECT * FROM users';
@@ -148,17 +148,13 @@ export const saveLocalUser = async (user) => {
     let db = await getDB();
 
   const configuration = JSON.stringify(user.configuration || []);
-  db.transaction(tx => {
-    tx.executeSql(
-      `INSERT OR REPLACE INTO users (id, first_name, last_name, email, device_id, app_version, configuration)
-       VALUES (?, ?, ?, ?, ?, ?, ?);`,
-      [user.id, user.first_name, user.last_name, user.email, user.device_id || '', user.app_version || '', configuration]
-    );
-  });
+    await api.createUser(user)
 };
 
 // Update local user device
 export const updateLocalUserDevice = async (userId, deviceId) => {
+  let db = await getDB();
+
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
       tx.executeSql(
@@ -174,6 +170,8 @@ export const updateLocalUserDevice = async (userId, deviceId) => {
 
 // Update user's last_summary
 export const update_local_user_last_summary = async (user_id, date) => {
+  let db = await getDB();
+
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
       tx.executeSql(
@@ -188,6 +186,8 @@ export const update_local_user_last_summary = async (user_id, date) => {
 
 // Get bettings filtered by date & owner_id
 export const get_local_bettings = async ({ owner_id, start_date, end_date, include_all }) => {
+  let db = await getDB();
+
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
       let query = '';
@@ -223,6 +223,8 @@ export const get_local_bettings = async ({ owner_id, start_date, end_date, inclu
 
 // Get draws filtered by date
 export const get_local_draws = async ({ start_date, end_date }) => {
+  let db = await getDB();
+
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
       tx.executeSql(

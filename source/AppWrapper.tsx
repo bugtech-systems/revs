@@ -5,7 +5,8 @@ import { App } from './App';
 import { WelcomeView } from './WelcomeView';
 import supabase from './utils/supabaseClient';
 import { SessionContext } from './context/SessionContext';
-import { initDB } from './utils/db';
+import { init, api, forceSync, startAutoSyncOnReconnect } from './utils/offlineSync';
+
 
 export const AppWrapper = () => {
   const [session, setSession] = useState(supabase.auth.getSession());
@@ -16,12 +17,34 @@ export const AppWrapper = () => {
   
     const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
+     
+       
     });
+  console.log(listener, 'sesssss')
 
     return () => {
       listener.subscription.unsubscribe();
     };
   }, []);
+  
+
+  
+  
+    useEffect(() => {
+      (async () => {
+        if(session?.user){
+            let displayName = String(session.user.email).split('@')[0];
+
+        console.log(session.user.email, 'sssss')
+             await init(displayName);
+        await startAutoSyncOnReconnect(displayName);
+
+        }
+      })();
+    }, [session]);
+  
+  
+  
 
   return (
     <Provider store={store}>

@@ -4,6 +4,9 @@ import moment from 'moment-timezone';
 import RNFS from 'react-native-fs';
 import { Alert, Dimensions, Platform } from 'react-native';
 import { useEffect, useState } from 'react';
+import 'react-native-get-random-values'; // polyfill for crypto.getRandomValues
+import { ObjectId } from 'bson';
+
 // import { Combinations } from '../Models';
 
 export const permuteDigits = (number) => {
@@ -34,6 +37,10 @@ export const permuteDigits = (number) => {
   permute(digits);
 
   return result;
+}
+
+export function generateObjectId() {
+  return new ObjectId().toHexString(); // e.g. "68630373feccf026d6aebea5"
 }
 
 export const generateRandomCombination = () => {
