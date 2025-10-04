@@ -684,11 +684,11 @@ async function pullFromSupabase(userId) {
       }
 
       // ✅ Step 5: remove local rows not present in Supabase
-      for (const localId of localIds) {
-        if (!remoteIds.has(localId)) {
-          await runSql(`DELETE FROM ${table} WHERE id = ?`, [localId]);
-        }
-      }
+      // for (const localId of localIds) {
+      //   if (!remoteIds.has(localId)) {
+      //     await runSql(`DELETE FROM ${table} WHERE id = ?`, [localId]);
+      //   }
+      // }
 
       // ✅ Step 6: update lastPulledAt
     } catch (err) {

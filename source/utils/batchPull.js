@@ -94,12 +94,12 @@ const processBatch = async (tableName, remoteData, localIds) => {
   }
 
   // Remove local records not present in Supabase
-  for (const localId of localIds) {
-    if (!remoteIds.has(localId)) {
-      await runSql(`DELETE FROM ${tableName} WHERE id = ?`, [localId]);
-      deleted++;
-    }
-  }
+  // for (const localId of localIds) {
+  //   if (!remoteIds.has(localId)) {
+  //     await runSql(`DELETE FROM ${tableName} WHERE id = ?`, [localId]);
+  //     deleted++;
+  //   }
+  // }
 
   return { inserted, updated, deleted };
 };
