@@ -645,8 +645,6 @@ async function pullFromSupabase(userId) {
         query = query.gte('updated_at', lastPulledAt);
       }
       
-      
-      
 
       const { data: remoteData, error } = await query.limit(10000);
       if (error) {
