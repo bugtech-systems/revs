@@ -1,16 +1,30 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet, Button } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
-import { init, api, forceSync, startAutoSyncOnReconnect, deleteDB } from './utils/offlineSync';
 import { PermissionsAndroid } from 'react-native';
+import useBatchedPull from './hooks/useBatchPulling';
 
 
 
 
 const SyncComponent = () => {
+  const {
+    isPulling,
+    currentTable,
+    progress,
+    recordsProcessed,
+    error,
+    lastPull,
+    results,
+    pullFromSupabase,
+    pullTables,
+    fullResync,
+    abortPull,
+    resetPullState
+  } = useBatchedPull();
+  
+  
   const [isOnline, setIsOnline] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const [lastSync, setLastSync] = useState(null);
 
 
 
@@ -41,7 +55,6 @@ async function requestStoragePermission() {
 
 
   useEffect(() => {
-    init()
     // Listen to network status
     const unsubscribe = NetInfo.addEventListener(state => {
       setIsOnline(state.isConnected && state.isInternetReachable);
@@ -55,12 +68,12 @@ async function requestStoragePermission() {
 
   return (
     <View style={styles.container}>
-      {syncing ? (
+      {isPulling ? (
         <ActivityIndicator size="small" color="#fff" />
       ) : (
         <Text style={styles.text}>
-          {isOnline ? 'Synced' : 'Offline'}
-          {lastSync ? ` • Last: ${new Date(lastSync).toLocaleTimeString()}` : ''}
+          {isOnline ? `Synced ${progress}` : 'Offline'}
+          {lastPull ? ` • Last: ${new Date(lastPull).toLocaleTimeString()}` : ''}
         </Text>
       )}
                

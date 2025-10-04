@@ -14,8 +14,7 @@ import Geolocation from 'react-native-geolocation-service';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, icons } from '../constants';
 import ConfirmationModal from '../components/ConfirmationModal';
-import { fetchUser, getLocalUser, initDB, placeBet, syncBettings, syncPendingBets } from '../utils/db';
-import { init, api, forceSync, startAutoSyncOnReconnect } from '../utils/offlineSync';
+import { init, api, forceSync, startAutoSyncOnReconnect, fetchUser} from '../utils/offlineSync';
 
 
 let keyPad = [

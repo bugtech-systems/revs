@@ -28,10 +28,26 @@ import { getLocalUsers, saveLocalUsers } from '../../utils/db';
 import { useScreenSize, getConfiguration } from '../../utils/helpers';
 import { api, clearAllStorage, deleteDB, forceSync } from '../../utils/offlineSync';
 import { exportDatabase } from '../../utils/exportHelper';
+import useBatchedPull from '../../hooks/useBatchPulling';
 
 
 const SettingsScreen = ({ navigation }) => {
   const dispatch = useDispatch();
+    const {
+    isPulling,
+    currentTable,
+    progress,
+    recordsProcessed,
+    error,
+    lastPull,
+    results,
+    pullFromSupabase,
+    pullTables,
+    fullResync,
+    abortPull,
+    resetPullState
+  } = useBatchedPull();
+  
   const { user, collector } = useSelector(({ user }) => user);
   const { confirmationModal } = useSelector(({ ui }) => ui);
 
@@ -393,6 +409,11 @@ const signOut = useCallback(async () => {
           <TouchableOpacity onPress={forceSync} style={{ marginBottom: 10 }}>
           <View style={{ backgroundColor: COLORS.gray400, paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
             <Text style={{ fontSize: 16, fontWeight: 'bold', color: COLORS.secondary }}>Force Sync</Text>
+          </View>
+        </TouchableOpacity>
+                  <TouchableOpacity onPress={fullResync} style={{ marginBottom: 10 }}>
+          <View style={{ backgroundColor: COLORS.gray400, paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', color: COLORS.secondary }}>Sync Bettings</Text>
           </View>
         </TouchableOpacity>
                   <TouchableOpacity onPress={exportDatabase} style={{ marginBottom: 10 }}>

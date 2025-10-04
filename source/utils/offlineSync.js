@@ -27,22 +27,24 @@ import { generateObjectId } from './helpers';
 // Enable debug (optional for development)
 // SQLite.DEBUG(true);
 
+export const BATCH_SIZE = 1000; // Supabase limit
 
 const DB_NAME = 'leo.db';
+
 let db = SQLite.openDatabase({ name: DB_NAME, location: 'default' });
 
 // local metadata key to store lastPulledAt timestamp per table
-const LAST_PULLED_KEY = 'offline:lastPulledAt';
+export const LAST_PULLED_KEY = 'offline:lastPulledAt';
 
 // Table list (as used in Supabase). Must match Supabase table names.
-const TABLES = [
+export const TABLES = [
 'users', 'draws', 'bettings', 
 'master_combinations',
 // 'messages', 'cashflow'
 ];
 
 // ---------- UTIL ----------
-const runSql = (sql, params = []) => {
+export const runSql = (sql, params = []) => {
   db = SQLite.openDatabase({ name: DB_NAME, location: 'default' });
   if (!db) {
    db = SQLite.openDatabase({ name: "app.db", location: "default" });
@@ -348,7 +350,7 @@ function parseJsonText(str) {
 }
 
 // ✅ Timestamps: always ISO 8601
-function nowISO() {
+export function nowISO() {
   return new Date().toISOString();
 }
 
@@ -494,7 +496,7 @@ async function localDelete(tableName, id) {
   return true;
 }
 
-async function localGet(tableName, id) {
+export async function localGet(tableName, id) {
   const res = await runSql(`SELECT * FROM ${tableName} WHERE id = ? LIMIT 1;`, [id]);
   if (res.rows.length === 0) return null;
   const row = res.rows.item(0);
@@ -638,7 +640,7 @@ async function pullFromSupabase(userId) {
       const localIds = await getAllLocalIds(table);
 
       // ✅ Step 2: fetch remote rows (always Supabase-first)
-      let query = supabase.from(table).select('*').limit(10000);
+      let query = supabase.from(table).select('*');
       if (lastPulledAt) {
         query = query.gte('updated_at', lastPulledAt);
       }
@@ -646,7 +648,7 @@ async function pullFromSupabase(userId) {
       
       
 
-      const { data: remoteData, error } = await query;
+      const { data: remoteData, error } = await query.limit(10000);
       if (error) {
         console.warn(`Pull error for ${table}`, error);
         continue;
@@ -922,7 +924,7 @@ function buildWhereClause(filters = {}) {
   return { whereSql, values };
 }
 
-async function getAllLocalIds(table) {
+export async function getAllLocalIds(table) {
   const res = await runSql(`SELECT id FROM ${table}`);
   const ids = [];
   if (res && res.rows) {
@@ -934,7 +936,7 @@ async function getAllLocalIds(table) {
 }
 
 
-async function insertOrReplace(table, row) {
+export async function insertOrReplace(table, row) {
   const cols = Object.keys(row);
   const placeholders = cols.map(() => '?').join(', ');
   const sql = `INSERT OR REPLACE INTO ${table} (${cols.join(', ')}) VALUES (${placeholders});`;
