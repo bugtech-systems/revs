@@ -22,6 +22,7 @@ import NetInfo from '@react-native-community/netinfo';
 import supabase from './supabaseClient';
 import { schema } from './schema';
 import { generateObjectId } from './helpers';
+import moment from 'moment-timezone';
 // SQLite.enablePromise(true); // optional, to use promises
 
 // Enable debug (optional for development)
@@ -440,6 +441,7 @@ async function localInsert(tableName, record) {
     record.commissions = toJsonText(record.commissions ?? []);
     record.combinations = toJsonText(record.combinations ?? []);
     record.uplines = toJsonText(record.uplines ?? []);
+    record.ticket_no = String(record.ticket_no ?? '')
   } else if (tableName === 'messages') {
     record.conversations = toJsonText(record.conversations ?? []);
   }
@@ -849,7 +851,6 @@ export function stopAutoSyncOnReconnect(id) {
   }
 }
 
-
 function buildWhereClause(filters = {}) {
   const whereClauses = [];
   const values = [];
@@ -933,7 +934,6 @@ export async function getAllLocalIds(table) {
   return ids;
 }
 
-
 export async function insertOrReplace(table, row) {
   const cols = Object.keys(row);
   const placeholders = cols.map(() => '?').join(', ');
@@ -941,7 +941,6 @@ export async function insertOrReplace(table, row) {
   const values = cols.map((c) => row[c]);
   await runSql(sql, values);
 }
-
 
 export async function clearAllStorage() {
   try {
@@ -954,4 +953,42 @@ export async function clearAllStorage() {
   } catch (e) {
     console.error("❌ Failed to clear AsyncStorage", e);
   }
+}
+
+export async function fetchBettings({ includeAll, date, userNow, user }) {
+  // Compute day range in ISO format for Supabase/SQLite compatibility
+  let startOfDay = moment(date).startOf('day').toISOString();
+  let endOfDay = moment(date).endOf('day').toISOString();
+
+  // Apply Realm-like adjustment logic
+  if (!includeAll && new Date(date) <= new Date(user?.lastSummary)) {
+    startOfDay = moment().add(1, 'd').endOf('day').toISOString();
+    endOfDay = moment().add(1, 'd').endOf('day').toISOString();
+  }
+
+  let filters = {
+    is_deleted: false,
+    input_type: 'normal',
+  };
+
+  // Handle includeAll vs specific owner
+  if (includeAll) {
+    // "ANY uplines == userNow" — assuming `uplines` is stored as JSON/text
+    // You can use LIKE here if it's a stringified array in SQLite
+    filters.uplines_like = `%${userNow}%`;
+  } else {
+    filters.owner_id = String(userNow);
+  }
+  
+  // Now execute the query via your API
+  const items = await api.listBettings({
+    filters,
+    // between: { field: 'timestamp', start: startOfDay, end: endOfDay },
+    orderBy: 'timestamp ASC',
+  });
+
+
+  console.log(items, "NAA?")
+
+  return items;
 }

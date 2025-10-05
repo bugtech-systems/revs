@@ -18,6 +18,8 @@ import SettingsScreen from './screens/drawers/SettingsScreen';
 import SyncComponent from './SyncComponent';
 import CustomDrawerIcon from './components/CustomDrawerIcon';
 import { getConfiguration } from './utils/helpers';
+import VoidScreen from './screens/VoidScreen';
+import ReviewScreen from './screens/ReviewScreen';
 
 
 
@@ -67,6 +69,7 @@ const DrawerNavigation = () => {
 
 export const StackNavigator = () => {
   const { session } = useContext(SessionContext);
+  
   const dispatch = useDispatch();
   const userRedux = useSelector(state => state.user.user);
   const [user, setUser] = useState(userRedux);
@@ -95,6 +98,18 @@ export const StackNavigator = () => {
       <NavigationContainer>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Drawer" component={DrawerNavigation} />
+          <Stack.Screen
+            name="ViewTicket"
+            component={ReviewScreen}
+            options={({ navigation, route }) => ({
+              headerTitle: '',
+              headerTitleStyle: { color: COLORS.white },
+              headerStyle: { backgroundColor: COLORS.secondary },
+              // headerLeft: () => (
+              //   <CustomDrawerIcon route={route} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'View Ticket'} />
+              // ),
+            })}
+          />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>
