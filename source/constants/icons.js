@@ -62,11 +62,19 @@ export const revokeDevice = require('../../assets/icons/access-denied.png')
 export const disabledSync = require('../../assets/icons/no-wifi.png')
 export const EnabledSync = require('../../assets/icons/wi-fi.png')
 export const cashFlow = require('../../assets/icons/money.png')
+export const mapUsers = require('../../assets/icons/map_users.png')
+export const testPrint = require('../../assets/icons/test_print.png')
+export const android = require('../../assets/icons/android.png')
+export const configuration = require('../../assets/icons/configuration.png')
 
 
 
 
 export default {
+    configuration,
+    android,
+    testPrint,
+    mapUsers,
     cashFlow,
     EnabledSync,
     disabledSync,

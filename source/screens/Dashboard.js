@@ -64,20 +64,20 @@ const Dashboard = ({ navigation }) => {
   };
 
   const renderHeader = () => (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%' }}>
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
       <TouchableOpacity
         onPress={showDatePicker}
-        style={{ width: '80%', backgroundColor: COLORS.white, borderRadius: 8, elevation: 4 }}
+        style={{ width: '85%', flexDirection: 'row', borderWidth: 1, backgroundColor: COLORS.white, borderRadius: 8, elevation: 4 }}
       >
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 5 }}>
-          <Text style={{ fontSize: 20, fontWeight: '500', color: COLORS.black }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 5, width: '100%' }}>
+          <Text style={{ fontSize: 20, fontWeight: '500', color: COLORS.black, paddingHorizontal: 6 }}>
             {moment(date).format('MM/DD/YYYY')}
           </Text>
           <Image source={icons.calendar} style={{ height: 40, width: 40, tintColor: COLORS.black }} />
         </View>
       </TouchableOpacity>
 
-      <View style={{ width: '20%', justifyContent: 'center', alignItems: 'flex-end' }}>
+      <View style={{ width: '15%', justifyContent: 'center', alignItems: 'flex-end' }}>
         <TouchableOpacity
           activeOpacity={0.9}
           onLongPress={() => own_user?.is_admin && able_to_set_last_summary && handle_last_summary()}
@@ -400,7 +400,7 @@ const styles = StyleSheet.create({
 		width: '100%',
 		// justifyContent: 'flex-start',
 		justifyContent: 'center',
-		backgroundColor: COLORS.gray300,
+		backgroundColor: '#f1f1f1',
 		// padding: 10
 	},
 	textRow: {

@@ -6,24 +6,22 @@ import { constants, icons, FONTS, SIZES, COLORS } from '../constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { checkNotifications, requestNotifications, openSettings } from 'react-native-permissions';
 import TextButton from '../components/TextButton';
-
+import { formatNumberWithComma } from '../utils/helpers';
 
 const permission_process = [
-    {
-      id: 1,
-      name: 'Please enable notifications',
-      description: 'This is required for getting notifications.',
-      image: icons.notification
-    },
-    { 
-      id: 2,
-      name: 'Please allow access to geolocation',
-      description: 'It will make the address search more precise.',
-      image: icons.location
-    }
-  ];
-
-
+  {
+    id: 1,
+    name: 'Please enable notifications',
+    description: 'This is required for getting notifications.',
+    image: icons.notification
+  },
+  {
+    id: 2,
+    name: 'Please allow access to geolocation',
+    description: 'It will make the address search more precise.',
+    image: icons.location
+  }
+];
 
 const PermissionScreen = ({ navigation }) => {
   // const scrollX = new Animated.Value(0)
@@ -35,180 +33,105 @@ const PermissionScreen = ({ navigation }) => {
   const [requestStatus, setRequestStatus] = useState(null);
 
   const onViewChangeRef = useRef(({ viewableItems, changed }) => {
-  console.log('WAWAWA', viewableItems[0])
+    console.log('WAWAWA', viewableItems[0])
     setCurrentIndex(viewableItems[0].index);
   });
 
-
-
-
   const handleBack = () => {
-    if(currentIndex === 0){
+    if (currentIndex === 0) {
       setCurrentIndex(currentIndex + 1)
       flatListRef?.current?.scrollToIndex({
         index: currentIndex + 1,
         Animated: true,
       });
     } else {
-    navigation.goBack()
+      navigation.goBack()
     }
-  }
+  };
 
-  // const handleContinue = async () => {
-  //   const onBoarded = await AsyncStorage.getItem('onBoarded');
+  const handleContinue = async () => {
+    const onBoarded = await AsyncStorage.getItem('onBoarded');
 
+    if (currentIndex === 0) {
+      console.log('Requesting notification permission...');
 
-  //   if(currentIndex === 0){
-  //       console.log('CONTINUEEING')
-  //     requestNotifications(['alert', 'sound']).then(({status, settings}) => {
-  //         console.log(status, settings, 'REQUEST NOTIF')
-  //         setRequestStatus(status);
-          
-  //         if(requestStatus === 'blocked'){
-  //           setRequestStatus(null);
-  //                  openSettings().catch(() => console.warn('cannot open settings'));
-  //             return;
-  //           }
-  //         if(status === 'granted'){
-  //           setRequestStatus(null);
-  //         setCurrentIndex(currentIndex + 1)
-  //         flatListRef?.current?.scrollToIndex({
-  //           index: currentIndex + 1,
-  //           Animated: true,
-  //         });
-  //       }
-  //     });
-      
-  //   }
-     
-    
-  //   if(currentIndex ===  1){
-  //     const granted = await PermissionsAndroid.request(
-  //       PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-  //       {
-  //           title: 'Geolocation Permission',
-  //           message: 'Can we access your location?',
-  //           buttonNeutral: 'Ask Me Later',
-  //           buttonNegative: 'Cancel',
-  //           buttonPositive: 'OK',
-  //       },
-  //   );
+      try {
+        const { status, settings } = await requestNotifications(['alert', 'sound']);
+        console.log(status, settings, 'Notification Permission Status');
 
-
-  //   console.log(granted, "THE GRANT?")
-    
-  //   if(granted === 'granted'){
-  //       navigation.goBack()
-  //   }
-  //   } 
-  // }
-
-const handleContinue = async () => {
-  const onBoarded = await AsyncStorage.getItem('onBoarded');
-
-  if (currentIndex === 0) {
-    console.log('Requesting notification permission...');
-
-    try {
-      const { status, settings } = await requestNotifications(['alert', 'sound']);
-      console.log(status, settings, 'Notification Permission Status');
-
-      if (status === 'blocked') {
-        console.warn('Notification permission is blocked. Opening settings...');
-        await openSettings();
-        return;
-      }
-
-      if (status === 'granted') {
-        setCurrentIndex(currentIndex + 1);
-        flatListRef?.current?.scrollToIndex({
-          index: currentIndex + 1,
-          animated: true,
-        });
-      } else {
-        console.warn('Notification permission not granted.');
-      }
-    } catch (error) {
-      console.error('Notification permission request failed:', error);
-    }
-  }
-
-  if (currentIndex === 1 && Platform.OS === 'android') {
-    try {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        {
-          title: 'Geolocation Permission',
-          message: 'Can we access your location?',
-          buttonNeutral: 'Ask Me Later',
-          buttonNegative: 'Cancel',
-          buttonPositive: 'OK',
+        if (status === 'blocked') {
+          console.warn('Notification permission is blocked. Opening settings...');
+          await openSettings();
+          return;
         }
-      );
 
-      console.log(granted, 'Location Permission Result');
-
-      if (granted === 'denied') {
-        // console.warn('Location permission set to never ask again. Opening settings...');
-        Linking.openSettings(); // Navigates to the app's system settings
-      } else {
-        navigation.goBack();
-        // console.warn('Location permission denied.');
+        if (status === 'granted') {
+          setCurrentIndex(currentIndex + 1);
+          flatListRef?.current?.scrollToIndex({
+            index: currentIndex + 1,
+            animated: true,
+          });
+        } else {
+          console.warn('Notification permission not granted.');
+        }
+      } catch (error) {
+        console.error('Notification permission request failed:', error);
       }
-    } catch (error) {
-      console.error('Location permission request failed:', error);
     }
-  }
-};
 
+    if (currentIndex === 1 && Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: 'Geolocation Permission',
+            message: 'Can we access your location?',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          }
+        );
 
+        console.log(granted, 'Location Permission Result');
 
+        if (granted === 'denied') {
+          // console.warn('Location permission set to never ask again. Opening settings...');
+          Linking.openSettings(); // Navigates to the app's system settings
+        } else {
+          navigation.goBack();
+          // console.warn('Location permission denied.');
+        }
+      } catch (error) {
+        console.error('Location permission request failed:', error);
+      }
+    }
+  };
 
-
-
-  async function checkPermissions () {
-  let notification = false;
-  let location = false;
-    let {status} = await checkNotifications();
+  async function checkPermissions() {
+    let notification = false;
+    let location = false;
+    let { status } = await checkNotifications();
     const locationGranted = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION)
     const onBoarded = await AsyncStorage.getItem('onBoarded');
 
-    
-
-    if(currentIndex === 0 && requestStatus === null && status === 'granted'){
-      
+    if (currentIndex === 0 && requestStatus === null && status === 'granted') {
       setCurrentIndex(1)
-     /*  flatListRef?.current?.scrollToIndex({
-       index:  1,
-       Animated: true,
-     }); */
-    }
-    
-    if(currentIndex === 1 && requestStatus === null && locationGranted){
-            // navigation.goBack()
+      /*  flatListRef?.current?.scrollToIndex({
+        index:  1,
+        Animated: true,
+      }); */
     }
 
+    if (currentIndex === 1 && requestStatus === null && locationGranted) {
+      // navigation.goBack()
     }
-  
+  };
 
-  
   useEffect(() => {
-  checkPermissions()
+    checkPermissions()
   }, [])
-  
-  // useEffect(() => {
-  //   if(requestStatus === 'granted'){
-  //     setCurrentIndex(currentIndex + 1)
-  //     // flatListRef?.current?.scrollToIndex({
-  //     //   index: 1,
-  //     //   Animated: true,
-  //     // });
-  //   }    
-  
-  // }, [requestStatus])
 
-
-  function Dots () {
+  function Dots() {
     const dotPosition = Animated.divide(scrollX, SIZES.width);
 
     return (
@@ -219,7 +142,7 @@ const handleContinue = async () => {
           justifyContent: 'center',
         }}>
         {permission_process.map((item, index) => {
-           const dotColor = dotPosition.interpolate({
+          const dotColor = dotPosition.interpolate({
 
             inputRange: [index - 1, index, index + 1],
             // inputRange: [
@@ -259,9 +182,7 @@ const handleContinue = async () => {
       </View>
     );
   };
-  
-  
-  
+
   function renderFooter() {
     return (
       <View
@@ -270,49 +191,49 @@ const handleContinue = async () => {
         }}>
         <Dots />
         {/* Button */}
-          <View
-            style={{
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              alignItems: "center",
-              paddingHorizontal: SIZES.padding,
-              margin: SIZES.padding * 2,
-              borderColor: COLORS.lightGray3
-            }}>
-            <TextButton
-              label="Skip"
-              labelStyle={{
-                ...FONTS.body2,
-                color: COLORS.primaryDisabled
-              }}
-              buttonContainerStyle={{
-                backgroundColor: null,
-                margin: SIZES.padding
-              }}
-              onPress={() => handleBack()}
-            />
-            <TextButton
-              label={requestStatus === 'blocked' ? "OPEN SETTINGS" : requestStatus === "denied" ? "REQUEST AGAIN" : "CONTINUE"}
-              labelStyle={{
-                ...FONTS.body2,
-                color: COLORS.white
-              }}
-              buttonContainerStyle={{
-                height: 50,
-                width: 200,
-                borderRadius: SIZES.radius,
-                margin: SIZES.padding
-              }}
-              onPress={() => handleContinue()}
-            />
-          </View>
+        <View
+          style={{
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            alignItems: "center",
+            paddingHorizontal: SIZES.padding,
+            margin: SIZES.padding * 2,
+            borderColor: COLORS.lightGray3
+          }}>
+          <TextButton
+            label="Skip"
+            labelStyle={{
+              ...FONTS.body2,
+              color: COLORS.primaryDisabled,
+              fontWeight: '600',
+            }}
+            buttonContainerStyle={{
+              backgroundColor: null,
+              margin: SIZES.padding
+            }}
+            onPress={() => handleBack()}
+          />
+          <TextButton
+            label={requestStatus === 'blocked' ? "OPEN SETTINGS" : requestStatus === "denied" ? "REQUEST AGAIN" : "CONTINUE"}
+            labelStyle={{
+              ...FONTS.body2,
+              color: COLORS.white,
+              fontWeight: 'bold'
+            }}
+            buttonContainerStyle={{
+              height: 50,
+              width: 200,
+              borderRadius: SIZES.radius,
+              backgroundColor: COLORS.secondary,
+              margin: SIZES.padding
+            }}
+            onPress={() => handleContinue()}
+          />
+        </View>
 
       </View>
     );
   }
-
-  
-  
 
   return (
     <View
@@ -366,25 +287,25 @@ const handleContinue = async () => {
                 // flex: 1
               }}>
               {/* Header */}
-                <Image 
-                  source={item.image}
-                  style={{
-                    // flex: 1,
-                    width: 125,
-                    height: 125,
-                    tintColor: COLORS.primary
-                    // opacity: .9,
-                  }}
-                />
+              <Image
+                source={item.image}
+                style={{
+                  // flex: 1,
+                  width: 125,
+                  height: 125,
+                  tintColor: COLORS.primary
+                  // opacity: .9,
+                }}
+              />
 
               {/* Details */}
               <View
-                style={{ paddingVertical: SIZES.padding * 3, paddingHorizontal: SIZES.padding * 3}}
-                >
+                style={{ paddingVertical: SIZES.padding * 3, paddingHorizontal: SIZES.padding * 3 }}
+              >
                 <Text style={{
                   ...FONTS.body2,
                   textAlign: 'center',
-                  color: COLORS.black                  
+                  color: COLORS.black
                 }}>
                   {item.name}
                 </Text>
@@ -396,7 +317,7 @@ const handleContinue = async () => {
                   {item.description}
                 </Text>
               </View>
-           
+
             </View>
           );
         }}

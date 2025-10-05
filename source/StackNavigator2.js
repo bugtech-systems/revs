@@ -30,6 +30,7 @@ import ReviewScreen from './screens/ReviewScreen';
 import Receipt from './screens/Receipt';
 import ViewTicket from './screens/ViewTicket';
 import VoidScreen from './screens/VoidScreen';
+import PermissionScreen from './screens/PermissionScreen';
 
 
 
@@ -40,7 +41,7 @@ const DrawerNavigation = () => {
   const { user, collector, selectedUser } = useSelector(state => state.user);
   const curUser = selectedUser ? selectedUser : user;
 
-  
+
   const generateDrawerScreenOptions = (label, icon, headerTitle, navigation) => ({
     headerTitle: '',
     drawerActiveBackgroundColor: COLORS.secondaryTransparent,
@@ -62,52 +63,52 @@ const DrawerNavigation = () => {
 
   return (
     <Drawer.Navigator screenOptions={{ drawerType: 'slide', overlayColor: 'rgba(138, 133, 133, 0.59)', swipeEdgeWidth: 100 }}>
-      <Drawer.Screen name="Dashboard" component={Dashboard} options={({navigation}) => generateDrawerScreenOptions('Dashboard', icons.dashboard, 'Dashboard', navigation)} />
+      <Drawer.Screen name="Dashboard" component={Dashboard} options={({ navigation }) => generateDrawerScreenOptions('Dashboard', icons.dashboard, 'Dashboard', navigation)} />
       {getConfiguration(curUser, 'ticketForm') && (
         <>
-          <Drawer.Screen name="Play" component={TicketForm} options={({navigation}) => generateDrawerScreenOptions('Play', icons.play, 'Play', navigation)} />
-          <Drawer.Screen name="Winnings" component={Winnings} options={({navigation}) => generateDrawerScreenOptions('Winnings', icons.winnings, 'Winnings', navigation)} />
-          <Drawer.Screen name="Transactions" component={Transactions} options={({navigation}) => generateDrawerScreenOptions('Transactions', icons.tickets, 'Transactions', navigation)} />
+          <Drawer.Screen name="Play" component={TicketForm} options={({ navigation }) => generateDrawerScreenOptions('Play', icons.play, 'Play', navigation)} />
+          <Drawer.Screen name="Winnings" component={Winnings} options={({ navigation }) => generateDrawerScreenOptions('Winnings', icons.winnings, 'Winnings', navigation)} />
+          <Drawer.Screen name="Transactions" component={Transactions} options={({ navigation }) => generateDrawerScreenOptions('Transactions', icons.tickets, 'Transactions', navigation)} />
         </>
       )} 
 
       {(getConfiguration(curUser, 'cashFlow')?.isCheck) && (
         <>
-          <Drawer.Screen name="CashFlow" component={CashFlow} options={({navigation}) => generateDrawerScreenOptions('Cash Flow', icons.cashFlow, 'Cash Flow', navigation)} />
+          <Drawer.Screen name="CashFlow" component={CashFlow} options={({ navigation }) => generateDrawerScreenOptions('Cash Flow', icons.cashFlow, 'Cash Flow', navigation)} />
         </>
       )}
 
       {!curUser?.isAdmin &&
-      <>
-          <Drawer.Screen name="CancelledTickets" component={CancelledTickets} options={({navigation}) => generateDrawerScreenOptions('Cancelled Tickets', icons.cancelled_ticket, 'Cancelled Tickets', navigation)} />
-      
-      </>
+        <>
+          <Drawer.Screen name="CancelledTickets" component={CancelledTickets} options={({ navigation }) => generateDrawerScreenOptions('Cancelled Tickets', icons.cancelled_ticket, 'Cancelled Tickets', navigation)} />
+
+        </>
       }
 
 
-        <Drawer.Screen name="Inbox" component={Inbox} options={({navigation}) => generateDrawerScreenOptions('Inbox', icons.send_message, 'Inbox', navigation)} />
+      <Drawer.Screen name="Inbox" component={Inbox} options={({ navigation }) => generateDrawerScreenOptions('Inbox', icons.send_message, 'Inbox', navigation)} />
 
       {(getConfiguration(curUser, 'coordinators')?.isCheck || getConfiguration(curUser, 'tellers')?.isCheck) && (
         <>
-        <Drawer.Screen name="CoordinatorsScreen" component={CoordinatorsScreen} options={({navigation}) => generateDrawerScreenOptions('Coordinators', icons.coordinator, 'Coordinators', navigation)} />
-        <Drawer.Screen name="TellersScreen" component={TellersScreen} options={({navigation}) => generateDrawerScreenOptions('Tellers', icons.teller, 'Tellers', navigation)} />
+          <Drawer.Screen name="CoordinatorsScreen" component={CoordinatorsScreen} options={({ navigation }) => generateDrawerScreenOptions('Coordinators', icons.coordinator, 'Coordinators', navigation)} />
+          <Drawer.Screen name="TellersScreen" component={TellersScreen} options={({ navigation }) => generateDrawerScreenOptions('Tellers', icons.teller, 'Tellers', navigation)} />
         </>
       )}
 
 
-{(getConfiguration(curUser, 'ticketForm')?.isCheck) && (
-  <>
-        <Drawer.Screen name="Results" component={Results2} options={({navigation}) => generateDrawerScreenOptions('Results', icons.results, 'Results', navigation)} />
-          <Drawer.Screen name="Summary Report" component={SummaryReport} options={({navigation}) => generateDrawerScreenOptions('Summary Report', icons.summary, 'Summary Report', navigation)} />
-  
-  </>
-  
-)}
+      {(getConfiguration(curUser, 'ticketForm')?.isCheck) && (
+        <>
+          <Drawer.Screen name="Results" component={Results2} options={({ navigation }) => generateDrawerScreenOptions('Results', icons.results, 'Results', navigation)} />
+          <Drawer.Screen name="Summary Report" component={SummaryReport} options={({ navigation }) => generateDrawerScreenOptions('Summary Report', icons.summary, 'Summary Report', navigation)} />
+
+        </>
+
+      )}
 
 
       {(getConfiguration(curUser, 'soldouts')?.isCheck) && (
         <>
-                  <Drawer.Screen name="Sold Outs" component={SoldOuts} options={({navigation}) => generateDrawerScreenOptions('Sold Outs', icons.soldout, 'Sold Outs', navigation)} />
+          <Drawer.Screen name="Sold Outs" component={SoldOuts} options={({ navigation }) => generateDrawerScreenOptions('Sold Outs', icons.soldout, 'Sold Outs', navigation)} />
 
         </>
       )}
@@ -118,7 +119,7 @@ const DrawerNavigation = () => {
 
 
       {getConfiguration(curUser, 'ticketForm') && (
-        <Drawer.Screen name="Settings" component={SettingsScreen} options={({navigation}) => generateDrawerScreenOptions('Settings', icons.settings, 'Settings', navigation)} />
+        <Drawer.Screen name="Settings" component={SettingsScreen} options={({ navigation }) => generateDrawerScreenOptions('Settings', icons.settings, 'Settings', navigation)} />
       )}
 
     </Drawer.Navigator>
@@ -216,7 +217,12 @@ export const StackNavigator = () => {
 					// ),
 				})}
 			/>
-       
+ 
+          <Stack.Screen
+            name="Permissions"
+            component={PermissionScreen}
+            options={{ headerShown: false }}
+          />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

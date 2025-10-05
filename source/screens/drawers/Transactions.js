@@ -1,5 +1,5 @@
 import { FlatList, Image, StyleSheet, Text, TextInput, Alert, TouchableOpacity, View, RefreshControl, Switch } from 'react-native'
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import moment from 'moment-timezone'
 // import { realmContext } from '../RealmContext'
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -9,8 +9,6 @@ import { useSelector, useDispatch } from 'react-redux'
 import Animated, { BounceOutDown, FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { COLORS, icons } from '../../constants'
 import { formatNumberWithComma, getConfiguration } from '../../utils/helpers';
-import supabase from '../../utils/supabaseClient';
-import { fetchBettings } from '../../utils/offlineSync';
 import { useOffline } from '../../context/OfflineProvider';
 
 const drawTimes = [
@@ -270,11 +268,13 @@ const Transactions = ({ navigation }) => {
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
+    setLoading(true);
     setTimeout(() => {
       setRefreshing(false);
       bumpVersion();
       setSearchQuery('');
       // setFilteredData(items)
+      setLoading(false);
     }, 2000);
   }, [date, userNow, includeAll]);
 
@@ -383,8 +383,10 @@ const Transactions = ({ navigation }) => {
         <Animated.View
           entering={FadeInDown.delay(index * 100).duration(500)} // Staggered animation
           exiting={FadeOutDown.delay(index * 100).duration(500)}
+          key={index}
         >
           <TouchableOpacity
+          key={index}
             // disabled={moment(date).isAfter(today) ? false : true}
             onLongPress={() => {
               if (updateTickets) {
