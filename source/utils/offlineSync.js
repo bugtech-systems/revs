@@ -726,10 +726,7 @@ export async function fetchWithFallback(table, query = {}) {
     // offline → use local only
     return await localQuery(table, query);
   }
-}
-
-
-
+};
 
 // Full sync: try push first then pull. We check connectivity, else skip.
 async function syncWithSupabase(id) {
@@ -748,10 +745,9 @@ async function syncWithSupabase(id) {
     console.warn('Sync failed', err);
     return { ok: false, err };
   }
-}
+};
 
 // ---------- PUBLIC API ----------
-
 export async function init(id) {
   await createTablesIfNotExists();
 
@@ -766,7 +762,7 @@ export async function init(id) {
     }
   
   }
-}
+};
 
 export const getDB = async () => {
   let db = await SQLite.openDatabase({ name: "app.db", location: "default" });
@@ -826,12 +822,12 @@ export async function deleteDB(){
   .catch(err => console.log('❌ Error deleting DB:', err));
 
 
-}
+};
 
 // Force sync manually
 export async function forceSync() {
   return await syncWithSupabase();
-}
+};
 
 // Optionally: watch connectivity and auto-sync when network returns
 let unsubscribeNetInfo = null;
@@ -843,13 +839,14 @@ export function startAutoSyncOnReconnect(id) {
       syncWithSupabase(id).catch((e) => console.warn('Auto sync failed', e));
     }
   });
-}
+};
+
 export function stopAutoSyncOnReconnect(id) {
   if (unsubscribeNetInfo) {
     unsubscribeNetInfo();
     unsubscribeNetInfo = null;
   }
-}
+};
 
 function buildWhereClause(filters = {}) {
   const whereClauses = [];
@@ -921,7 +918,7 @@ function buildWhereClause(filters = {}) {
 
   const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
   return { whereSql, values };
-}
+};
 
 export async function getAllLocalIds(table) {
   const res = await runSql(`SELECT id FROM ${table}`);
@@ -932,7 +929,7 @@ export async function getAllLocalIds(table) {
     }
   }
   return ids;
-}
+};
 
 export async function insertOrReplace(table, row) {
   const cols = Object.keys(row);
@@ -940,7 +937,7 @@ export async function insertOrReplace(table, row) {
   const sql = `INSERT OR REPLACE INTO ${table} (${cols.join(', ')}) VALUES (${placeholders});`;
   const values = cols.map((c) => row[c]);
   await runSql(sql, values);
-}
+};
 
 export async function clearAllStorage() {
   try {
@@ -953,7 +950,7 @@ export async function clearAllStorage() {
   } catch (e) {
     console.error("❌ Failed to clear AsyncStorage", e);
   }
-}
+};
 
 export async function fetchBettings({ includeAll, date, userNow, user }) {
   // Compute day range in ISO format for Supabase/SQLite compatibility
@@ -984,11 +981,173 @@ export async function fetchBettings({ includeAll, date, userNow, user }) {
   const items = await api.listBettings({
     filters,
     // between: { field: 'timestamp', start: startOfDay, end: endOfDay },
-    orderBy: 'timestamp ASC',
+    orderBy: 'timestamp DESC',
   });
 
 
   console.log(items, "NAA?")
 
   return items;
+};
+
+export async function fetchWinningBettings({ date, user, includeAll = false }) {
+  const table = "bettings";
+  const userNow = user?.id ? String(user.id) : "";
+  const state = await NetInfo.fetch();
+
+  // Define start and end of day range
+  let startOfDay = moment(date).startOf("day").toISOString();
+  let endOfDay = moment(date).endOf("day").toISOString();
+
+  // Realm-like adjustment logic
+  if (!includeAll && new Date(date) <= new Date(user?.lastSummary)) {
+    startOfDay = moment().add(1, "d").endOf("day").toISOString();
+    endOfDay = moment().add(1, "d").endOf("day").toISOString();
+  }
+
+  // =============================
+  // ONLINE (Supabase)
+  // =============================
+  if (state.isConnected) {
+    try {
+      let query = supabase
+        .from(table)
+        .select("*")
+        .eq("is_deleted", false)
+        .eq("input_type", "normal")
+        .gt("winning", 0)
+        .gte("timestamp", startOfDay)
+        .lt("timestamp", endOfDay)
+        .order("timestamp", { ascending: false });
+
+      // Apply user filter
+      if (includeAll) {
+        // filter bettings where uplines contain userNow
+        query = query.contains("uplines", [userNow]);
+      } else {
+        query = query.eq("owner_id", userNow);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      // ✅ Sync fetched data to local SQLite
+      for (const row of data) {
+        const normalized = normalizeForSQLite(table, row);
+        await insertOrReplace(table, normalized);
+      }
+
+      return data;
+    } catch (err) {
+      console.warn("⚠️ Supabase fetchWinningBettings failed, using local fallback:", err);
+    }
+  }
+
+  // =============================
+  // OFFLINE (SQLite)
+  // =============================
+  const params = [startOfDay, endOfDay];
+  let whereClause = `
+    WHERE is_deleted = 0 
+    AND input_type = 'normal'
+    AND winning > 0
+    AND timestamp >= ? 
+    AND timestamp < ?
+  `;
+
+  if (includeAll && userNow) {
+    whereClause += ` AND uplines LIKE '%' || ? || '%'`;
+    params.push(userNow);
+  } else if (userNow) {
+    whereClause += ` AND owner_id = ?`;
+    params.push(userNow);
+  }
+
+  const query = `SELECT * FROM ${table} ${whereClause} ORDER BY timestamp DESC;`;
+
+  const localRes = await runSql(query, params);
+  const rows = [];
+  for (let i = 0; i < localRes.rows.length; i++) {
+    rows.push(localRes.rows.item(i));
+  }
+
+  return rows;
+}
+
+
+/**
+ * 1️⃣ Get current user
+ * Realm: users.filtered('email == $0')
+ */
+export async function getCurrentUser({ user, collector }) {
+  const userNow = user?.email ? user.email : collector ? collector : "";
+
+  return localQuery('users', {
+    filters: {
+      email: { op: '=', value: userNow },
+    },
+  });
+}
+
+/**
+ * 2️⃣ Get deleted users (excluding authenticated user)
+ * Realm: users.filtered('isDeleted == true && email != $0')
+ */
+export async function getDeletedUsers({ authenticatedUser }) {
+  return localQuery('users', {
+    filters: {
+      is_deleted: { op: '=', value: true },
+      email: { op: '!=', value: authenticatedUser },
+    },
+  });
+}
+
+/**
+ * 3️⃣ Get coordinators (excluding authenticated user)
+ * Realm: users.filtered('role == "coordinator" && isDeleted == false && email != $0')
+ */
+export async function getCoordinators({ authenticatedUser }) {
+  return localQuery('users', {
+    filters: {
+      role: { op: '=', value: 'coordinator' },
+      is_deleted: { op: '=', value: false },
+      email: { op: '!=', value: authenticatedUser },
+    },
+  });
+}
+
+/**
+ * 4️⃣ Get tellers (excluding authenticated user)
+ * Realm: users.filtered('role == "teller" && isDeleted == false && email != $0')
+ */
+export async function getTellers({ authenticatedUser }) {
+  return localQuery('users', {
+    filters: {
+      role: { op: '=', value: 'teller' },
+      is_deleted: { op: '=', value: false },
+      email: { op: '!=', value: authenticatedUser },
+    },
+  });
+}
+
+export async function getBettingByTicketNo(ticketNo) {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `SELECT * FROM bettings WHERE ticket_no = ? LIMIT 1;`,
+        [ticketNo],
+        (txObj, resultSet) => {
+          const rows = [];
+          for (let i = 0; i < resultSet.rows.length; i++) {
+            rows.push(resultSet.rows.item(i));
+          }
+          resolve(rows);
+        },
+        (txObj, error) => {
+          console.error('Error fetching betting by ticket_no:', error);
+          reject(error);
+        }
+      );
+    });
+  });
 }

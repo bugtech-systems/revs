@@ -54,145 +54,23 @@ const Transactions = ({ navigation }) => {
   const [users, setUsers] = useState([]);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
+  const userNow = user ? user.id : "";
+
+  const updateTickets = getConfiguration(users[0], 'updateTickets')?.isCheck;
 
   let startOfDay = moment(date).startOf('day').toDate();
   let endOfDay = moment(date).endOf('day').toDate();
 
-  let collectorName = selectedUser ? selectedUser : collector;
-  const userNow = user ? user.id : "";
 
-
-  console.log(userNow, "THE USER REDUX")
-
-
-  // const fetchUserData = useMemo(async () => {
-  //   try {
-  //     const { data: users, error } = await supabase
-  //       .from('users')
-  //       .select("*")
-  //       .eq('email', collectorName)
-  //       if (error) {
-  //         setUsers([]);
-  //         return null;
-  //       } else {
-  //         setUsers(users)
-  //       }
-  //   } catch (err) {
-  //     console.log(err)
-  //     return;
-  //   }
-  
-  // }, [selectedUser, collector]);
-
-
-  // let userQuery = fetchUserData;
-
-
-
-  // useEffect(() => {
-
-
-  // }, [fetchUserData])
-
-
-
-
-  
-  
-  const updateTickets =  getConfiguration(users[0], 'updateTickets')?.isCheck;
-
-
-  console.log(updateTickets, "CAN EDIT?")
-
-  
-  
-  
-  // const fetchBettings = useMemo(async () => {
-  //   let userNow = users[0] ? users[0]._id : "";
-  //   let { data: bettings, error } = await supabase
-  //     .from('bettings')
-  //     .select("*")
-
-
-  // }, [])
-  
-
-//   async function fetchBettings({ includeAll, date, userNow, user }) {
-//   // compute day range
-//   let startOfDay = moment(date).startOf('day').toISOString(); // ISO timestamps for supabase
-//   let endOfDay = moment(date).endOf('day').toISOString();
-
-//   // replicate your "if date <= user.lastSummary" branch
-//   if (!includeAll && new Date(date) <= new Date(user?.lastSummary || 0)) {
-//     // advance to next day (your original used add(1,'d').endOf('day') for both start & end - preserved)
-//     startOfDay = moment().add(1, 'd').startOf('day').toISOString();
-//     endOfDay = moment().add(1, 'd').endOf('day').toISOString();
-//   }
-
-//   if (includeAll) {
-//     // includeAll branch:
-//     // filter: ANY uplines == $0 && isDeleted == false && inputType == "normal" && timestamp >= $1 && timestamp <= $2
-//     // supabase doesn't support "ANY uplines == 'value'" directly for jsonb arrays; use filter on JSONB field with contains or Postgres operator.
-//     // Assuming `uplines` is a JSONB array of strings, we can query with: uplines::text LIKE '%"userNow"%'
-//     // Or better: use contains — uplines @> '["userNow"]'
-//     const { data, error } = await supabase
-//       .from('bettings')
-//       .select('*')
-//       .eq('is_deleted', false)
-//       .eq('input_type', 'normal')
-//       .gte('timestamp', startOfDay)
-//       .lte('timestamp', endOfDay)
-//       .filter('uplines', 'cs', JSON.stringify([String(userNow)])) // 'cs' = contains (array containment) for Postgres arrays/JSONB
-//       .order('timestamp', { ascending: true });
-
-//     if (error) throw error;
-//     return data;
-//   } else {
-//     // non-includeAll branch:
-//     // filter: isDeleted == false && inputType == "normal" && timestamp >= $0 && timestamp < $1 && owner_id == $2
-//     const { data, error } = await supabase
-//       .from('bettings')
-//       .select('*')
-//       .eq('is_deleted', false)
-//       .eq('input_type', 'normal')
-//       .gte('timestamp', startOfDay)
-//       .lt('timestamp', endOfDay)
-//       .eq('owner_id', String(userNow))
-//       .order('timestamp', { ascending: false }); // sorted('timestamp', true) — descending
-
-//     if (error) throw error;
-//     return data;
-//   }
-// }
-
-
-
-
-
-
-  // const items = useQuery(Betting, data => {
-  //   if (includeAll) {
-  //     return data.filtered('ANY uplines == $0 &&  isDeleted == false && inputType == "normal" && timestamp >= $1 && timestamp <= $2', String(userNow), startOfDay, endOfDay).sorted('timestamp');
-  //   } else {
-  //     if (new Date(date) <= new Date(user?.lastSummary)) {
-  //       startOfDay = moment().add(1, 'd').endOf('day').toDate();
-  //       endOfDay = moment().add(1, 'd').endOf('day').toDate();
-  //     }
-  //     return data.filtered('isDeleted == false && inputType == "normal" && timestamp >= $0 && timestamp < $1 && owner_id == $2', startOfDay, endOfDay, String(userNow)).sorted('timestamp', true)
-  //   }
-  // }, [date, users, selectedUser, includeAll]);
-
-
-
-    useEffect(() => {
+  useEffect(() => {
     const load = async () => {
       const data = await fetchBettings({ includeAll, date, userNow, user });
       setItems(data);
       setLoading(false);
     };
     load();
-  }, [date, userNow, user, includeAll]);
-  
+  }, [date, userNow, user, includeAll, refreshing]);
+
 
   console.log(items, "THE ITEM")
 
@@ -542,7 +420,7 @@ const Transactions = ({ navigation }) => {
               }}
               value={includeAll}
             />
-              <Text style={{ ...styles.toggleText, color: COLORS.black, fontWeight: '500' }}>Show All</Text>
+            <Text style={{ ...styles.toggleText, color: COLORS.black, fontWeight: '500' }}>Show All</Text>
           </View>}
         {renderTickerList(filteredList)}
 
