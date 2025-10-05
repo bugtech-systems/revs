@@ -2,26 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet, Button } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { PermissionsAndroid } from 'react-native';
-import useBatchedPull from './hooks/useBatchPulling';
+import { useOfflineSync } from "./context/OfflineProvider";
 
 
 
 
 const SyncComponent = () => {
-  const {
-    isPulling,
-    currentTable,
-    progress,
-    recordsProcessed,
-    error,
-    lastPull,
-    results,
-    pullFromSupabase,
-    pullTables,
-    fullResync,
-    abortPull,
-    resetPullState
-  } = useBatchedPull();
+  const { api, syncing, lastSync, online, syncNow } = useOfflineSync();
+
   
   
   const [isOnline, setIsOnline] = useState(false);

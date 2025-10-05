@@ -5,7 +5,8 @@ import { App } from './App';
 import { WelcomeView } from './WelcomeView';
 import supabase from './utils/supabaseClient';
 import { SessionContext } from './context/SessionContext';
-import { init, api, forceSync, startAutoSyncOnReconnect, stopAutoSyncOnReconnect } from './utils/offlineSync';
+import { OfflineSyncProvider } from "./context/OfflineProvider";
+
 
 
 export const AppWrapper = () => {
@@ -28,23 +29,18 @@ export const AppWrapper = () => {
 
   
   
-    useEffect(() => {
-      (async () => {
-        await init();
-        await startAutoSyncOnReconnect(session?.user?.email);
-      })();
-      return async () => {
-         stopAutoSyncOnReconnect(session?.user?.email)
-    };
-    }, [session]);
+
   
 
   return (
     <Provider store={store}>
       <SessionContext.Provider value={{ session, setSession }}>
+          <OfflineSyncProvider session={session}>
+
         {/* <UpdateModalProvider> */}
           {session ? <App /> : <WelcomeView />}
         {/* </UpdateModalProvider> */}
+        </OfflineSyncProvider>
       </SessionContext.Provider>
     </Provider>
   );
