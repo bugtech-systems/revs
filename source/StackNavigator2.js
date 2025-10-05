@@ -29,6 +29,7 @@ import SoldOuts from './screens/drawers/SoldOuts';
 import ReviewScreen from './screens/ReviewScreen';
 import Receipt from './screens/Receipt';
 import ViewTicket from './screens/ViewTicket';
+import VoidScreen from './screens/VoidScreen';
 
 
 

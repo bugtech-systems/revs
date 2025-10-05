@@ -8,7 +8,9 @@ import {
   stopAutoSyncOnReconnect,
   nowISO,
   fetchUser,
-  saveLocalUser
+  saveLocalUser,
+  init,
+  clearAllStorage
   
 } from "../utils/offlineSync";
 import {  pullFromSupabase, forceFullResync } from '../utils/batchPull';
@@ -34,11 +36,12 @@ export const OfflineProvider = ({ session, children }) => {
   // Initialize DB + run initial sync
   useEffect(() => {
     const bootstrap = async () => {
-      bumpVersion();
-
+      clearAllStorage()
+      await init();
+      bumpVersion()
     };
     bootstrap();
-  }, [session?.user?.email]);
+  }, []);
 
   // Track network
   useEffect(() => {
@@ -80,6 +83,8 @@ export const OfflineProvider = ({ session, children }) => {
 
      // Initial load
   useEffect(() => {
+      if(session?.user?.email){
+
       startAutoSyncOnReconnect(session?.user?.email);
       bumpVersion();
      
@@ -89,8 +94,9 @@ export const OfflineProvider = ({ session, children }) => {
     clearInterval(interval);
      stopAutoSyncOnReconnect(session?.user?.email);
     }    
+      }
 
-  }, []);
+  }, [session?.user?.email]);
 
 
   // Wrapped API that bumps version after any CRUD

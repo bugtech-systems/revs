@@ -47,37 +47,38 @@ export const TABLES = [
 // ---------- UTIL ----------
 let db = SQLite.openDatabase(
       { name: DB_NAME, location: "default" },
-      async () => { await createTablesIfNotExists(); console.log("SQLite opened", DB_NAME);},
+      async () => {  console.log("SQLite opened", DB_NAME);},
       (err) => console.error("SQLite open error", err)
     );
 
 // ---------- INIT ----------
-// export async function init(userId) {
-//   // Ensure single DB open
-//   if (!db) {
-//     db = SQLite.openDatabase(
-//       { name: DB_NAME, location: "default" },
-//       async () => {  console.log("SQLite opened", DB_NAME);},
-//       (err) => console.error("SQLite open error", err)
-//     );
-//   }
+export async function init(userId) {
+  // Ensure single DB open
+  if (!db) {
+    db = SQLite.openDatabase(
+      { name: DB_NAME, location: "default" },
+      async () => {  console.log("SQLite opened", DB_NAME);},
+      (err) => console.error("SQLite open error", err)
+    );
+  }
 
-//   // create tables if not exists
-//   // Optionally fire an initial sync in background (not blocking)
-//   NetInfo.fetch().then((s) => {
-//     if (s.isConnected && userId) {
-//       // kick off sync in background
-//       syncWithSupabase(userId).catch((e) => console.warn("Initial sync error", e));
-//     }
-//   });
-// }
+  // create tables if not exists
+  await createTablesIfNotExists();
+  // Optionally fire an initial sync in background (not blocking)
+  NetInfo.fetch().then((s) => {
+    if (s.isConnected && userId) {
+      // kick off sync in background
+      syncWithSupabase(userId).catch((e) => console.warn("Initial sync error", e));
+    }
+  });
+}
 
 // ---------- UTIL ----------
 function ensureDB() {
   if (!db) {
     db = SQLite.openDatabase(
       { name: DB_NAME, location: "default" },
-      async () => { await createTablesIfNotExists(); console.log("SQLite opened", DB_NAME);},
+      async () => {  console.log("SQLite opened", DB_NAME);},
       (err) => console.error("SQLite open error", err)
     );
   }
