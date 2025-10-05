@@ -1,5 +1,5 @@
 import { FlatList, Image, StyleSheet, Text, TextInput, Alert, TouchableOpacity, View, RefreshControl, Switch } from 'react-native'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import moment from 'moment-timezone'
 // import { realmContext } from '../RealmContext'
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -7,13 +7,11 @@ import SelectDropdown from 'react-native-select-dropdown'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { useSelector, useDispatch } from 'react-redux'
 import Animated, { BounceOutDown, FadeInDown, FadeOutDown } from 'react-native-reanimated';
-import { Betting, Draws, Users } from '../../Models'
 import { COLORS, icons } from '../../constants'
-import { SET_ACTIVE_USER } from '../../redux/actions/types';
-import { realmContext } from '../../RealmContext';
 import { formatNumberWithComma, getConfiguration } from '../../utils/helpers';
+import supabase from '../../utils/supabaseClient';
+import { fetchBettings } from '../../utils/offlineSync';
 
-const { useRealm, useQuery } = realmContext;
 const drawTimes = [
   {
     id: 0,
@@ -38,7 +36,6 @@ const ownItemsSubscriptionName = 'ownItems';
 
 const Transactions = ({ navigation }) => {
   const dispatch = useDispatch()
-  const realm = useRealm()
   const { collector, user, selectedUser } = useSelector(({ user }) => user);
   const [date, setDate] = useState(new Date())
   const [drawTime, setDrawTime] = useState('')
@@ -54,39 +51,150 @@ const Transactions = ({ navigation }) => {
   const [showTime, setShowTime] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [includeAll, setIncludeAll] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   let startOfDay = moment(date).startOf('day').toDate();
   let endOfDay = moment(date).endOf('day').toDate();
 
   let collectorName = selectedUser ? selectedUser : collector;
+  const userNow = user ? user.id : "";
 
 
-  const users = useQuery(Users, user => {
-    return user.filtered(
-      'email == $0',
-      collectorName,
-    );
-  }, [collectorName]);
+  console.log(userNow, "THE USER REDUX")
 
 
+  // const fetchUserData = useMemo(async () => {
+  //   try {
+  //     const { data: users, error } = await supabase
+  //       .from('users')
+  //       .select("*")
+  //       .eq('email', collectorName)
+  //       if (error) {
+  //         setUsers([]);
+  //         return null;
+  //       } else {
+  //         setUsers(users)
+  //       }
+  //   } catch (err) {
+  //     console.log(err)
+  //     return;
+  //   }
+  
+  // }, [selectedUser, collector]);
+
+
+  // let userQuery = fetchUserData;
+
+
+
+  // useEffect(() => {
+
+
+  // }, [fetchUserData])
+
+
+
+
+  
+  
   const updateTickets =  getConfiguration(users[0], 'updateTickets')?.isCheck;
+
 
   console.log(updateTickets, "CAN EDIT?")
 
+  
+  
+  
+  // const fetchBettings = useMemo(async () => {
+  //   let userNow = users[0] ? users[0]._id : "";
+  //   let { data: bettings, error } = await supabase
+  //     .from('bettings')
+  //     .select("*")
 
-  const items = useQuery(Betting, data => {
-    let userNow = users[0] ? users[0]._id : "";
-    if (includeAll) {
-      return data.filtered('ANY uplines == $0 &&  isDeleted == false && inputType == "normal" && timestamp >= $1 && timestamp <= $2', String(userNow), startOfDay, endOfDay).sorted('timestamp');
-    } else {
-      if (new Date(date) <= new Date(user?.lastSummary)) {
-        startOfDay = moment().add(1, 'd').endOf('day').toDate();
-        endOfDay = moment().add(1, 'd').endOf('day').toDate();
-      }
-      return data.filtered('isDeleted == false && inputType == "normal" && timestamp >= $0 && timestamp < $1 && owner_id == $2', startOfDay, endOfDay, String(userNow)).sorted('timestamp', true)
-    }
-  }, [date, users, selectedUser, includeAll]);
 
+  // }, [])
+  
+
+//   async function fetchBettings({ includeAll, date, userNow, user }) {
+//   // compute day range
+//   let startOfDay = moment(date).startOf('day').toISOString(); // ISO timestamps for supabase
+//   let endOfDay = moment(date).endOf('day').toISOString();
+
+//   // replicate your "if date <= user.lastSummary" branch
+//   if (!includeAll && new Date(date) <= new Date(user?.lastSummary || 0)) {
+//     // advance to next day (your original used add(1,'d').endOf('day') for both start & end - preserved)
+//     startOfDay = moment().add(1, 'd').startOf('day').toISOString();
+//     endOfDay = moment().add(1, 'd').endOf('day').toISOString();
+//   }
+
+//   if (includeAll) {
+//     // includeAll branch:
+//     // filter: ANY uplines == $0 && isDeleted == false && inputType == "normal" && timestamp >= $1 && timestamp <= $2
+//     // supabase doesn't support "ANY uplines == 'value'" directly for jsonb arrays; use filter on JSONB field with contains or Postgres operator.
+//     // Assuming `uplines` is a JSONB array of strings, we can query with: uplines::text LIKE '%"userNow"%'
+//     // Or better: use contains — uplines @> '["userNow"]'
+//     const { data, error } = await supabase
+//       .from('bettings')
+//       .select('*')
+//       .eq('is_deleted', false)
+//       .eq('input_type', 'normal')
+//       .gte('timestamp', startOfDay)
+//       .lte('timestamp', endOfDay)
+//       .filter('uplines', 'cs', JSON.stringify([String(userNow)])) // 'cs' = contains (array containment) for Postgres arrays/JSONB
+//       .order('timestamp', { ascending: true });
+
+//     if (error) throw error;
+//     return data;
+//   } else {
+//     // non-includeAll branch:
+//     // filter: isDeleted == false && inputType == "normal" && timestamp >= $0 && timestamp < $1 && owner_id == $2
+//     const { data, error } = await supabase
+//       .from('bettings')
+//       .select('*')
+//       .eq('is_deleted', false)
+//       .eq('input_type', 'normal')
+//       .gte('timestamp', startOfDay)
+//       .lt('timestamp', endOfDay)
+//       .eq('owner_id', String(userNow))
+//       .order('timestamp', { ascending: false }); // sorted('timestamp', true) — descending
+
+//     if (error) throw error;
+//     return data;
+//   }
+// }
+
+
+
+
+
+
+  // const items = useQuery(Betting, data => {
+  //   if (includeAll) {
+  //     return data.filtered('ANY uplines == $0 &&  isDeleted == false && inputType == "normal" && timestamp >= $1 && timestamp <= $2', String(userNow), startOfDay, endOfDay).sorted('timestamp');
+  //   } else {
+  //     if (new Date(date) <= new Date(user?.lastSummary)) {
+  //       startOfDay = moment().add(1, 'd').endOf('day').toDate();
+  //       endOfDay = moment().add(1, 'd').endOf('day').toDate();
+  //     }
+  //     return data.filtered('isDeleted == false && inputType == "normal" && timestamp >= $0 && timestamp < $1 && owner_id == $2', startOfDay, endOfDay, String(userNow)).sorted('timestamp', true)
+  //   }
+  // }, [date, users, selectedUser, includeAll]);
+
+
+
+    useEffect(() => {
+    const load = async () => {
+      const data = await fetchBettings({ includeAll, date, userNow, user });
+      setItems(data);
+      setLoading(false);
+    };
+    load();
+  }, [date, userNow, user, includeAll]);
+  
+
+  console.log(items, "THE ITEM")
 
   // DATE
   const onChangeDate = (event, selectedDate) => {
@@ -254,10 +362,10 @@ const Transactions = ({ navigation }) => {
           >
 
             <Text style={{ textAlign: 'left', fontSize: 18, width: '30%', color: COLORS.black, }}>
-              {item.ticketNo}
+              {item.ticket_no}
             </Text>
-            <Text style={{ textAlign: 'left', fontSize: 18, width: '30%', fontWeight: 'bold', color: item.gameTime == '2pm' ? '#3897e7' : item.gameTime == '5pm' ? '#ff9d3e' : item.gameTime == '9pm' ? COLORS.black600 : null }}>
-              {String(item.gameTime).toUpperCase()}
+            <Text style={{ textAlign: 'left', fontSize: 18, width: '30%', fontWeight: 'bold', color: item.game_time == '2pm' ? '#3897e7' : item.game_time == '5pm' ? '#ff9d3e' : item.game_time == '9pm' ? COLORS.black600 : null }}>
+              {String(item.game_time).toUpperCase()}
             </Text>
             <Text style={{ textAlign: 'left', width: '30%', fontSize: 18, color: COLORS.black, }}>
               ₱{Number(total)}
@@ -378,10 +486,13 @@ const Transactions = ({ navigation }) => {
 
 
 
-  let filteredList = filterTime == 'All Time' ? items : items.filter(a => a.gameTime == filterTime);
-  filteredList = searchQuery ? items.filter(a => String(a.ticketNo).includes(String(searchQuery))) : filteredList
+  let filteredList = filterTime == 'All Time' ? items : items.filter(a => a.game_time == filterTime);
+  filteredList = searchQuery ? items.filter(a => String(a.ticket_no).includes(String(searchQuery))) : filteredList
 
-  let totalGross = filteredList.reduce((n, { gross }) => n + gross, 0);
+  let totalGross = filteredList.reduce((n, { gross }) => n + Number(gross), 0);
+
+
+  console.log(totalGross, "GROSSY")
 
 
   return (
