@@ -2,14 +2,14 @@ import React, { useContext, useEffect, useState } from 'react';
 import { View, Modal, StyleSheet } from 'react-native';
 import * as Progress from 'react-native-progress';
 import { StackNavigator } from './StackNavigator2';
-// import { AppInitializer } from './AppInitializer';
 import NotifService from './utils/NotificationService';
 import { COLORS } from './constants';
-import { fetchUser, getLocalUser, initDB, saveLocalUser } from './utils/db';
 import  supabase  from './utils/supabaseClient';
 import { useDispatch } from 'react-redux';
-import { SET_USER } from './redux/actions/types';
+import { SET_ACTIVE_USER, SET_COLLECTOR, SET_USER } from './redux/actions/types';
 import { SessionContext } from './context/SessionContext';
+// import { useOfflineSync } from './context/OfflineSyncProvider';
+import { useOffline } from './context/OfflineProvider';
 
 const LoadingIndicator = () => (
   <View style={{ ...styles.activityContainer, backgroundColor: COLORS.transparentBlack7 }}>
@@ -19,6 +19,7 @@ const LoadingIndicator = () => (
 
 export const App = () => {
   const dispatch = useDispatch();
+  const { fetchUser,  saveLocalUser} = useOffline();
   const [loading, setLoading] = useState(true);
     const { session } = useContext(SessionContext);
 
@@ -61,6 +62,8 @@ export const App = () => {
   
       if (localUser) {
         dispatch({ type: SET_USER, payload: localUser });
+        dispatch({ type: SET_COLLECTOR, payload: email });
+        dispatch({ type: SET_ACTIVE_USER, payload: localUser });
       }
   
 
@@ -79,7 +82,7 @@ console.log(loading, session, 'loaad')
 
   return (
     <>
-      {/* <AppInitializer /> */}
+      {/* <AppInitializer />  */}
       {/* <SyncProvider> */}
       <StackNavigator />
       {/* </SyncProvider> */}

@@ -22,49 +22,99 @@ import NetInfo from '@react-native-community/netinfo';
 import supabase from './supabaseClient';
 import { schema } from './schema';
 import { generateObjectId } from './helpers';
+import {  pullFromSupabase, forceFullResync } from './batchPull';
+
 import moment from 'moment-timezone';
-// SQLite.enablePromise(true); // optional, to use promises
 
 // Enable debug (optional for development)
-// SQLite.DEBUG(true);
+SQLite.DEBUG(false);
+SQLite.enablePromise(false); // optional, to use promises
 
 export const BATCH_SIZE = 1000; // Supabase limit
 
-const DB_NAME = 'leo.db';
+export const DB_NAME = 'leov3.db';
 
-let db = SQLite.openDatabase({ name: DB_NAME, location: 'default' });
-
-// local metadata key to store lastPulledAt timestamp per table
 export const LAST_PULLED_KEY = 'offline:lastPulledAt';
 
 // Table list (as used in Supabase). Must match Supabase table names.
 export const TABLES = [
-'users', 'draws', 'bettings', 
-'master_combinations',
+// 'users', 
+'bettings', 
+// 'master_combinations',
 // 'messages', 'cashflow'
 ];
 
 // ---------- UTIL ----------
-export const runSql = (sql, params = []) => {
-  db = SQLite.openDatabase({ name: DB_NAME, location: 'default' });
+let db = SQLite.openDatabase(
+      { name: DB_NAME, location: "default" },
+      async () => { await createTablesIfNotExists(); console.log("SQLite opened", DB_NAME);},
+      (err) => console.error("SQLite open error", err)
+    );
+
+// ---------- INIT ----------
+// export async function init(userId) {
+//   // Ensure single DB open
+//   if (!db) {
+//     db = SQLite.openDatabase(
+//       { name: DB_NAME, location: "default" },
+//       async () => {  console.log("SQLite opened", DB_NAME);},
+//       (err) => console.error("SQLite open error", err)
+//     );
+//   }
+
+//   // create tables if not exists
+//   // Optionally fire an initial sync in background (not blocking)
+//   NetInfo.fetch().then((s) => {
+//     if (s.isConnected && userId) {
+//       // kick off sync in background
+//       syncWithSupabase(userId).catch((e) => console.warn("Initial sync error", e));
+//     }
+//   });
+// }
+
+// ---------- UTIL ----------
+function ensureDB() {
   if (!db) {
-   db = SQLite.openDatabase({ name: "app.db", location: "default" });
+    db = SQLite.openDatabase(
+      { name: DB_NAME, location: "default" },
+      async () => { await createTablesIfNotExists(); console.log("SQLite opened", DB_NAME);},
+      (err) => console.error("SQLite open error", err)
+    );
   }
- return new Promise((resolve, reject) => {
-    db.transaction((tx) => {
-      tx.executeSql(
-        sql,
-        params,
-        (_, res) => resolve(res),
-        (_, err) => {
-          console.error('SQL ERROR', sql, params, err);
-          reject(err);
-        }
-      );
-    });
-  });
+  return db;
 }
-  
+
+/**
+ * runSql: wrapper to execute SQL and return a Promise with the result
+ * ensures db is opened and handles errors consistently.
+ */
+export function runSql (sql, params = [])  {
+    let database = ensureDB();
+  return new Promise((resolve, reject) => {
+    database.transaction(
+      (tx) => {
+        tx.executeSql(
+          sql,
+          params,
+          (_, res) => resolve(res),
+          (_, err) => {
+            console.error("SQL ERROR", sql, params, err);
+            // returning false here would rollback the transaction; we reject to bubble up
+            reject(err);
+            return false;
+          }
+        );
+      },
+      (txErr) => {
+        // transaction error
+        console.error("Transaction error", txErr);
+        reject(txErr);
+      }
+    );
+  });
+};
+
+
 
 // // convert JS object to JSON string for JSONB columns
 // const toJsonText = (v) => (v === undefined || v === null ? null : JSON.stringify(v));
@@ -77,7 +127,7 @@ export const runSql = (sql, params = []) => {
 // };
 
 export const fetchUser = async (email) => {
-  let db = await getDB();
+  // let db = await getDB();
 
 
   try {
@@ -151,8 +201,12 @@ export const fetchUser = async (email) => {
   }
 };
 
+export const saveLocalUser = async (user) => {
+            await api.createUser(user)
+}
+
 // // get timestamp string in ISO format
-// const nowISO = () => new Date().toISOString();
+// const nowISO = () => moment().tz("Asia/Manila").toISOString();
 
 // ---------- SCHEMA CREATION (SQLite) ----------
 // Note: SQLite types simplified. JSONB stored as TEXT.
@@ -332,7 +386,7 @@ async function removeQueueItem(id) {
 }
 
 // ✅ Converts JSON fields before storing into SQLite (TEXT)
-function toJsonText(obj) {
+export function toJsonText(obj) {
   try {
     return obj ? JSON.stringify(obj) : null;
   } catch {
@@ -341,7 +395,7 @@ function toJsonText(obj) {
 }
 
 // ✅ Parse back JSON fields from SQLite string
-function parseJsonText(str) {
+export function parseJsonText(str) {
   if (str === null || str === undefined) return null;
   try {
     return JSON.parse(str);
@@ -352,13 +406,13 @@ function parseJsonText(str) {
 
 // ✅ Timestamps: always ISO 8601
 export function nowISO() {
-  return new Date().toISOString();
+  return moment().tz("Asia/Manila").format("YYYY-MM-DDTHH:mm:ss.SSSZ");
 }
 
 // ✅ Normalize row from SQLite -> JS object for Supabase
 
 // ✅ normalize single value
-function normalizeValue(type, value, target = "supabase") {
+export function normalizeValue(type, value, target = "supabase") {
   if (value === null || value === undefined) return null;
 
   switch (type) {
@@ -396,8 +450,8 @@ export function normalizeForSupabase(table, row) {
   }
 
   // timestamps fallback
-  normalized.created_at = normalized.created_at || new Date().toISOString();
-  normalized.updated_at = normalized.updated_at || new Date().toISOString();
+  normalized.created_at = normalized.created_at || moment().tz("Asia/Manila").toISOString();
+  normalized.updated_at = normalized.updated_at || moment().tz("Asia/Manila").toISOString();
 
   return normalized;
 }
@@ -413,8 +467,8 @@ export function normalizeForSQLite(table, remoteRow) {
   }
 
   // timestamps fallback
-  normalized.created_at = normalized.created_at || new Date().toISOString();
-  normalized.updated_at = normalized.updated_at || new Date().toISOString();
+  normalized.created_at = normalized.created_at || moment().tz("Asia/Manila").toISOString();
+  normalized.updated_at = normalized.updated_at || moment().tz("Asia/Manila").toISOString();
 
   return normalized;
 }
@@ -424,39 +478,33 @@ export function normalizeForSQLite(table, remoteRow) {
 // ---------- CRUD Helpers (local-first) ----------
 // Generic insert: expects record object with fields matching local column names
 async function localInsert(tableName, record) {
-  // set timestamps
+  // Generate id + timestamps if missing
   const id = record.id || generateObjectId();
   const createdAt = record.created_at || nowISO();
   const updatedAt = record.updated_at || createdAt;
-  record.id = id;
-  record.created_at = createdAt;
-  record.updated_at = updatedAt;
 
-  // Ensure JSON fields are stringified if present for known tables
-  if (tableName === 'users') {
-    record.configuration = toJsonText(record.configuration ?? []);
-    record.uplines = toJsonText(record.uplines ?? []);
-  } else if (tableName === 'bettings') {
-    record.hits = toJsonText(record.hits ?? []);
-    record.commissions = toJsonText(record.commissions ?? []);
-    record.combinations = toJsonText(record.combinations ?? []);
-    record.uplines = toJsonText(record.uplines ?? []);
-    record.ticket_no = String(record.ticket_no ?? '')
-  } else if (tableName === 'messages') {
-    record.conversations = toJsonText(record.conversations ?? []);
-  }
+  record = { ...record, id, created_at: createdAt, updated_at: updatedAt };
 
-  // build dynamic insert
-  const cols = Object.keys(record);
+  // Normalize for SQLite based on schema
+  const normalized = normalizeForSQLite(tableName, record);
+
+  // Build dynamic insert
+  const cols = Object.keys(normalized);
   const placeholders = cols.map(() => '?').join(', ');
+  const values = cols.map((c) => normalized[c]);
+
   const sql = `INSERT OR REPLACE INTO ${tableName} (${cols.join(', ')}) VALUES (${placeholders});`;
-  const values = cols.map((c) => record[c]).map(normalizeValue);
 
   await runSql(sql, values);
-  // enqueue for sync
-  await enqueueSync('insert', tableName, id, record);
 
-  return { id, ...record };
+  // enqueue for sync (use normalized row so Supabase gets valid JSON)
+  await enqueueSync('insert', tableName, id, normalized);
+
+  // Return freshly inserted row
+  const updated = await localGet(tableName, id);
+  console.log(`[localInsert] Inserted into ${tableName}:`, updated);
+
+  return updated;
 }
 
 async function localUpdate(tableName, id, patch) {
@@ -500,6 +548,8 @@ async function localDelete(tableName, id) {
 
 export async function localGet(tableName, id) {
   const res = await runSql(`SELECT * FROM ${tableName} WHERE id = ? LIMIT 1;`, [id]);
+  
+  
   if (res.rows.length === 0) return null;
   const row = res.rows.item(0);
 
@@ -519,38 +569,42 @@ export async function localGet(tableName, id) {
   return row;
 }
 
-async function localList(tableName, whereClause = '', params = []) {
-  const sql = `SELECT * FROM ${tableName} ${whereClause};`;
+async function localList(tableName, whereClause = "", params = []) {
+  // Always order by created_at DESC
+  const sql = `SELECT * FROM ${tableName} ${whereClause} ORDER BY created_at DESC;`;
   const res = await runSql(sql, params);
   const rows = [];
+
   for (let i = 0; i < res.rows.length; i++) {
     const r = res.rows.item(i);
-    if (tableName === 'users') {
+
+    if (tableName === "users") {
       r.configuration = parseJsonText(r.configuration);
       r.uplines = parseJsonText(r.uplines);
-    } else if (tableName === 'bettings') {
+    } else if (tableName === "bettings") {
       r.hits = parseJsonText(r.hits);
       r.commissions = parseJsonText(r.commissions);
       r.combinations = parseJsonText(r.combinations);
       r.uplines = parseJsonText(r.uplines);
-    } else if (tableName === 'messages') {
+    } else if (tableName === "messages") {
       r.conversations = parseJsonText(r.conversations);
     }
+
     rows.push(r);
   }
   return rows;
 }
 
-// query = { filters: { field: value, ... }, limit, offset, orderBy }
 async function localQuery(tableName, query = {}) {
   const { filters = {}, limit, offset, orderBy } = query;
 
   // WHERE (dynamic)
   const { whereSql, values } = buildWhereClause(filters);
 
-
-  // ORDER BY
-  const orderSql = orderBy ? `ORDER BY ${orderBy}` : "";
+  // ORDER BY (default created_at DESC if not provided)
+  const orderSql = orderBy
+    ? `ORDER BY ${orderBy}`
+    : "ORDER BY created_at DESC";
 
   // LIMIT / OFFSET
   const limitSql = limit ? `LIMIT ${limit}` : "";
@@ -614,6 +668,7 @@ async function pushQueueToSupabase() {
         if (error) throw error;
         await removeQueueItem(queueId);
       } else if (op === 'delete') {
+        
         const { error } = await supabase.from(tableName).delete().eq('id', rowId);
         if (error) {
           // If not found or other errors, decide to remove or keep queue. We remove to avoid infinite loop.
@@ -630,72 +685,81 @@ async function pushQueueToSupabase() {
 
 // pull: fetch remote changes since lastPulledAt for each table and write to local
 // ---------- PULL FROM SUPABASE (always source of truth) ----------
-async function pullFromSupabase(userId) {
+// async function pullFromSupabase(userId) {
 
 
-  for (const table of TABLES) {
-    try {
-      const key = `${LAST_PULLED_KEY}:${table}`;
-      const lastPulledAt = (await AsyncStorage.getItem(key)) || null;
+//   for (const table of TABLES) {
+//     try {
+//       const key = `${LAST_PULLED_KEY}:${table}`;
+//       const lastPulledAt = (await AsyncStorage.getItem(key)) || null;
 
-      // ✅ Step 1: get all local IDs
-      const localIds = await getAllLocalIds(table);
+//       // ✅ Step 1: get all local IDs
+//       const localIds = await getAllLocalIds(table);
 
-      // ✅ Step 2: fetch remote rows (always Supabase-first)
-      let query = supabase.from(table).select('*');
-      if (lastPulledAt) {
-        query = query.gte('updated_at', lastPulledAt);
-      }
+//       // ✅ Step 2: fetch remote rows (always Supabase-first)
+//       let query = supabase.from(table).select("*").order("updated_at", { ascending: true }).limit(10000);
+//       if (lastPulledAt) {
+//         query = query.gte('updated_at', lastPulledAt);
+//       }
       
 
-      const { data: remoteData, error } = await query.limit(10000);
-      if (error) {
-        console.warn(`Pull error for ${table}`, error);
-        continue;
-      }
+//       const { data: remoteData, error } = await query;
+//       if (error) {
+//         console.warn(`Pull error for ${table}`, error);
+//         continue;
+//       }
 
-      // ✅ Step 3: build a map of Supabase IDs
-      const remoteIds = new Set(remoteData.map(r => r.id));
-      console.log(localIds.length, lastPulledAt, table,  'pulllling', 'existing', remoteData.length)
+//       // ✅ Step 3: build a map of Supabase IDs
+//       const remoteIds = new Set(remoteData.map(r => r.id));
 
-      // ✅ Step 4: sync Supabase rows into local
-      for (const remoteRow of remoteData) {
+//       // ✅ Step 4: sync Supabase rows into local
+//       for (const remoteRow of remoteData) {
       
-        if (remoteRow.is_deleted) {
-          // delete locally if remote says deleted
-          await runSql(`DELETE FROM ${table} WHERE id = ?`, [remoteRow.id]);
-          continue;
-        }
+//         if (remoteRow.is_deleted) {
+//           // delete locally if remote says deleted
+//           await runSql(`DELETE FROM ${table} WHERE id = ?`, [remoteRow.id]);
+//           continue;
+//         }
 
-        const local = await localGet(table, remoteRow.id);
-        const remoteUpdatedAt = remoteRow.updated_at || nowISO();
-        const localUpdatedAt = local ? local.updated_at || null : null;
+//         const local = await localGet(table, remoteRow.id);
+//         const remoteUpdatedAt = remoteRow.updated_at || nowISO();
+//         const localUpdatedAt = local ? local.updated_at || null : null;
 
-        if (!local) {
-          // new in supabase → insert
-          const toInsert = normalizeForSQLite(table, remoteRow);
-          await insertOrReplace(table, toInsert);
-        } else if (!localUpdatedAt || remoteUpdatedAt > localUpdatedAt) {
-          // newer in supabase → replace local
-          const toInsert = normalizeForSQLite(table, remoteRow);
-          await insertOrReplace(table, toInsert);
-        }
-             await AsyncStorage.setItem(key, nowISO());
-      }
+//         if (!local) {
+//           // new in supabase → insert
+//           const toInsert = normalizeForSQLite(table, remoteRow);
+//           await insertOrReplace(table, toInsert);
+//         } else if (!localUpdatedAt || remoteUpdatedAt > localUpdatedAt) {
+//           // newer in supabase → replace local
+//           const toInsert = normalizeForSQLite(table, remoteRow);
+//           await insertOrReplace(table, toInsert);
+//         }
+//              await AsyncStorage.setItem(key, nowISO());
+//       }
 
-      // ✅ Step 5: remove local rows not present in Supabase
-      // for (const localId of localIds) {
-      //   if (!remoteIds.has(localId)) {
-      //     await runSql(`DELETE FROM ${table} WHERE id = ?`, [localId]);
-      //   }
-      // }
+//       // ✅ Step 5: verify "orphaned" local rows before deletion
+//       // for (const localId of localIds) {
+//       //   if (!remoteIds.has(localId)) {
+//       //     // double check Supabase directly by ID
+//       //     const { data: checkRow, error: checkError } = await supabase
+//       //       .from(table)
+//       //       .select("id, is_deleted")
+//       //       .eq("id", localId)
+//       //       .single();
 
-      // ✅ Step 6: update lastPulledAt
-    } catch (err) {
-      console.warn('Pull error', err);
-    }
-  }
-}
+//       //     if (!checkRow || checkRow?.is_deleted) {
+//       //       console.log(`Removing orphaned row from ${table}: ${localId}`);
+//       //       await runSql(`DELETE FROM ${table} WHERE id = ?`, [localId]);
+//       //     }
+//       //   }
+//       // }
+
+//       // ✅ Step 6: update lastPulledAt
+//     } catch (err) {
+//       console.warn('Pull error', err);
+//     }
+//   }
+// }
 
 // ---------- FETCH HELPER (Supabase first, fallback local) ----------
 export async function fetchWithFallback(table, query = {}) {
@@ -741,7 +805,8 @@ async function syncWithSupabase(id) {
   console.log('Starting sync...');
   try {
     await pushQueueToSupabase(id);
-    await pullFromSupabase(id);
+    // await force
+    await pullFromSupabase();
     console.log('Sync completed.');
     return { ok: true };
   } catch (err) {
@@ -750,23 +815,6 @@ async function syncWithSupabase(id) {
   }
 }
 
-// ---------- PUBLIC API ----------
-
-export async function init(id) {
-  await createTablesIfNotExists();
-
-  // Optionally run a sync if network available
-  const state = await NetInfo.fetch();
-  if (state.isConnected) {
-    // Run sync but do not block init
-    if(id){
-    syncWithSupabase(id).catch((e) => console.warn('Initial sync failed', e));
-    } else {
-      console.log('No id to sync')
-    }
-  
-  }
-}
 
 export const getDB = async () => {
   let db = await SQLite.openDatabase({ name: "app.db", location: "default" });
@@ -782,14 +830,14 @@ export const api = {
   updateUser: async (id, patch) => localUpdate('users', id, patch),
   deleteUser: async (id) => localDelete('users', id),
   getUser: async (id) => localGet('users', id),
-  listUsers: async (params) => fetchWithFallback('users', params),
+  listUsers: async (params) => localQuery('users', params),
 
   // draws
   createDraw: async (draw) => localInsert('draws', { ...draw }),
   updateDraw: async (id, patch) => localUpdate('draws', id, patch),
   deleteDraw: async (id) => localDelete('draws', id),
   getDraw: async (id) => localGet('draws', id),
-  listDraws: async (params) => fetchWithFallback('draws', params),
+  listDraws: async (params) => localQuery('draws', params),
 
   // bettings
   createBetting: async (b) => localInsert('bettings', { ...b }),
@@ -803,7 +851,7 @@ export const api = {
   updateMasterCombination: async (id, patch) => localUpdate('master_combinations', id, patch),
   deleteMasterCombination: async (id) => localDelete('master_combinations', id),
   getMasterCombination: async (id) => localGet('master_combinations', id),
-  listMasterCombinations: async (params) => fetchWithFallback('master_combinations', params),
+  listMasterCombinations: async (params) => localQuery('master_combinations', params),
 
   // messages
   createMessage: async (m) => localInsert('messages', { ...m }),
@@ -956,39 +1004,46 @@ export async function clearAllStorage() {
 }
 
 export async function fetchBettings({ includeAll, date, userNow, user }) {
-  // Compute day range in ISO format for Supabase/SQLite compatibility
-  let startOfDay = moment(date).startOf('day').toISOString();
-  let endOfDay = moment(date).endOf('day').toISOString();
+  // Convert to Philippine timezone (always consistent with app)
+  const startOfDay = moment(date).tz("Asia/Manila").startOf("day").toISOString();
+  const endOfDay = moment(date).tz("Asia/Manila").endOf("day").toISOString();
 
-  // Apply Realm-like adjustment logic
+  // Realm-like adjustment logic
+  let adjustedStart = startOfDay;
+  let adjustedEnd = endOfDay;
+
   if (!includeAll && new Date(date) <= new Date(user?.lastSummary)) {
-    startOfDay = moment().add(1, 'd').endOf('day').toISOString();
-    endOfDay = moment().add(1, 'd').endOf('day').toISOString();
+    adjustedStart = moment().tz("Asia/Manila").add(1, "d").startOf("day").toISOString();
+    adjustedEnd = moment().tz("Asia/Manila").add(1, "d").endOf("day").toISOString();
   }
 
-  let filters = {
+  // Filters
+  const filters = {
     is_deleted: false,
-    input_type: 'normal',
+    input_type: "normal",
+    timestamp: { op: "between", from:  adjustedStart, to: adjustedEnd }
   };
 
-  // Handle includeAll vs specific owner
   if (includeAll) {
-    // "ANY uplines == userNow" — assuming `uplines` is stored as JSON/text
-    // You can use LIKE here if it's a stringified array in SQLite
-    filters.uplines_like = `%${userNow}%`;
+    // Match any uplines containing userNow
+    filters.uplines = { op: "contains", value: userNow };
   } else {
-    filters.owner_id = String(userNow);
+    filters.owner_id = userNow;
   }
-  
-  // Now execute the query via your API
+
+  // Execute query via API
   const items = await api.listBettings({
     filters,
-    // between: { field: 'timestamp', start: startOfDay, end: endOfDay },
-    orderBy: 'timestamp ASC',
+    orderBy: "timestamp ASC",
   });
 
-
-  console.log(items, "NAA?")
+  console.log("Fetched bettings", {
+    count: items?.length ?? 0,
+    date,
+    includeAll,
+    start: adjustedStart,
+    end: adjustedEnd,
+  });
 
   return items;
 }

@@ -94,12 +94,29 @@ const processBatch = async (tableName, remoteData, localIds) => {
   }
 
   // Remove local records not present in Supabase
-  // for (const localId of localIds) {
-  //   if (!remoteIds.has(localId)) {
-  //     await runSql(`DELETE FROM ${tableName} WHERE id = ?`, [localId]);
-  //     deleted++;
-  //   }
-  // }
+      for (const localId of localIds) {
+        if (!remoteIds.has(localId)) {
+          // double check Supabase directly by ID
+            const { data: checkRows, error: checkError } = await supabase
+            .from(tableName)
+            .select("id")
+            .eq("id", localId);
+    
+          if (checkError) {
+            console.warn(`Supabase check failed for ${tableName}:${localId}`, checkError);
+            continue; // skip if Supabase lookup failed
+          }
+    
+          const checkRow = checkRows && checkRows.length > 0 ? checkRows[0] : null;
+          console.log("CHECK ROW", localId, checkRow);
+    
+          // Row not in Supabase OR explicitly deleted → remove locally
+          if (!checkRow ) {
+            console.log(`Removing orphaned row from ${tableName}: ${localId}`);
+            await runSql(`DELETE FROM ${tableName} WHERE id = ?`, [localId]);
+          }
+        }
+      }
 
   return { inserted, updated, deleted };
 };

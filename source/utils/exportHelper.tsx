@@ -2,8 +2,7 @@ import { Platform } from 'react-native';
 import RNFS from 'react-native-fs';
 import Share from 'react-native-share';
 import { PermissionsAndroid } from 'react-native';
-
-const DB_NAME = 'leo.db';
+import { DB_NAME } from './offlineSync.js'
 
 // Detect actual DB path based on platform + default location
 function getDbPath() {
@@ -11,7 +10,6 @@ function getDbPath() {
     // iOS default = Library/LocalDatabase/
     return `${RNFS.LibraryDirectoryPath}/LocalDatabase/${DB_NAME}`;
   } else {
-  const path = `${RNFS.DocumentDirectoryPath}/leo.db`;
 
     // Android default = /data/data/<package-name>/databases/
     return `/data/data/com.rev/databases/${DB_NAME}`;

@@ -1,68 +1,36 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet, Button } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet, Button, TouchableOpacity } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { PermissionsAndroid } from 'react-native';
-import { useOfflineSync } from "./context/OfflineProvider";
+// import { useOfflineSync } from "./context/OfflineSyncProvider";
+import { useOffline } from "./context/OfflineProvider";
 
 
 
 
 const SyncComponent = () => {
-  const { api, syncing, lastSync, online, syncNow } = useOfflineSync();
+  const {  syncing, lastSync, online, syncNow} = useOffline();
 
   
-  
-  const [isOnline, setIsOnline] = useState(false);
 
 
-
-
-
-
-
-async function requestStoragePermission() {
-  try {
-    const granted = await PermissionsAndroid.request(
-      PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
-      {
-        title: "Storage Permission",
-        message: "App needs access to your storage to save the database file.",
-        buttonNeutral: "Ask Me Later",
-        buttonNegative: "Cancel",
-        buttonPositive: "OK",
-      }
-    );
-    return granted === PermissionsAndroid.RESULTS.GRANTED;
-  } catch (err) {
-    console.warn(err);
-    return false;
-  }
-}
-
-
-
-
-  useEffect(() => {
-    // Listen to network status
-    const unsubscribe = NetInfo.addEventListener(state => {
-      setIsOnline(state.isConnected && state.isInternetReachable);
-    });
-
-    return () => unsubscribe();
-  }, []);
 
 
 
 
   return (
     <View style={styles.container}>
-      {isPulling ? (
+      {syncing ? (
         <ActivityIndicator size="small" color="#fff" />
       ) : (
+      <TouchableOpacity
+      onPress={syncNow}
+      >
         <Text style={styles.text}>
-          {isOnline ? `Synced ${progress}` : 'Offline'}
-          {lastPull ? ` • Last: ${new Date(lastPull).toLocaleTimeString()}` : ''}
+          {online ? `Synced` : 'Offline'}
+          {lastSync ? ` • Last: ${new Date(lastSync).toLocaleTimeString()}` : ''}
         </Text>
+        </TouchableOpacity>
       )}
                
     </View>

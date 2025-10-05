@@ -6,12 +6,12 @@ import { useSelector, useDispatch } from 'react-redux';
 import { COLORS, SIZES } from '../constants/theme';
 import icons from '../constants/icons';
 import { formatNumber, getConfiguration } from '../utils/helpers';
-import { fetchUser, getLocalUser, get_local_bettings, get_local_draws } from '../utils/db'; // Your SQLite helpers
-import  supabase  from '../utils/supabaseClient';
-import { init, api, forceSync, startAutoSyncOnReconnect } from '../utils/offlineSync';
+import { useOffline } from '../context/OfflineProvider';
+// import { useOfflineSync } from '../context/OfflineSyncProvider';
 
 
 const Dashboard = ({ navigation }) => {
+  const { dataVersion, api, fetchUser } = useOffline()
   const { user, collector, selectedUser } = useSelector(({user}) => user);
 
   const [date, setDate] = useState(new Date());
@@ -285,13 +285,12 @@ const Dashboard = ({ navigation }) => {
       if (!collector) return;
 		let selectedCollector = await fetchUser(collector);
 
-		console.log(selectedCollector.id, 'SELECTED')
 
 //   const today = new Date().toISOString(); 
 
 // Start and end of the day
-const start_of_day = moment(new Date(date)).startOf('day').toISOString();
-const end_of_day = moment(new Date(date)).endOf('day').toISOString();
+const start_of_day = moment(new Date(date)).tz("Asia/Manila").startOf('day').toISOString();
+const end_of_day = moment(new Date(date)).tz("Asia/Manila").endOf('day').toISOString();
 
 // Build filters
 let filters = {};
@@ -318,7 +317,6 @@ if (includeAll) {
         // limit: 20,
       });
 
-	console.log(localBettings, filters, start_of_day, end_of_day, 'bettings query')
 
 
     
@@ -338,9 +336,15 @@ if (includeAll) {
       setBettings(localBettings);
       setDraws(localDraws);
     })();
-  }, [date, includeAll, collector]);
+    
+    return () => {
 
 
+	}
+  }, [date, includeAll, collector, dataVersion]);
+
+
+console.log(dataVersion, 'DATA VERSION DASHBOARD')
 
   return (
   	<SafeAreaView style={{ ...styles.wrapper }}>

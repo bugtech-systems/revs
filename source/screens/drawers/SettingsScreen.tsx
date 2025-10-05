@@ -24,11 +24,13 @@ import {
   SET_USER,
   SET_USER_CONFIG,
 } from '../../redux/actions/types';
-import { getLocalUsers, saveLocalUsers } from '../../utils/db';
+// import { getLocalUsers, saveLocalUsers } from '../../utils/db';
 import { useScreenSize, getConfiguration } from '../../utils/helpers';
-import { api, clearAllStorage, deleteDB, forceSync } from '../../utils/offlineSync';
+// import { api, clearAllStorage, deleteDB, forceSync } from '../../utils/offlineSync';
 import { exportDatabase } from '../../utils/exportHelper';
 import useBatchedPull from '../../hooks/useBatchPulling';
+import { useOffline } from '../../context/OfflineProvider';
+import { clearAllStorage } from '../../utils/offlineSync';
 
 
 const SettingsScreen = ({ navigation }) => {
@@ -47,6 +49,8 @@ const SettingsScreen = ({ navigation }) => {
     abortPull,
     resetPullState
   } = useBatchedPull();
+  const {api, forceSync} = useOffline()
+  
   
   const { user, collector } = useSelector(({ user }) => user);
   const { confirmationModal } = useSelector(({ ui }) => ui);
@@ -126,7 +130,7 @@ const SettingsScreen = ({ navigation }) => {
   
     const handleDelete = async () => {
   
-  await deleteDB()
+      await deleteDB()
     // now safe to write to RNFS.DownloadDirectoryPath
   
     }

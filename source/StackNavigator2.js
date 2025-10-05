@@ -20,6 +20,7 @@ import CustomDrawerIcon from './components/CustomDrawerIcon';
 import { getConfiguration } from './utils/helpers';
 import VoidScreen from './screens/VoidScreen';
 import ReviewScreen from './screens/ReviewScreen';
+import Receipt from './screens/Receipt';
 
 
 
@@ -62,7 +63,7 @@ const DrawerNavigation = () => {
           <Drawer.Screen name="Transactions" component={Transactions} options={({navigation}) => generateDrawerScreenOptions('Transactions', icons.tickets, 'Transactions', navigation)} />
           <Drawer.Screen name="Settings" component={SettingsScreen} options={({navigation}) => generateDrawerScreenOptions('Settings', icons.settings, 'Settings', navigation)} />
         </>
-      )}
+      )} 
     </Drawer.Navigator>
   );
 };
@@ -110,6 +111,40 @@ export const StackNavigator = () => {
               // ),
             })}
           />
+          <Stack.Screen
+				name="VoidScreen"
+				component={VoidScreen}
+				options={({ navigation, route }) => ({
+					headerTitle: '',
+					headerTitleStyle: { color: COLORS.white },
+					headerStyle: { backgroundColor: COLORS.secondary },
+					headerLeft: () => (
+						<CustomDrawerIcon route={route} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'View Ticket'} />
+					),
+				})}
+			/>
+			<Stack.Screen
+				name="Receipt"
+				component={Receipt}
+				options={({ navigation }) => ({
+					title: 'Receipt Template',
+					headerTitleStyle: { color: COLORS.white },
+					headerStyle: { backgroundColor: COLORS.secondary },
+					headerLeft: () => (
+						<TouchableOpacity
+							onPress={() => navigation.goBack()}
+							style={{ padding: 10, alignItems: 'center', justifyContent: 'center', }}
+						>
+							<Image
+								source={icons.back}
+								style={{
+									height: 20,
+									width: 20,
+									tintColor: COLORS.white
+								}} />
+						</TouchableOpacity>),
+				})}
+			/>
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

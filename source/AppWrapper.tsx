@@ -5,7 +5,8 @@ import { App } from './App';
 import { WelcomeView } from './WelcomeView';
 import supabase from './utils/supabaseClient';
 import { SessionContext } from './context/SessionContext';
-import { OfflineSyncProvider } from "./context/OfflineProvider";
+import { OfflineSyncProvider } from "./context/OfflineSyncProvider";
+import { OfflineProvider } from "./context/OfflineProvider";
 
 
 
@@ -35,12 +36,13 @@ export const AppWrapper = () => {
   return (
     <Provider store={store}>
       <SessionContext.Provider value={{ session, setSession }}>
-          <OfflineSyncProvider session={session}>
-
+          {/* <OfflineSyncProvider session={session}> */}
+        <OfflineProvider session={session}>
         {/* <UpdateModalProvider> */}
           {session ? <App /> : <WelcomeView />}
         {/* </UpdateModalProvider> */}
-        </OfflineSyncProvider>
+        </OfflineProvider>
+        {/* </OfflineSyncProvider> */}
       </SessionContext.Provider>
     </Provider>
   );

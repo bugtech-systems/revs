@@ -6,10 +6,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import moment from 'moment-timezone';
 import { COLORS, icons } from './constants';
 import supabase  from './utils/supabaseClient'; // Your initialized Supabase client
-import { getLocalUser, saveLocalUser } from './utils/db'; // SQLite helper functions
-import { fetchUser } from './utils/offlineSync';
+// import { useOfflineSync } from './context/OfflineSyncProvider';
+import { useOffline } from './context/OfflineProvider';
 
 export function WelcomeView(): React.ReactElement {
+  const { fetchUser,  saveLocalUser} = useOffline();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);

@@ -1,20 +1,20 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { StyleSheet, Text, Keyboard, View, ScrollView, TouchableOpacity, FlatList, TextInput, Image, Button, TouchableWithoutFeedback, Alert, Modal, ToastAndroid } from 'react-native'
 // import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
-import { Betting, Users, Draws, Combinations } from '../Models';
 import moment from 'moment-timezone';
 import { useSelector, useDispatch } from 'react-redux';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 // import { file_server_token, file_server_url, file_download_url } from '../../commonData.json';
 // import ImageUploader from '../components/ImageUploader';
 // import { SPrize, Win2Prize } from '../utils/commonData';
-import { checkSoldOutParts, getConfiguration, getWithWin200Config, updateDateTimeIfGreater } from '../utils/helpers';
+import { checkSoldOutParts, generateObjectId, getConfiguration, getWithWin200Config, updateDateTimeIfGreater } from '../utils/helpers';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Geolocation from 'react-native-geolocation-service';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, icons } from '../constants';
 import ConfirmationModal from '../components/ConfirmationModal';
-import { init, api, forceSync, startAutoSyncOnReconnect, fetchUser} from '../utils/offlineSync';
+import { useOffline } from '../context/OfflineProvider';
+// import { api, fetchUser } from '../utils/offlineSync';
 
 
 let keyPad = [
@@ -69,9 +69,8 @@ let keyPad = [
 ]
 
 export default function TicketForm({ navigation }) {
-    const dispatch = useDispatch()
+    const { fetchUser, api } = useOffline();
     const { collector, user } = useSelector(({ user }) => user);
-
     const [amountVal, setAmountVal] = useState('')
     const [time, setSelectedTime] = useState('2pm')
     const [arrayBetting, setBetting] = useState([]);
@@ -95,6 +94,8 @@ export default function TicketForm({ navigation }) {
     const [modalTitle, setModalTitle] = useState('');
     const [modalMessage, setModalMessage] = useState('');
     const [pendingBet, setPendingBet] = useState(null);
+    const [draws, setDraws] = useState([])
+    const [combinations, setCombinations] = useState([])
 
     let isWinTo = false;
     const current = new Date();
@@ -114,7 +115,6 @@ export default function TicketForm({ navigation }) {
 
     let users = []
 
-    const draws = []
     
     
     let comb = []
@@ -511,11 +511,11 @@ export default function TicketForm({ navigation }) {
             let winStraight = getConfiguration(users[0], 'winStraight')?.value
             let validDate = await updateDateTimeIfGreater();
             let selectedUser = await fetchUser(collector)
-            // if(!validDate){
-            // 	setLoading(false)
-            // 	Alert.alert('Set Timezone Properly!');
-            // 	return;
-            // }
+            if(!validDate){
+            	setLoading(false)
+            	Alert.alert('Set Timezone Properly!');
+            	return;
+            }
             
             console.log(selectedUser, 'SELECTED USER')
             
@@ -622,11 +622,9 @@ export default function TicketForm({ navigation }) {
                         { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
                     );
                 }
-
-       
-
-                    
-                    let placedBet = await api.createBetting({
+         
+                let newBet = {
+                        id: generateObjectId(),
                         ramble: Number(totalRamble),
                         straight: Number(totalStraight),
                         is_complete: false,
@@ -647,9 +645,12 @@ export default function TicketForm({ navigation }) {
                         combinations: combinations,
                         commissions: newComms,
                         uplines: newUplines,
-                        created_at: new Date(),
-                        updated_at: new Date()
-                    })
+                        created_at: moment().tz("Asia/Manila"),
+                        updated_at: moment().tz("Asia/Manila")
+                    }
+
+                    
+                    let placedBet = await api.createBetting(newBet)
                     
                     
                     console.log(placedBet, 'PLACEDD BETSS')
@@ -685,13 +686,12 @@ export default function TicketForm({ navigation }) {
 
 
 
-
-                //     setLoading(false)
-                //     // dispatch({type: SET_LOADING})
-                //     setSelectedTab('keypads')
-                //     setBetting([]);
-                //     setDate(new Date());
-                //     navigation.navigate('VoidScreen', JSON.stringify(betCreated))
+                        console.log('Navigate')
+                    setLoading(false)
+                    setSelectedTab('keypads')
+                    setBetting([]);
+                    setDate(new Date());
+                    navigation.navigate('VoidScreen', JSON.stringify(newBet))
 
                 // })
             } else {
@@ -880,11 +880,32 @@ export default function TicketForm({ navigation }) {
         setDate(currentDate);
     };
 
-    // useEffect(() => {
-    //     initializeGameTime()
-    // }, [draws])
+    useEffect(() => {
+        initializeGameTime()
+    }, [draws])
 
     useEffect(() => {
+    const start_of_day = moment(new Date()).startOf('day').toISOString();
+    const end_of_day = moment(new Date()).endOf('day').toISOString();
+    
+    
+    const initData = async () => {
+       let localDraws = await api.listDraws({
+       filters: { 
+        draw_date:  { 
+           op: "between",
+	      from: start_of_day,
+	      to: end_of_day,
+        }}
+      });
+
+    let localCombinations = await api.listMasterCombinations();
+    setDraws(localDraws)
+    setCombinations(localCombinations)
+    } 
+    
+    initData()
+    
         return () => {
             setIs2pmDisabled(false)
             setIs5pmDisabled(false)
@@ -894,23 +915,7 @@ export default function TicketForm({ navigation }) {
         }
     }, [])
 
-    // useEffect(() => {
-    //     const current = new Date();
-    //     const startOfDay = moment(current).startOf('day').toDate();
-    //     const endOfDay = moment(current).endOf('day').toDate();
 
-    //     let combinationsData = realm.objects(Combinations);
-    //     let drawsDataArray = realm.objects(Draws);
-
-
-
-
-    //     realm.subscriptions.update(mutableSubs => {
-    //         mutableSubs.add(combinationsData, { name: combinationsSubscriptionName });
-    //         mutableSubs.add(drawsDataArray, { name: drawsSubscriptionName });
-    //     });
-
-    // }, [realm, users])
 
     const intervalTime = 3 * 60 * 1000;
 

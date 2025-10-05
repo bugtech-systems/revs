@@ -64,8 +64,9 @@ import { COLORS, SIZES } from '../constants/theme';
 import { useDispatch, useSelector } from 'react-redux';
 import { SET_LOADING, STOP_LOADING } from '../redux/actions/types';
 import { DocumentDirectoryPath, downloadFile, writeFile, readDir, stat, readFile, unlink } from 'react-native-fs';
-import { BSON } from 'realm';
+// import { BSON } from 'realm';
 import { BarcodeCreatorView, BarcodeFormat } from 'react-native-barcode-creator';
+import { useOffline } from '../context/OfflineProvider';
 
 const { useRealm, useQuery } = realmContext;
 const { ReactNativeLoading } = NativeModules;
@@ -83,7 +84,7 @@ if (subscription === undefined) {
 }
 
 export default function TestScreen({ data, isPrint, onPrint }) {
-    const realm = useRealm()
+    const { api } = useOffline()
     const { collector, user, selectedUser } = useSelector(({ user }) => user);
     const viewShotRef = useRef();
     const [total, setTotal] = useState(0)
@@ -96,22 +97,10 @@ export default function TestScreen({ data, isPrint, onPrint }) {
 
 
 
-    console.log(user, "SELEC")
-
-    let users = useQuery(Users, doc => {
-        let userNow = selectedUser ? selectedUser : user?.email;
-
-        console.log(userNow, "userNowuserNowuserNowuserNowuserNow")
-
-        return doc.filtered(
-            'email == $0',
-            userNow
-        );
-    }, [collector, selectedUser, user]);
 
 
-    let winStraight = getConfiguration(users[0], 'winStraight');
-    let withWin200 = getConfiguration(users[0], 'withWin200');
+    let winStraight = getConfiguration(selectedUser, 'winStraight');
+    let withWin200 = getConfiguration(selectedUser, 'withWin200');
 
     const showError = (error) => {
         Alert.alert('Print error', error, [
@@ -164,7 +153,7 @@ export default function TestScreen({ data, isPrint, onPrint }) {
     // const handlePrint = async () => {
     //     setPrintCount(prev => prev += 1)
     //     dispatch({ type: SET_LOADING })
-    //     let printHeader = getConfiguration(users[0], 'printHeader')
+    //     let printHeader = getConfiguration(selectedUser, 'printHeader')
     //     let item = realm.objectForPrimaryKey(Betting, BSON.ObjectId(data._id));
     //     const filePath = `${DocumentDirectoryPath}/bwlogo1.png`;
     //     let loadImage = Image.resolveAssetSource({ uri: `https://sharewin.pro/apiv2/assets/bwlogo1.png` }).uri;
@@ -173,7 +162,7 @@ export default function TestScreen({ data, isPrint, onPrint }) {
     //         let job = new RawBTPrintJob();
     //         let base64StringImage = await RawbtApi.getImageBase64String(loadImage);
     //         let base64String = await RawbtApi.getImageBase64String(uri);
-    //         if (printHeader.isCheck && String(users[0]?.receiptTemplate).toLowerCase() != 'samar') {
+    //         if (printHeader.isCheck && String(selectedUser?.receiptTemplate).toLowerCase() != 'samar') {
     //             job.image(base64StringImage, new AttributesImage(ALIGNMENT_CENTER, 16));
     //         }
     //         job.image(base64String);
@@ -205,8 +194,7 @@ export default function TestScreen({ data, isPrint, onPrint }) {
 
   const tryCapture = async () => {
     try {
-      let printHeader = getConfiguration(users[0], 'printHeader');
-      let item = realm.objectForPrimaryKey(Betting, BSON.ObjectId(data._id));
+      let printHeader = getConfiguration(selectedUser, 'printHeader');
       const filePath = `${DocumentDirectoryPath}/bwlogo1.png`;
       const loadImage = Image.resolveAssetSource({ uri: `https://sharewin.pro/apiv2/assets/bwlogo1.png` }).uri;
 
@@ -215,7 +203,7 @@ export default function TestScreen({ data, isPrint, onPrint }) {
       const base64String = await RawbtApi.getImageBase64String(uri);
 
       let job = new RawBTPrintJob();
-      if (printHeader.isCheck && String(users[0]?.receiptTemplate).toLowerCase() != 'samar') {
+      if (printHeader.isCheck && String(selectedUser?.receiptTemplate).toLowerCase() != 'samar') {
         job.image(base64StringImage, new AttributesImage(ALIGNMENT_CENTER, 16));
       }
       job.image(base64String);
@@ -223,9 +211,7 @@ export default function TestScreen({ data, isPrint, onPrint }) {
 
       await RawbtApi.printJob(job.GSON());
 
-      realm.write(() => {
-        item.isPrint = true;
-      });
+ 
 
       onPrint();
     } catch (err) {
@@ -257,7 +243,7 @@ export default function TestScreen({ data, isPrint, onPrint }) {
             // }
             setPrintCount(prev => prev += 1)
             dispatch({ type: SET_LOADING })
-            const item = realm.objectForPrimaryKey(Betting, BSON.ObjectId(data._id));
+            // const item = realm.objectForPrimaryKey(Betting, BSON.ObjectId(data._id));
             let winStraight = getConfiguration(user, 'winStraight');
             let withWin200 = getConfiguration(user, 'withWin200');
 
@@ -354,10 +340,11 @@ export default function TestScreen({ data, isPrint, onPrint }) {
             RawbtApi.printJob(job.GSON())
                 .then(() => {
                     console.log('NAG PRINT NAG SUCCESS!!!')
-                    realm.write(() => {
+     /*                realm.write(() => {
                         item.isPrint = true;
                         item.printCopy = (item.printCopy ?? 0) + 1;
-                    });
+                    }); */
+                    
                     onPrint();
                 })
                 .catch((err) => {
@@ -607,9 +594,6 @@ console.log(data.combinations.length, 'THE VIEW HEIGHT')
                                             stlwsmr.v1.02.05.24
                                         </Text>
                                     </View>
-
-
-
                                 </View>
 
                             </ViewShot>
@@ -714,8 +698,8 @@ console.log(data.combinations.length, 'THE VIEW HEIGHT')
 
                                     </View>
 
-                                    {result?.map(resItem => (
-                                        <View style={{ flexDirection: 'row', borderWidth: 1, borderColor: COLORS.black, width: '100%' }}>
+                                    {result?.map((resItem, index) => (
+                                        <View key={index} style={{ flexDirection: 'row', borderWidth: 1, borderColor: COLORS.black, width: '100%' }}>
                                             <View style={{ width: '25%', borderRightWidth: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 6 }}>
                                                 <Text style={{ ...styles.fontStyles1, fontSize: 24, fontWeight: '600' }}>
                                                     {resItem.combination.slice(0, 1)}-{resItem.combination.slice(1, 2)}-{resItem.combination.slice(2)}
@@ -762,14 +746,14 @@ console.log(data.combinations.length, 'THE VIEW HEIGHT')
                             //  onPress={() =>
                             // //  {
                             // // 	// console.log(data?.isPrint, "data?.isPrintdata?.isPrintdata?.isPrintdata?.isPrint")
-                            // // 	String(users[0]?.receiptTemplate).toLowerCase() == 'samar' ?
+                            // // 	String(selectedUser?.receiptTemplate).toLowerCase() == 'samar' ?
                             // // 	samarPrint({
                             // // 		data: data,
                             // // 		gameTime: data?.gameTime,
                             // // 		collectorDetails: {
-                            // // 			firstName: users[0]?.firstName,
-                            // // 			lastName: users[0]?.lastName,
-                            // // 			mobile: users[0]?.mobile
+                            // // 			firstName: selectedUser?.firstName,
+                            // // 			lastName: selectedUser?.lastName,
+                            // // 			mobile: selectedUser?.mobile
                             // // 		}
                             // // 	}) : handlePrint()
                             // // }}

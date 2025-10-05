@@ -11,6 +11,7 @@ import { COLORS, icons } from '../../constants'
 import { formatNumberWithComma, getConfiguration } from '../../utils/helpers';
 import supabase from '../../utils/supabaseClient';
 import { fetchBettings } from '../../utils/offlineSync';
+import { useOffline } from '../../context/OfflineProvider';
 
 const drawTimes = [
   {
@@ -35,31 +36,21 @@ const itemSubscriptionName = 'items';
 const ownItemsSubscriptionName = 'ownItems';
 
 const Transactions = ({ navigation }) => {
-  const dispatch = useDispatch()
+  const { api, dataVersion, bumpVersion } = useOffline();
+  
   const { collector, user, selectedUser } = useSelector(({ user }) => user);
   const [date, setDate] = useState(new Date())
-  const [drawTime, setDrawTime] = useState('')
-  const [searchString, setSearchString] = useState('');
-  const [grandTotal, setGrandTotal] = useState(0);
   const [show, setShowDate] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(Number(10));
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [refreshing, setRefreshing] = React.useState(false);
   const [filterTime, setFilterTime] = useState(drawTimes[0].name)
   const [showTime, setShowTime] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [includeAll, setIncludeAll] = useState(false);
-  const [users, setUsers] = useState([]);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  let startOfDay = moment(date).startOf('day').toDate();
-  let endOfDay = moment(date).endOf('day').toDate();
 
-  let collectorName = selectedUser ? selectedUser : collector;
-  const userNow = user ? user.id : "";
+  const userNow = selectedUser ? selectedUser.id : user.id;
 
 
   console.log(userNow, "THE USER REDUX")
@@ -99,7 +90,7 @@ const Transactions = ({ navigation }) => {
 
   
   
-  const updateTickets =  getConfiguration(users[0], 'updateTickets')?.isCheck;
+  const updateTickets =  getConfiguration(selectedUser, 'updateTickets')?.isCheck;
 
 
   console.log(updateTickets, "CAN EDIT?")
@@ -108,7 +99,7 @@ const Transactions = ({ navigation }) => {
   
   
   // const fetchBettings = useMemo(async () => {
-  //   let userNow = users[0] ? users[0]._id : "";
+  //   let userNow = selectedUser ? selectedUser._id : "";
   //   let { data: bettings, error } = await supabase
   //     .from('bettings')
   //     .select("*")
@@ -182,28 +173,77 @@ const Transactions = ({ navigation }) => {
   //   }
   // }, [date, users, selectedUser, includeAll]);
 
+ function getDayRange(date) {
+  const d = new Date(date);
 
+  // Start of the day (00:00:00.000)
+  const start_of_day = new Date(
+    d.getFullYear(),
+    d.getMonth(),
+    d.getDate(),
+    0, 0, 0, 0
+  ).toISOString();
+
+  // End of the day (23:59:59.999)
+  const end_of_day = new Date(
+    d.getFullYear(),
+    d.getMonth(),
+    d.getDate(),
+    23, 59, 59, 999
+  ).toISOString();
+
+  return { start_of_day, end_of_day };
+}
 
     useEffect(() => {
     const load = async () => {
-      const data = await fetchBettings({ includeAll, date, userNow, user });
-      setItems(data);
+    console.log(date, 'LOOOADED')
+    const { start_of_day, end_of_day  } = getDayRange(date)
+    // Start and end of the day
+    
+  console.log(start_of_day, end_of_day, 'date range')
+    
+    let filters = {}
+    if (includeAll) {
+  filters = {
+    ...filters,
+    uplines: { op: "contains", value: userNow },
+    timestamp: { op: "between", from: start_of_day, to: end_of_day },
+  };
+} else {
+  filters = {
+    ...filters,
+    owner_id: userNow,
+    timestamp: { op: "between", from: start_of_day, to: end_of_day },
+  };
+}
+
+
+
+      let localBettings = await api.listBettings({
+        filters: filters,
+        orderBy: 'created_at DESC',
+        // limit: 20,
+      });
+
+    
+      setItems(localBettings);
       setLoading(false);
     };
     load();
-  }, [date, userNow, user, includeAll]);
+  }, [date, userNow, includeAll, dataVersion]);
   
 
-  console.log(items, "THE ITEM")
+  console.log("THE ITEM", show)
 
   // DATE
   const onChangeDate = (event, selectedDate) => {
     const currentDate = selectedDate || date;
-    console.log(event?.type, "THE EVENT")
+    console.log(event?.type, "THE EVENT", currentDate)
     if (event?.type == 'neutralButtonPressed') {
       setShowDate(Platform.OS === 'ios');
       // setFilterDate(false)
-      setDate(moment().toDate());
+      setDate(new Date());
       // return
     } else if (event?.type == 'set') {
       setShowDate(Platform.OS === 'ios');
@@ -228,16 +268,14 @@ const Transactions = ({ navigation }) => {
 
 
   const onRefresh = React.useCallback(() => {
-    let rnd = Math.floor(100 + Math.random() * 900);
     setRefreshing(true);
     setTimeout(() => {
       setRefreshing(false);
-      setRefreshTrigger(rnd);
+      bumpVersion();
       setSearchQuery('');
-      setCurrentPage(1)
       // setFilteredData(items)
     }, 2000);
-  }, []);
+  }, [date, userNow, includeAll]);
 
 
   const handleSearch = (query) => {
@@ -403,7 +441,7 @@ const Transactions = ({ navigation }) => {
 
         <FlatList
           data={listData}
-          keyExtractor={(item, index) => item._id}
+          keyExtractor={(item, index) => item.id}
           renderItem={renderItem}
           showsHorizontalScrollIndicator={false}
           showsVerticalScrollIndicator={false}
@@ -432,7 +470,7 @@ const Transactions = ({ navigation }) => {
   }
 
   // useEffect(() => {
-  // let cur = users[0] ? users[0]._id : "";
+  // let cur = selectedUser ? selectedUser._id : "";
   // let filterString = `owner_id == "${cur}"`;
 
 
@@ -507,7 +545,7 @@ const Transactions = ({ navigation }) => {
             mode="date"
             display="default"
             onChange={onChangeDate}
-            minimumDate={new Date(users[0]?.lastSummary)}
+            minimumDate={new Date(selectedUser?.last_summary)}
             maximumDate={new Date(moment().toDate())}
             negativeButton={{ label: "Cancel", }}
             neutralButton={{ label: "Clear", }}
@@ -527,17 +565,12 @@ const Transactions = ({ navigation }) => {
             <Text style={{ fontWeight: 'bold', color: COLORS.black, fontSize: 16 }}>{formatNumberWithComma(totalGross)}</Text>
           </View>
         </View>
-        {(users[0] && users[0].role !== 'teller' && getConfiguration(users[0], 'showAllData')?.isCheck) &&
+        {(selectedUser && selectedUser.role !== 'teller' && getConfiguration(selectedUser, 'showAllData')?.isCheck) &&
           <View style={{ ...styles.toggleRow, justifyContent: 'flex-start' }}>
             <Switch
               trackColor={{ true: '#00ED64' }}
-              render
               onValueChange={() => {
-                if (realm.syncSession?.state !== 'active') {
-                  Alert.alert(
-                    'Switching subscriptions does not affect Realm data when the sync is offline.',
-                  );
-                }
+              console.log(!includeAll)
                 setIncludeAll(!includeAll);
               }}
               value={includeAll}
