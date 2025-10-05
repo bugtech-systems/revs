@@ -1,21 +1,15 @@
 import { FlatList, Image, StyleSheet, Text, TextInput, TouchableOpacity, Switch, View, Platform, Alert } from 'react-native'
 import React, { useCallback, useEffect, useState } from 'react'
 import moment from 'moment-timezone'
-import { useUser, useApp } from '@realm/react';
-import { Betting, Draws, Users } from '../../Models'
 import DateTimePicker from '@react-native-community/datetimepicker';
 import SelectDropdown from 'react-native-select-dropdown'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { useDispatch, useSelector } from 'react-redux'
-import { SET_ACTIVE_USER } from '../../redux/actions/types';
 import { COLORS, icons } from '../../constants'
-import { realmContext } from '../../RealmContext';
 import { formatNumberWithComma, getConfiguration } from '../../utils/helpers';
 import Animated, { BounceOutDown, FadeInDown, FadeOutDown } from 'react-native-reanimated';
+import { fetchBettings, fetchWinningBettings } from '../../utils/offlineSync';
 
-// import { useRealm, useQuery } from '@realm/react';
-
-const { useRealm, useQuery } = realmContext;
 
 const drawTimes = [
     {
@@ -40,8 +34,6 @@ const Winnings = ({ navigation }) => {
     const dispatch = useDispatch()
     const { collector, user } = useSelector(({ user }) => user);
     let number;
-    const realm = useRealm()
-    const userRealm = useApp();
     const [date, setDate] = useState(new Date())
     const [drawTime, setDrawTime] = useState('')
     const [searchString, setSearchString] = useState('');
@@ -57,34 +49,12 @@ const Winnings = ({ navigation }) => {
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [includeAll, setIncludeAll] = useState(false);
     const [filterTime, setFilterTime] = useState('')
-
-    const users = useQuery(Users, user => {
-        return user.filtered(
-            'email == $0',
-            collector,
-        );
-    }, [collector]);
-
-    const items = useQuery(Betting, data => {
-        const startOfDay = moment(date).startOf('day').toDate();
-        const endOfDay = moment(date).endOf('day').toDate();
-        let userNow = users[0] ? users[0]._id : "";
-
-
-        if (includeAll) {
-            return data.filtered('ANY uplines == $0 &&  isDeleted == false && inputType == "normal" && timestamp >= $1 && timestamp < $2 && winning > 0', String(userNow), startOfDay, endOfDay).sorted('timestamp');
-        } else {
-            return data.filtered('isDeleted == false && inputType == "normal" && owner_id == $0 && timestamp >= $1 && timestamp < $2 && winning > 0', String(userNow), startOfDay, endOfDay).sorted('timestamp');
-        }
-    }, [date, users[0], includeAll]);
+    const [items, setItems] = useState([]);
+    const [loading, setLoading] = useState(false);
+    
+    const userNow = user ? user.id : "";
 
     const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-
-    const getCurrentPageData = () => {
-        const start = (currentPage - 1) * itemsPerPage;
-        const end = start + itemsPerPage;
-        return filteredData.slice(start, end);
-    };
 
     // DATE
     const onChangeDate = (event, selectedDate) => {
@@ -121,7 +91,7 @@ const Winnings = ({ navigation }) => {
         setShowTime(Platform.OS === 'ios');
         if (filteredData) {
             const selectedOption = filteredData.find(item => {
-                return item.gameTime == selectedTime
+                return item.game_time == selectedTime
             }
             );
             if (selectedOption) {
@@ -164,7 +134,7 @@ const Winnings = ({ navigation }) => {
         const renderItem = ({ item, index }) => {
             // let amount = 0;
 
-            let winPrize = item?.isWinTo ? getConfiguration(users[0], 'withWin200').value : getConfiguration(users[0], 'winStraight').value
+            let winPrize = item?.is_win_to ? getConfiguration(user, 'withWin200').value : getConfiguration(user, 'winStraight').value
             const backgroundColor = index % 2 === 0 ? COLORS.gray200 : COLORS.gray300;
 
 
@@ -177,17 +147,17 @@ const Winnings = ({ navigation }) => {
                     <TouchableOpacity
                         onPress={() => {
                             // dispatch({ type: SET_ACTIVE_USER, payload: collector })
-                            navigation.navigate('Winning Ticket', JSON.stringify({ ...item, agent: users[0].firstName }))
+                            navigation.navigate('Winning Ticket', JSON.stringify({ ...item, agent: user.firstName }))
 
                         }}
                         style={{ paddingVertical: 10, backgroundColor: backgroundColor, width: '100%', flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-start' }}
                     // style={{ flex: 1, alignItems: 'flex-start', borderColor: COLORS.gray600, justifyContent: 'flex-start', width: '100%', flexDirection: 'row', marginTop: index == 0 ? 0 : 12, paddingTop: 12, paddingHorizontal: 10, borderTopWidth: index == 0 ? 0 : 1, }}
                     >
                         <Text style={{ width: '40%', flexGrow: 1, textAlign: 'left', left: 10, fontSize: 18, color: COLORS.black, }}>
-                            {item.ticketNo}
+                            {item.ticket_no}
                         </Text>
-                        <Text style={{ fontSize: 16, width: '30%', textAlign: 'center', fontSize: 18, color: item.gameTime == '2pm' ? '#3897e7' : item.gameTime == '5pm' ? '#ff9d3e' : item.gameTime == '9pm' ? COLORS.black600 : null }}>
-                            {String(item.gameTime).toUpperCase()}
+                        <Text style={{ fontSize: 16, width: '30%', textAlign: 'center', fontSize: 18, color: item.game_time == '2pm' ? '#3897e7' : item.game_time == '5pm' ? '#ff9d3e' : item.game_time == '9pm' ? COLORS.black600 : null }}>
+                            {String(item.game_time).toUpperCase()}
                         </Text>
                         <Text style={{ fontSize: 16, width: '30%', textAlign: 'center', fontSize: 18, color: COLORS.black }}>
                             ₱{formatNumberWithComma(item.winning * winPrize)}
@@ -251,6 +221,17 @@ const Winnings = ({ navigation }) => {
         setFilterTime(drawTimes[0].name)
     }, [])
 
+
+    useEffect(() => {
+    const load = async () => {
+        const data = await fetchWinningBettings({ includeAll, date, user,  });
+        setItems(data);
+        setLoading(false);
+    };
+    load();
+    }, [date, userNow, user, includeAll]);
+    
+    
     function renderHeader() {
         return (
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%' }}>
@@ -303,14 +284,9 @@ const Winnings = ({ navigation }) => {
         )
     }
 
-
-
-
-    let filteredList = filterTime == 'All Time' ? items : items.filter(a => a.gameTime == filterTime);
-    filteredList = searchQuery ? items.filter(a => String(a.ticketNo).includes(String(searchQuery))) : filteredList
-    let totalWins = filteredList.reduce((n, { isWinTo, winning }) => n + (winning * (isWinTo ? getConfiguration(users[0], 'withWin200').value : getConfiguration(users[0], 'winStraight').value)), 0);
-
-
+    let filteredList = filterTime == 'All Time' ? items : items.filter(a => a.game_time == filterTime);
+    filteredList = searchQuery ? items.filter(a => String(a.ticket_no).includes(String(searchQuery))) : filteredList
+    let totalWins = filteredList.reduce((n, { is_win_to, winning }) => n + (Number(winning) * (is_win_to ? getConfiguration(user, 'withWin200').value : getConfiguration(user, 'winStraight').value)), 0);
 
     return (
         <SafeAreaProvider style={styles.wrapper}>
@@ -324,7 +300,7 @@ const Winnings = ({ navigation }) => {
                         mode="date"
                         display="default"
                         onChange={onChangeDate}
-                        minimumDate={new Date(users[0]?.lastSummary)}
+                        minimumDate={new Date(user?.lastSummary)}
                         maximumDate={new Date(moment().toDate())}
                         negativeButton={{ label: "Cancel", }}
                         neutralButton={{ label: "Clear", }}
@@ -340,16 +316,16 @@ const Winnings = ({ navigation }) => {
                         <Text style={{ fontWeight: 'bold', color: COLORS.black, fontSize: 16 }}>{formatNumberWithComma(totalWins)}</Text>
                     </View>
                 </View>
-                {(users[0] && users[0].role !== 'teller' && getConfiguration(users[0], 'showAllData')?.isCheck) &&
+                {(user && user.role !== 'teller' && getConfiguration(user, 'showAllData')?.isCheck) &&
                     <View style={styles.toggleRow}>
                         <Switch
                             trackColor={{ true: '#00ED64' }}
                             onValueChange={() => {
-                                if (realm.syncSession?.state !== 'active') {
-                                    Alert.alert(
-                                        'Switching subscriptions does not affect Realm data when the sync is offline.',
-                                    );
-                                }
+                                // if (realm.syncSession?.state !== 'active') {
+                                //     Alert.alert(
+                                //         'Switching subscriptions does not affect Realm data when the sync is offline.',
+                                //     );
+                                // }
                                 setIncludeAll(!includeAll);
                             }}
                             value={includeAll}

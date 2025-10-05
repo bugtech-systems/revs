@@ -1,214 +1,147 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
-    View,
-    Text,
-    FlatList,
-    StyleSheet,
-    Modal,
-    TextInput,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    Keyboard,
-    Switch,
-    Alert,
-    Image,
-    Platform,
-    RefreshControl,
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  Modal,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  Keyboard,
+  Switch,
+  Alert,
+  Image,
+  Platform,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useUser } from '@realm/react';
 import moment from 'moment-timezone';
 import Animated, {
-    useAnimatedScrollHandler,
-    useSharedValue,
-    useAnimatedStyle,
-    withTiming,
-    FadeInDown, FadeOutDown
+  useAnimatedScrollHandler,
+  useSharedValue,
+  FadeInDown,
+  FadeOutDown,
 } from 'react-native-reanimated';
-// import { Cashflow } from '../models/Cashflow';
-import { Cashflow, Users } from '../../Models';
 import { COLORS, icons } from '../../constants';
-import { realmContext } from '../../RealmContext';
 import SelectDropdown from 'react-native-select-dropdown';
 import { useSelector } from 'react-redux';
-import CreateIcon from 'react-native-vector-icons/MaterialIcons'; // or any other icon library
-import { BSON } from 'realm';
-import { cutString, formatNumber } from '../../utils/helpers';
+import CreateIcon from 'react-native-vector-icons/MaterialIcons';
+import { cutString, formatNumber, formatNumberWithComma } from '../../utils/helpers';
+import supabase from '../../utils/supabaseClient';
 
-
-const { useRealm, useQuery } = realmContext;
+// import { supabase } from '../../lib/supabaseClient'; // ⬅️ import your supabase client
 
 const drawTimes = [
-    {
-        id: 0,
-        name: 'All Types'
-    },
-    {
-        id: 1,
-        name: 'Expense'
-    },
-    {
-        id: 2,
-        name: 'Payment'
-    },
-    {
-        id: 3,
-        name: 'Borrow'
-    },
+  { id: 0, name: 'All Types' },
+  { id: 1, name: 'Expense' },
+  { id: 2, name: 'Payment' },
+  { id: 3, name: 'Borrow' },
 ];
 
 export default function CashFlowTab() {
-    const realm = useRealm();
-    const allCashflows = useQuery(Cashflow).sorted('createdAt', true);
-    const { collector, user, selectedUser } = useSelector(({ user }) => user);
-    const [modalVisible, setModalVisible] = useState(false);
-    const [modalType, setModalType] = useState('');
-    const [refreshing, setRefreshing] = React.useState(false);
+  const { collector, user, selectedUser } = useSelector(({ user }) => user);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalType, setModalType] = useState('');
     const [showAll, setShowAll] = useState(false);
-    const [filteredList, setFilteredList] = useState([]);
-    const [selectedType, setSelectedType] = useState('All Types');
-    const [date, setDate] = useState(new Date());
-    const [showDate, setShowDate] = useState(false);
-    const [viewInputType ,setViewInputType] = useState('');
-    const [filterTime, setFilterTime] = useState(drawTimes[0].name)
-    const [searchQuery, setSearchQuery] = useState('');
-    const [inputType, setInputType] = useState('Expense');
-    const [formData, setFormData] = useState({
-        amount: '',
-        description: '',
-        owner: '',
-        owner_name: '',
-        user: user?._id,
-        updatedBy: null,
-        createdAt: moment().toDate(),
-        updatedAt: moment().toDate(),
-        isDeleted: false,
-        inputType: 'expense',
-    });
+  const [refreshing, setRefreshing] = useState(false);
+  const [filteredList, setFilteredList] = useState([]);
+  const [selectedType, setSelectedType] = useState('All Types');
+  const [date, setDate] = useState(new Date());
+  const [showDate, setShowDate] = useState(false);
+  const [viewinput_type, setViewinput_type] = useState('');
+  const [filterTime, setFilterTime] = useState(drawTimes[0].name);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [input_type, setinput_type] = useState('Expense');
+  const [allCashflows, setAllCashflows] = useState([]);
+  const [downlines, setDownlines] = useState([]);
+  const [search, setSearch] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+const [inputType, setInputType] = useState('Expense');
+  const [formData, setFormData] = useState({
+    amount: '',
+    description: '',
+    owner: '',
+    owner_name: '',
+    user: user?.id,
+    updated_by: null,
+    created_at: moment().toDate(),
+    updated_at: moment().toDate(),
+    is_deleted: false,
+    input_type: 'expense',
+  });
 
-    const [search, setSearch] = useState('');
-    const [searchResults, setSearchResults] = useState([]);
-    const startOfDay = moment(date).startOf('day').toDate();
-    const endOfDay = moment(date).endOf('day').toDate();
-
-    const searchBarOffset = useSharedValue(0); // Y-axis offset (0 = visible, -100 = hidden)
-    const searchBarOpacity = useSharedValue(1); // Opacity (1 = visible, 0 = hidden)
+  const startOfDay = moment(date).startOf('day').toISOString();
+  const endOfDay = moment(date).endOf('day').toISOString();
+  const searchBarOffset = useSharedValue(0);
+  const searchBarOpacity = useSharedValue(1);
     const expandSearchBarWrapper = useSharedValue(1);
 
+  const collectorName = selectedUser ? selectedUser : collector;
 
-    let collectorName = selectedUser ? selectedUser : collector;
+  // ✅ Fetch users (downlines)
+  const fetchUsers = useCallback(async () => {
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', collectorName)
+      .single();
 
-    const users = useQuery(Users, user => {
-        return user.filtered(
-            'email == $0',
-            collectorName,
-        );
-    }, [collectorName]);
+    if (userError || !userData) return;
 
-    const downlines = useQuery(Users, user =>
-        user.filtered('ANY uplines._id == $0', users[0]._id)
-    );
+    const { data: downlineData } = await supabase
+      .from('users')
+      .select('*')
+      .contains('uplines', [userData._id]);
 
-    function calculatePayablesDifference(cashflows, users, date) {
-        const currentUserId = String(users[0]?._id);
+    setDownlines(downlineData || []);
+  }, [collectorName]);
 
-        // Format the selected date for comparison
-        const startOfDay = moment(date).startOf('day').toDate();
-        const endOfDay = moment(date).endOf('day').toDate();
+  // ✅ Fetch cashflows
+  const fetchCashflows = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('cashflow')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-        // Helper function to filter by type, date, user, and deletion
-        const filterByType = (type) =>
-            cashflows
-                .filter(item =>
-                    item.inputType?.toLowerCase() === type &&
-                    !item.isDeleted &&
-                    item.user === currentUserId &&
-                    new Date(item.createdAt) >= startOfDay &&
-                    new Date(item.createdAt) <= endOfDay
-                )
-                .reduce((sum, item) => sum + item.amount, 0);
-
-        const totalBorrow = filterByType('borrow');
-        const totalPayment = filterByType('payment');
-        const totalExpense = filterByType('expense');
-
-        const totalPayable = totalBorrow - totalPayment;
-
-        return {
-            totalBorrow,
-            totalPayment,
-            totalExpense,
-            totalPayable,
-        };
+    if (error) {
+      console.error('Error fetching cashflows:', error);
+      return;
     }
+    setAllCashflows(data || []);
+  }, []);
 
-    const handleViewModal = async (props) => {
-        console.log(props, "THE PROPS PASSED")
-        console.log(inputType, 'inputTypeinputTypeinputType')
-        setInputType(props.inputType == 'expense' ? 'Expense' : props.inputType == 'borrow' ? 'Borrow' : props.inputType == 'payment' ? 'Payment' : null);
-        setModalType('view')
-        setViewInputType(props?.inputType)
-        // Populate Modal Text Input
-        setFormData({
-            ...props, amount: String(props?.amount),
-            // owner_name: String(props.owner_name)
-        });
-        setSearch(String(props?.owner_name).toUpperCase())
-        setModalVisible(true)
-    }
-
-    useEffect(() => {
-        const updateSubs = async () => {
-            await realm.subscriptions.update((mutableSubs) => {
-                if (showAll) {
-                    mutableSubs.removeByName('ownCashflow');
-                    mutableSubs.add(realm.objects(Cashflow), { name: 'allCashflow' });
-                } else {
-                    mutableSubs.removeByName('allCashflow');
-                    mutableSubs.add(
-                        realm.objects(Cashflow).filtered(`user == "${users[0]._id}"`),
-                        { name: 'ownCashflow' }
-                    );
-                }
-            });
-        };
-
-        updateSubs().catch(console.error);
-    }, [realm, user, showAll]);
-
-    useEffect(() => {
-        filterCashflows();
-    }, [selectedType, date, searchQuery]);
-
-    const onRefresh = React.useCallback(() => {
-        let rnd = Math.floor(100 + Math.random() * 900);
-        setRefreshing(true);
-        setTimeout(() => {
-            setRefreshing(false);
-            setSearchQuery('');
-        }, 2000);
-    }, []);
-
-    const handleSelectUser = (user, type) => {
-        setFormData((prev) => ({
-            ...prev,
-            owner: user._id,
-            owner_name: user?.firstName,
-        }));
-        setSearch(user.firstName);
-        setSearchResults([]);
+  // ✅ Handle adding a cashflow
+  const handleSubmitCashflow = async () => {
+    const payload = {
+      amount: parseFloat(formData.amount),
+      description: formData.description || '',
+      owner: formData.owner || '',
+      owner_name: formData.owner_name || '',
+      user: user?.id,
+      input_type: formData.input_type,
+      is_deleted: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      updated_by: null,
     };
 
-    const handleInputChange = (field, value) => {
-        setFormData((prev) => ({
-            ...prev,
-            [field]: value,
-            updatedAt: moment().toDate(),
-        }));
-    };
+    const { error } = await supabase.from('cashflow').insert([payload]);
 
-    const handleCloseViewModal = () => {
+    if (error) {
+      console.error('Error creating cashflow:', error);
+      Alert.alert('Error', 'Something went wrong while saving.');
+    } else {
+      Alert.alert('CashFlow Created', 'The cashflow entry has been saved.');
+      setModalVisible(false);
+      fetchCashflows();
+      resetForm();
+    }
+  };
+
+
+      const handleCloseViewModal = () => {
         const defaultType = 'Expense';
         Keyboard.dismiss()
         setModalVisible(false);
@@ -230,128 +163,146 @@ export default function CashFlowTab() {
         setInputType(defaultType)
 
     }
-    
-    const handleTypeChange = (type) => {
-        const defaultType = type.toLowerCase();
-        setInputType(type);
-        setFormData({
-            amount: '',
-            description: '',
-            owner: '',
-            owner_name: '',
-            user: user?._id,
-            updatedBy: null,
-            createdAt: moment().toDate(),
-            updatedAt: moment().toDate(),
-            isDeleted: false,
-            inputType: defaultType,
-        });
-        setSearch('');
+
+  const resetForm = () => {
+    setFormData({
+      amount: '',
+      description: '',
+      owner: '',
+      owner_name: '',
+      user: user?.id,
+      input_type: 'expense',
+      is_deleted: false,
+      created_at: moment().toDate(),
+      updated_at: moment().toDate(),
+      updated_by: null,
+    });
+    setSearch('');
+  };
+    const handleSelectUser = (user, type) => {
+        setFormData((prev) => ({
+            ...prev,
+            owner: user.id,
+            owner_name: user?.first_name,
+        }));
+        setSearch(user.first_name);
         setSearchResults([]);
     };
 
-    const handleSubmitCashflow = () => {
-
-        try {
-            realm.write(() => {
-                realm.create('cashflow', {
-                    amount: parseFloat(formData.amount), // ensure it's a number
-                    description: formData.description || '',
-                    owner: String(formData.owner) || '',
-                    owner_name: formData.owner_name || '',
-                    user: String(formData.user), // Should be a valid ObjectId
-                    inputType: formData.inputType, // "expense", "payment", etc.
-                    isDeleted: false,
-                    createdAt: formData.createdAt || new Date(),
-                    updatedAt: new Date(),
-                    updatedBy: null,
-                });
-            });
-
-            // Reset modal and form after success
-            setModalVisible(false);
-            setSearch('')
-            setFormData({
-                amount: '',
-                description: '',
-                owner: '',
-                owner_name: '',
-                user: user?._id,
-                inputType: inputType.toLowerCase(),
-                isDeleted: false,
-                createdAt: moment().toDate(),
-                updatedAt: moment().toDate(),
-                updatedBy: null,
-            });
-
-
-            Alert.alert('CashFlow Created', 'The cashflow entry has been saved.');
-        } catch (err) {
-            console.error('Error creating cashflow:', err);
-            Alert.alert('Error', 'Something went wrong while saving the cashflow.');
-        }
-
-        filterCashflows()
+    const handleInputChange = (field, value) => {
+        setFormData((prev) => ({
+            ...prev,
+            [field]: value,
+            updatedAt: moment().toDate(),
+        }));
     };
 
-    const filterCashflows = () => {
-        const dateStr = moment(date).format('YYYY-MM-DD');
+  
 
-        // Step 1: Filter by date range
-        let filtered = allCashflows.filtered(
-            `createdAt >= $0 && createdAt < $1`,
-            startOfDay,
-            endOfDay
+  // ✅ Filter list based on date, type, and search
+  const filterCashflows = useCallback(() => {
+    let filtered = allCashflows.filter(
+      (item) =>
+        new Date(item.created_at) >= new Date(startOfDay) &&
+        new Date(item.created_at) < new Date(endOfDay)
+    );
+
+    if (selectedType !== 'All Types') {
+      const selected = selectedType.toLowerCase();
+      if (selected === 'payment') {
+        filtered = filtered.filter(
+          (item) => item.input_type === 'payment' || item.input_type === 'borrow'
         );
+      } else {
+        filtered = filtered.filter((item) => item.input_type === selected);
+      }
+    }
 
-        // Step 2: Filter by selectedType (dropdown)
-        if (selectedType !== 'All Types') {
-            const selected = selectedType.toLowerCase();
-            if (selected === 'payment') {
-                // Include both 'payment' and 'borrow' when selectedType is 'Payment'
-                filtered = filtered.filtered(`inputType == $0 OR inputType == $1`, 'payment', 'borrow');
-            } else {
-                filtered = filtered.filtered(`inputType == $0`, selected);
-            }
-        }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (i) =>
+          i.owner_name?.toLowerCase().includes(q) ||
+          i.description?.toLowerCase().includes(q) ||
+          String(i.amount)?.includes(q)
+      );
+    }
 
-        // Step 3: Convert Realm Results to plain JS array
-        let result = Array.from(filtered);
+    setFilteredList(filtered);
+  }, [allCashflows, selectedType, searchQuery, date]);
 
-        // Step 4: Filter by filterTime if needed
-        if (filterTime.toLowerCase() !== 'all types') {
-            const type = filterTime.toLowerCase();
+  useEffect(() => {
+    fetchUsers();
+    fetchCashflows();
+  }, []);
 
-            // Include borrow with payment if filterTime is 'payment'
-            result = result.filter(item =>
-                type === 'payment'
-                    ? item.inputType === 'payment' || item.inputType === 'borrow'
-                    : item.inputType === type
-            );
-        }
+  useEffect(() => {
+    filterCashflows();
+  }, [selectedType, date, searchQuery, allCashflows]);
 
-        // Step 5: Filter by search query
-        if (searchQuery.trim()) {
-            const lowerSearch = searchQuery.toLowerCase();
-            result = result.filter(item =>
-                (item.owner_name && item.owner_name.toLowerCase().includes(lowerSearch)) ||
-                (item.description && item.description.toLowerCase().includes(lowerSearch)) ||
-                (item.amount && String(item.amount).toLowerCase().includes(lowerSearch)) ||
-                (item.inputType && item.inputType.toLowerCase().includes(lowerSearch)) ||
-                // 🟢 Always include 'borrow' entries in search results
-                item.inputType === 'borrow'
-            );
-        }
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchCashflows().then(() => setRefreshing(false));
+  };
 
-        // Step 6: Update state
-        setFilteredList(result);
+   function calculatePayablesDifference(cashflows, user, date) {
+        const currentUserId = String(user.id);
+
+        // Format the selected date for comparison
+        const startOfDay = moment(date).startOf('day').toDate();
+        const endOfDay = moment(date).endOf('day').toDate();
+
+        // Helper function to filter by type, date, user, and deletion
+        const filterByType = (type) =>
+            cashflows
+                .filter(item =>
+                    item.input_type?.toLowerCase() === type &&
+                    !item.is_deleted &&
+                    item.user === currentUserId &&
+                    new Date(item.createdAt) >= startOfDay &&
+                    new Date(item.createdAt) <= endOfDay
+                )
+                .reduce((sum, item) => sum + item.amount, 0);
+
+        const totalBorrow = filterByType('borrow');
+        const totalPayment = filterByType('payment');
+        const totalExpense = filterByType('expense');
+
+        const totalPayable = totalBorrow - totalPayment;
+
+        return {
+            totalBorrow,
+            totalPayment,
+            totalExpense,
+            totalPayable,
+        };
+    }
+
+  const handleViewModal = (item) => {
+    setinput_type(item.input_type === 'expense'
+      ? 'Expense'
+      : item.input_type === 'borrow'
+      ? 'Borrow'
+      : 'Payment');
+    setModalType('view');
+    setViewinput_type(item.input_type);
+    setFormData({ ...item, amount: String(item.amount) });
+    setSearch(item.owner_name);
+    setModalVisible(true);
+  };
+
+      const handleSearch = (query) => {
+        setSearchQuery(query);
     };
 
-    const formatNumberWithComma = (num) => {
-        return parseFloat(num || 0).toLocaleString();
+        const handleTimeSelect = (item) => {
+        console.log(item, "THE ITEMSSSSSSS")
+        setSelectedType(item);
+        setFilterTime(item);
     };
 
-    const showDatePicker = () => {
+
+     const showDatePicker = () => {
         console.log('nag show')
         setShowDate(true);
     };
@@ -374,22 +325,10 @@ export default function CashFlowTab() {
             // setFilterDate(false)
         }
     };
-    const handleSubmit = () => {
-        console.log('Submitted Data:', formData);
-        setModalVisible(false);
-    };
+  // keep UI same:
+  // ... renderHeader(), renderSearchInput(), renderTickerList() and Modal (unchanged)
 
-    const handleSearch = (query) => {
-        setSearchQuery(query);
-    };
-
-    const handleTimeSelect = (item) => {
-        console.log(item, "THE ITEMSSSSSSS")
-        setSelectedType(item);
-        setFilterTime(item);
-    };
-
-    function renderSearchInput() {
+  function renderSearchInput() {
         return (
             <Animated.View
                 style={[
@@ -446,9 +385,8 @@ export default function CashFlowTab() {
             </Animated.View>
         );
     }
-
-
-    function renderHeader() {
+  // Return UI (same as before)
+  function renderHeader() {
         return (
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%' }}>
                 <TouchableOpacity
@@ -507,7 +445,7 @@ export default function CashFlowTab() {
     function renderTickerList(listData) {
 
         const displayList = filteredList.filter(item => {
-            const isBorrow = item.inputType?.toLowerCase() === 'borrow';
+            const isBorrow = item.input_type?.toLowerCase() === 'borrow';
 
             if (filterTime?.toLowerCase() === 'payment' && isBorrow) return false;
 
@@ -517,7 +455,7 @@ export default function CashFlowTab() {
                     item.owner_name?.toLowerCase().includes(lowerSearch) ||
                     item.description?.toLowerCase().includes(lowerSearch) ||
                     String(item.amount)?.toLowerCase().includes(lowerSearch) ||
-                    item.inputType?.toLowerCase().includes(lowerSearch);
+                    item.input_type?.toLowerCase().includes(lowerSearch);
                 return matches;
             }
 
@@ -573,20 +511,20 @@ export default function CashFlowTab() {
                                 fontSize: 19,
                                 fontWeight: 'bold',
                                 color:
-                                    item.inputType === 'borrow' || item.inputType === 'payment'
+                                    item.input_type === 'borrow' || item.input_type === 'payment'
                                         ? COLORS.black900
-                                        : item.inputType === 'expense'
+                                        : item.input_type === 'expense'
                                             ? COLORS.transparentRed
                                             : COLORS.black,
                             }}>
-                                {String(item.inputType).toUpperCase()}
+                                {String(item.input_type).toUpperCase()}
                             </Text>
 
-                            {['borrow', 'payment'].includes(item.inputType) ? (
+                            {['borrow', 'payment'].includes(item.input_type) ? (
                                 <>
                                     <Text style={{ fontWeight: 'bold', color: COLORS.darkGray2, fontSize: 14 }}>
                                         <Text style={{ fontWeight: '500', fontSize: 13 }}>
-                                            {item.inputType === 'borrow' ? 'From: ' : 'To: '}
+                                            {item.input_type === 'borrow' ? 'From: ' : 'To: '}
                                         </Text>
                                         {String(item.owner_name).toUpperCase()}
                                     </Text>
@@ -645,11 +583,13 @@ export default function CashFlowTab() {
         );
     }
 
-    const result = calculatePayablesDifference(allCashflows, users, date);
-    return (
-        <SafeAreaProvider style={styles.wrapper}>
-            <View style={{ flex: 1, width: '100%' }}>
-                {renderHeader()}
+    const result = calculatePayablesDifference(allCashflows, user, date);
+  
+  
+  return (
+    <SafeAreaProvider style={styles.wrapper}>
+      <View style={{ flex: 1, width: '100%' }}>
+        {renderHeader()}
                 {showDate && (
                     <DateTimePicker
                         testID="dateTimePicker"
@@ -657,7 +597,7 @@ export default function CashFlowTab() {
                         mode="date"
                         display="default"
                         onChange={onChangeDate}
-                        minimumDate={new Date(users[0]?.lastSummary)}
+                        minimumDate={new Date(user?.lastSummary)}
                         maximumDate={new Date(moment().toDate())}
                         negativeButton={{ label: "Cancel", }}
                         neutralButton={{ label: "Clear", }}
@@ -680,14 +620,14 @@ export default function CashFlowTab() {
                                 <View style={styles.modalView}>
 
                                     {/* Type Selector */}
-                                    <Text style={{ ...styles.label, color: COLORS.darkGray2 }}>{viewInputType !== 'create' ? 'Type:' : 'Select Type:'}</Text>
+                                    <Text style={{ ...styles.label, color: COLORS.darkGray2 }}>{viewinput_type !== 'create' ? 'Type:' : 'Select Type:'}</Text>
                                     <View style={{...styles.dropdown, justifyContent: modalType !== 'create' ? 'flex-start' : 'center'}}>
                                         {
                                             modalType !== 'create' ? 
                                             <>
                                                 {['Expense', 'Payment', 'Borrow'].map((type) => {
                                             return (
-                                            //         String(viewInputType).toLowerCase() == String(type).toLowerCase() ? (
+                                            //         String(viewinput_type).toLowerCase() == String(type).toLowerCase() ? (
                                             //             <TouchableOpacity key={type} onPress={() => handleTypeChange(type)}>
                                             //     <Text style={{...styles.dropdownItem, backgroundColor: COLORS.primaryTransparent1}}>
                                             //         {type}
@@ -699,7 +639,7 @@ export default function CashFlowTab() {
                                             <TouchableOpacity key={type} disabled={modalType !== 'create' ? true : false} onPress={() => handleTypeChange(type)}>
                                                 <Text style={[
                                                     styles.dropdownItem,
-                                                    inputType === type && styles.selectedDropdownItem,
+                                                    input_type === type && styles.selectedDropdownItem,
                                                 ]}>
                                                     {type}
                                                 </Text>
@@ -712,7 +652,7 @@ export default function CashFlowTab() {
                                             <>
                                                 {['Expense', 'Payment', 'Borrow'].map((type) => {
                                             return (
-                                            //         String(viewInputType).toLowerCase() == String(type).toLowerCase() ? (
+                                            //         String(viewinput_type).toLowerCase() == String(type).toLowerCase() ? (
                                             //             <TouchableOpacity key={type} onPress={() => handleTypeChange(type)}>
                                             //     <Text style={{...styles.dropdownItem, backgroundColor: COLORS.primaryTransparent1}}>
                                             //         {type}
@@ -724,7 +664,7 @@ export default function CashFlowTab() {
                                             <TouchableOpacity key={type} disabled={modalType !== 'create' ? true : false} onPress={() => handleTypeChange(type)}>
                                                 <Text style={[
                                                     styles.dropdownItem,
-                                                    inputType === type && styles.selectedDropdownItem,
+                                                    input_type === type && styles.selectedDropdownItem,
                                                     { fontWeight: 'bold', fontSize: 18 }
                                                 ]}>
                                                     {type}
@@ -738,7 +678,7 @@ export default function CashFlowTab() {
                                     </View>
 
                                     {/* Dynamic Fields */}
-                                    {inputType === 'Expense' && (
+                                    {input_type === 'Expense' && (
                                         <>
                                             <View
                                                 style={{
@@ -779,7 +719,7 @@ export default function CashFlowTab() {
                                         </>
                                     )}
 
-                                    {(inputType === 'Payment' || inputType === 'Borrow') && (
+                                    {(input_type === 'Payment' || input_type === 'Borrow') && (
                                         <>
 
                                             <View
@@ -817,12 +757,12 @@ export default function CashFlowTab() {
                                                     }}
                                                 >
 
-                                                    <Text style={{ ...styles.label, color: COLORS.darkGray2 }}>{inputType === 'Payment' ? 'Payment to:' : 'Borrow from:'}</Text>
+                                                    <Text style={{ ...styles.label, color: COLORS.darkGray2 }}>{input_type === 'Payment' ? 'Payment to:' : 'Borrow from:'}</Text>
                                                     <View style={styles.suggestionWrapper}>
                                                         {search.length > 0 && searchResults.length > 0 && (
                                                             <Text style={styles.suggestionText}>
                                                                 <Text style={styles.inputText}>{search}</Text>
-                                                                {searchResults[0]?.firstName.substring(search.length)}
+                                                                {searchResults[0]?.first_name.substring(search.length)}
                                                             </Text>
                                                         )}
 
@@ -834,7 +774,7 @@ export default function CashFlowTab() {
                                                             onChangeText={(text) => {
                                                                 setSearch(text);
                                                                 const results = downlines.filter((u) =>
-                                                                    u?.firstName.toLowerCase().startsWith(text.toLowerCase())
+                                                                    u?.first_name.toLowerCase().startsWith(text.toLowerCase())
                                                                 );
                                                                 setSearchResults(results);
                                                             }}
@@ -842,7 +782,7 @@ export default function CashFlowTab() {
                                                                 if (search.length > 0 && searchResults.length > 0) {
                                                                     const selected = searchResults[0];
                                                                     handleSelectUser(selected);
-                                                                    setSearch(String(selected?.firstName).toUpperCase()); // Autocomplete
+                                                                    setSearch(String(selected?.first_name).toUpperCase()); // Autocomplete
                                                                     setSearchResults([]);
                                                                 }
                                                             }}
@@ -896,7 +836,7 @@ export default function CashFlowTab() {
                 
                 {showAll && (() => {
                     const payablesByUser = filteredList.reduce((acc, item) => {
-                        if (item.inputType === 'borrow') {
+                        if (item.input_type === 'borrow') {
                             const userId = item.user?.toString();
                             if (!userId || userId === user._id.toString()) return acc;
 
@@ -928,14 +868,22 @@ export default function CashFlowTab() {
                         </View>
                     );
                 })()}
-
-            </View>
-        </SafeAreaProvider>
-    );
+      </View>
+    </SafeAreaProvider>
+  );
 }
 
+// keep all your styles below untouched
 const styles = StyleSheet.create({
-    toggleRow: {
+  wrapper: {
+    flex: 1,
+    backgroundColor: COLORS.gray100,
+    paddingHorizontal: 10,
+  },
+  dropdownItemStyle: { padding: 10 },
+  dropdownMenuStyle: { backgroundColor: COLORS.white },
+  dropdownItemTxtStyle: { color: COLORS.black },
+  toggleRow: {
         flexDirection: 'row',
         paddingHorizontal: 10,
         alignItems: 'center',

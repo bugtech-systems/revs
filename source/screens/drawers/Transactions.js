@@ -50,6 +50,7 @@ const Transactions = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
 
 
+
   const userNow = selectedUser ? selectedUser.id : user.id;
 
 
@@ -575,7 +576,7 @@ const Transactions = ({ navigation }) => {
               }}
               value={includeAll}
             />
-              <Text style={{ ...styles.toggleText, color: COLORS.black, fontWeight: '500' }}>Show All</Text>
+            <Text style={{ ...styles.toggleText, color: COLORS.black, fontWeight: '500' }}>Show All</Text>
           </View>}
         {renderTickerList(filteredList)}
 

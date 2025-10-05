@@ -117,7 +117,7 @@ const Dashboard = ({ navigation }) => {
     //   grand_hits += hits;
     //   grand_comm += comm;
     //   grand_net += net;
-      return { gameTime: game_time, bettings: bets, gross, hits, comm, net };
+      return { game_time: game_time, bettings: bets, gross, hits, comm, net };
     });
 
 
@@ -125,8 +125,8 @@ const Dashboard = ({ navigation }) => {
 
 
 	let grossCards = grouped_bettings.map((a, index) => {
-			let { gameTime, bettings, gross, hits, comm } = a;
-			let currentDraw = draws.filter(dr => dr.game_time == gameTime)[0];
+			let { game_time, bettings, gross, hits, comm } = a;
+			let currentDraw = draws.filter(dr => dr.game_time == game_time)[0];
 			
 			let isWin200 = currentDraw?.is_win_to ? getConfiguration(user, 'withWin200')?.isCheck : false;
 			let winPrize = isWin200 ? getConfiguration(user, 'withWin200').value : getConfiguration(user, 'winStraight').value
@@ -146,10 +146,10 @@ const Dashboard = ({ navigation }) => {
 			let net = gross - winning - genCommsTotal;
 			grand_hits = grand_hits + winning;
 			grand_net = grand_net + net;
-// console.log(gameTime, 'ggg')
+// console.log(game_time, 'ggg')
 			return (
 				<View
-					key={gameTime}
+					key={game_time}
 					style={{
 						minHeight: 100,
 						borderWidth: 1,
@@ -164,7 +164,7 @@ const Dashboard = ({ navigation }) => {
 					}}>
 					<View style={{ minHeight: 40, flexDirection: 'row', justifyContent: 'space-between', width: '100%', padding: 10 }}>
 						<Text style={{ color: COLORS.black, fontWeight: 'bold' }}>
-							{gameTime}
+							{game_time}
 						</Text>
 						<Text style={{ color: COLORS.black, fontWeight: 'bold' }}>
 							{currentDraw && currentDraw.combination ? String(currentDraw.combination).split('').join('-') : 'Pending'}
