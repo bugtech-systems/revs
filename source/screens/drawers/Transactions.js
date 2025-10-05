@@ -7,15 +7,11 @@ import SelectDropdown from 'react-native-select-dropdown'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { useSelector, useDispatch } from 'react-redux'
 import Animated, { BounceOutDown, FadeInDown, FadeOutDown } from 'react-native-reanimated';
-import { Betting, Draws, Users } from '../../Models'
 import { COLORS, icons } from '../../constants'
-import { SET_ACTIVE_USER } from '../../redux/actions/types';
-import { realmContext } from '../../RealmContext';
 import { formatNumberWithComma, getConfiguration } from '../../utils/helpers';
 import supabase from '../../utils/supabaseClient';
 import { fetchBettings } from '../../utils/offlineSync';
 
-const { useRealm, useQuery } = realmContext;
 const drawTimes = [
   {
     id: 0,

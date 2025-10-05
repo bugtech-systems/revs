@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import 'react-native-url-polyfill/auto';
 import Config from 'react-native-config';
 
-const supabase = createClient(Config.PROD_SUPABASE_URL, Config.PROD_SUPABASE_ANON_KEY, {
+const supabase = createClient(Config.SUPABASE_URL, Config.SUPABASE_ANON_KEY, {
   auth: {
     storage: AsyncStorage,
     autoRefreshToken: true,
