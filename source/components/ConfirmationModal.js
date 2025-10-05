@@ -31,15 +31,15 @@ const ConfirmationModal = ({ visible, title, message, onClose, handleConfirm, ti
             <>
               <TouchableOpacity style={{...styles.button, width: '48%', alignItems: 'center', justifyContent: 'center', elevation: 4}} 
             onPress={handleClose}>
-                <Text style={{...styles.buttonText, color: '#226cbf', fontWeight: '500'}}>{'Cancel'}</Text>
+                <Text style={{...styles.buttonText, color: COLORS.secondary, fontWeight: 'bold'}}>{'Cancel'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={{...styles.button, backgroundColor: '#226cbf', width: '48%', alignItems: 'center', justifyContent: 'center', elevation: 4}} onPress={handleConfirmLogout}>
+            <TouchableOpacity style={{...styles.button, backgroundColor: COLORS.secondary, width: '48%', alignItems: 'center', justifyContent: 'center', elevation: 4}} onPress={handleConfirmLogout}>
                 <Text style={{...styles.linkText,  fontWeight: '500', color: COLORS.white,}}>{'Yes'}</Text>
             </TouchableOpacity>
             </>
             :
             <View style={{width: '100%', alignItems: 'center', justifyContent: 'center', ...buttonContainerStyle }}>
-              <TouchableOpacity style={{...styles.button, backgroundColor: '#226cbf', width: '40%', alignItems: 'center', justifyContent: 'center', elevation: 4, ...butttonStyle }} 
+              <TouchableOpacity style={{...styles.button, backgroundColor: COLORS.secondary, width: '40%', alignItems: 'center', justifyContent: 'center', elevation: 4, ...butttonStyle }} 
               onPress={handleClose}>
                   <Text style={{...styles.buttonText, color: COLORS.white, fontWeight: '500', ...butttonTextStyle }}>{'Confirm'}</Text>
               </TouchableOpacity>
@@ -69,13 +69,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    color: COLORS.darkGray2,
+    color: COLORS.black900,
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 10,
   },
   message: {
-    color: COLORS.darkgray,
+    color: COLORS.black300,
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 20,

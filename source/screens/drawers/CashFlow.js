@@ -151,12 +151,12 @@ const [inputType, setInputType] = useState('Expense');
             description: '',
             owner: '',
             owner_name: '',
-            user: user?._id,
-            updatedBy: null,
-            createdAt: moment().toDate(),
-            updatedAt: moment().toDate(),
-            isDeleted: false,
-            inputType: defaultType,
+            user: user?.id,
+            updated_by: null,
+            created_at: moment().toDate(),
+            updated_at: moment().toDate(),
+            is_deleted: false,
+            input_type: defaultType,
         });
         setSearch('');
         setSearchResults([]);
@@ -193,7 +193,7 @@ const [inputType, setInputType] = useState('Expense');
         setFormData((prev) => ({
             ...prev,
             [field]: value,
-            updatedAt: moment().toDate(),
+            updated_at: moment().toDate(),
         }));
     };
 
@@ -259,8 +259,8 @@ const [inputType, setInputType] = useState('Expense');
                     item.input_type?.toLowerCase() === type &&
                     !item.is_deleted &&
                     item.user === currentUserId &&
-                    new Date(item.createdAt) >= startOfDay &&
-                    new Date(item.createdAt) <= endOfDay
+                    new Date(item.created_at) >= startOfDay &&
+                    new Date(item.created_at) <= endOfDay
                 )
                 .reduce((sum, item) => sum + item.amount, 0);
 
@@ -539,7 +539,7 @@ const [inputType, setInputType] = useState('Expense');
 
                         <View style={{ width: '50%', alignItems: 'flex-end', paddingRight: 10 }}>
                             <Text style={{ fontWeight: 'bold', fontSize: 12, color: COLORS.darkGray2 }}>
-                                {moment(item.createdAt).format('MMMM DD, YYYY hh:mm A')}
+                                {moment(item.created_at).format('MMMM DD, YYYY hh:mm A')}
                             </Text>
                             <Text style={{ fontWeight: 'bold', fontSize: 20, color: COLORS.warningBorderColor }}>
                                 {formatNumber(Number(item.amount).toFixed(2))}
@@ -597,7 +597,7 @@ const [inputType, setInputType] = useState('Expense');
                         mode="date"
                         display="default"
                         onChange={onChangeDate}
-                        minimumDate={new Date(user?.lastSummary)}
+                        minimumDate={new Date(user?.last_summary)}
                         maximumDate={new Date(moment().toDate())}
                         negativeButton={{ label: "Cancel", }}
                         neutralButton={{ label: "Clear", }}
@@ -838,7 +838,7 @@ const [inputType, setInputType] = useState('Expense');
                     const payablesByUser = filteredList.reduce((acc, item) => {
                         if (item.input_type === 'borrow') {
                             const userId = item.user?.toString();
-                            if (!userId || userId === user._id.toString()) return acc;
+                            if (!userId || userId === user.id.toString()) return acc;
 
                             const userName = item.owner_name || 'Unknown User';
 

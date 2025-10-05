@@ -62,7 +62,7 @@ const CoordinatorsScreen = ({ navigation }) => {
           [userNow]
         );
         const rows = [];
-        for (let i = 0; i < result.rows.length; i++) {
+      for (let i = 0; i < result.rows.length; i++) {
           rows.push(result.rows.item(i));
         }
         setUsersCoord(rows);

@@ -441,7 +441,7 @@ async function localInsert(tableName, record) {
     record.commissions = toJsonText(record.commissions ?? []);
     record.combinations = toJsonText(record.combinations ?? []);
     record.uplines = toJsonText(record.uplines ?? []);
-    record.ticket_no = String(record.ticket_no ?? '')
+    // record.ticket_no = String(record.ticket_no ?? '')
   } else if (tableName === 'messages') {
     record.conversations = toJsonText(record.conversations ?? []);
   }
@@ -1000,7 +1000,7 @@ export async function fetchWinningBettings({ date, user, includeAll = false }) {
   let endOfDay = moment(date).endOf("day").toISOString();
 
   // Realm-like adjustment logic
-  if (!includeAll && new Date(date) <= new Date(user?.lastSummary)) {
+  if (!includeAll && new Date(date) <= new Date(user?.last_summary)) {
     startOfDay = moment().add(1, "d").endOf("day").toISOString();
     endOfDay = moment().add(1, "d").endOf("day").toISOString();
   }
