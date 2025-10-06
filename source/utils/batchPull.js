@@ -94,6 +94,8 @@ const processBatch = async (tableName, remoteData, localIds) => {
   }
 
   // Remove local records not present in Supabase
+  if(tableName == 'bettings'){
+
       for (const localId of localIds) {
         if (!remoteIds.has(localId)) {
           // double check Supabase directly by ID
@@ -117,6 +119,7 @@ const processBatch = async (tableName, remoteData, localIds) => {
           }
         }
       }
+  }
 
   return { inserted, updated, deleted };
 };

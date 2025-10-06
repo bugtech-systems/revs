@@ -330,8 +330,6 @@ if (includeAll) {
         }}
       });
       
-      
-      
 
       setBettings(localBettings);
       setDraws(localDraws);
@@ -344,7 +342,7 @@ if (includeAll) {
   }, [date, includeAll, collector, dataVersion]);
 
 
-console.log(dataVersion, 'DATA VERSION DASHBOARD')
+console.log(dataVersion, 'DATA VERSION DASHBOARD', draws, date)
 
   return (
   	<SafeAreaView style={{ ...styles.wrapper }}>

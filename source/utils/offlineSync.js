@@ -40,7 +40,8 @@ export const LAST_PULLED_KEY = 'offline:lastPulledAt';
 export const TABLES = [
 // 'users', 
 'bettings', 
-// 'master_combinations',
+'master_combinations',
+'draws'
 // 'messages', 'cashflow'
 ];
 
