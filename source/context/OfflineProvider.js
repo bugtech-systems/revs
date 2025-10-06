@@ -78,7 +78,7 @@ export const OfflineProvider = ({ session, children }) => {
             setSyncing(false);
     }
     
-  }, []);
+  }, [syncing]);
   
     const fullResync = useCallback(async () => {
     try {
@@ -96,7 +96,7 @@ export const OfflineProvider = ({ session, children }) => {
             setSyncing(false);
     }
     
-  }, []);
+  }, [syncing]);
 
   
 
@@ -150,7 +150,8 @@ export const OfflineProvider = ({ session, children }) => {
     bumpVersion,
     fetchUser,
     saveLocalUser,
-    forceSync
+    forceSync,
+    fullResync
   };
 
   return (

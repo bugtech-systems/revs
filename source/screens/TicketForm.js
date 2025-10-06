@@ -70,7 +70,7 @@ let keyPad = [
 
 export default function TicketForm({ navigation }) {
     const { fetchUser, api, dataVersion } = useOffline();
-    const { collector, user } = useSelector(({ user }) => user);
+    const { collector, user, selectedUser } = useSelector(({ user }) => user);
     const [amountVal, setAmountVal] = useState('')
     const [time, setSelectedTime] = useState('2pm')
     const [arrayBetting, setBetting] = useState([]);
@@ -97,7 +97,7 @@ export default function TicketForm({ navigation }) {
     const [draws, setDraws] = useState([])
     const [combinations, setCombinations] = useState([])
 
-    let isWinTo = false;
+    let is_win_to = false;
     const current = new Date();
     const hoursNow = current.getHours();
     const minNow = current.getMinutes();
@@ -119,11 +119,11 @@ export default function TicketForm({ navigation }) {
 
     //     const checkSoldOut = ({ comb, combination, amountTarget, amountRamble }) => {
     //     const maxLimit = comb.maxLimit ? comb.maxLimit : 50;
-    //   const straightExceeded = comb.straightTotal + Number(amountTarget) > comb.straightLimit;
-    //   const rambleExceeded = comb.rambleTotal + Number(amountRamble) > comb.rambleLimit;
+    //   const straightExceeded = comb.straight_total + Number(amountTarget) > comb.straightLimit;
+    //   const rambleExceeded = comb.ramble_total + Number(amountRamble) > comb.rambleLimit;
 
-    //   const remainingStraight = Math.max(0, comb.straightLimit - comb.straightTotal);
-    //   const remainingRamble = Math.max(0, comb.rambleLimit - comb.rambleTotal);
+    //   const remainingStraight = Math.max(0, comb.straightLimit - comb.straight_total);
+    //   const remainingRamble = Math.max(0, comb.rambleLimit - comb.ramble_total);
     //   console.log(maxLimit, 'MAX LIMIT')
 
     //   let messages = [];
@@ -225,8 +225,8 @@ export default function TicketForm({ navigation }) {
     //     const rambleMaxLimit = comb?.rambleMaxLimit ?? 0;
     //     const maxLimit = comb.maxLimit ?? 50;
 
-    //     const currentStraight = comb.straightTotal ?? 0;
-    //     const currentRamble = comb.rambleTotal ?? 0;
+    //     const currentStraight = comb.straight_total ?? 0;
+    //     const currentRamble = comb.ramble_total ?? 0;
 
     //     const straightBet = Number(amountTarget) || 0;
     //     const rambleBet = Number(amountRamble) || 0;
@@ -295,12 +295,12 @@ export default function TicketForm({ navigation }) {
     // };
 
     const checkSoldOut = ({ comb, combination, amountTarget, amountRamble }) => {
-        let hasMaxLimit = getConfiguration(users[0], 'hasMaxLimit').isCheck;
+        let hasMaxLimit = getConfiguration(selectedUser, 'hasMaxLimit').isCheck;
         const straightMaxLimit = comb?.straightMaxLimit ?? 0;
         const rambleMaxLimit = comb?.rambleMaxLimit ?? 0;
 
-        const currentStraight = comb.straightTotal ?? 0;
-        const currentRamble = comb.rambleTotal ?? 0;
+        const currentStraight = comb.straight_total ?? 0;
+        const currentRamble = comb.ramble_total ?? 0;
 
         const straightBet = Number(amountTarget) || 0;
         const rambleBet = Number(amountRamble) || 0;
@@ -392,24 +392,23 @@ export default function TicketForm({ navigation }) {
         }
     }
 
-    const handleBet = (item) => {
+    const handleBet = async (item) => {
         let { combination, amount, ramble, target } = item;
-        const selectedDigit = combination;
          let checkIfWin200 = false;
 
 
         // setBetting([]) // clear test state
         // search for a realm object with a primary key that is an objectId
-        // itemComb[0].straightTotal += 
+        // itemComb[0].straight_total += 
         const currentTime = new Date();
-        const currentHour = currentTime.getHours();
-        const currentMins = currentTime.getMinutes();
+        const comb = await api.listMasterCombinations({
+            filters: {  
+                digit: combination
+            }
+        });
 
 
-
-        let straightTotalLimit = 0;
-        let rambleTotalLimit = 0;
-        let maxTotalLimit = 0;
+    
 
         const isSoldOut = false
 
@@ -427,11 +426,11 @@ export default function TicketForm({ navigation }) {
             return;
         }
 
-        let totalS = comb[0]?.straightTotal + Number(amountTarget);
-        let totalR = comb[0]?.rambleTotal + Number(amountRamble);
+        let totalS = comb[0]?.straight_total + Number(amountTarget);
+        let totalR = comb[0]?.ramble_total + Number(amountRamble);
 
 
-        if (((combs.length > 1 && combs.length < 300) && (!comb[0]?.straightTotal && !comb[0]?.rambleTotal))) {
+        if (((comb.length > 1 && comb.length < 300) && (!comb[0]?.straight_total && !comb[0]?.ramble_total))) {
             Alert.alert(`Sold Out Combination!`)
             return;
         }
@@ -447,26 +446,23 @@ export default function TicketForm({ navigation }) {
             return;
         }
 
-        let withWin200 = getConfiguration(users[0], 'withWin200').isCheck;
+        let withWin200 = getConfiguration(selectedUser, 'withWin200').isCheck;
         if (checkIfWin200 && selectedActive != 'target') {
             // showToastWin200Bet();
             setPendingBet({
                 ...item,
-                isWinTo: withWin200 ? comb[0].isWinTo : false
+                is_win_to: withWin200 ? comb[0].is_win_to : false
             });
             setShowWin200Modal(true);
             return;
         } 
         if (amount != 0 || !combination) {
-            setBetting(prevState => [...prevState, { ...item, isWinTo: withWin200 ? comb[0].isWinTo : false }]);
+            setBetting(prevState => [...prevState, { ...item, is_win_to: withWin200 ? comb[0].is_win_to : false }]);
             setCombination('')
             setAmountRamble('')
             setAmountTarget('')
             setSelectedActive('combi')
-            // realm.write(() => {
-            //     comb[0].straightTotal = Number(totalS);
-            //     comb[0].rambleTotal = Number(totalR);
-            // });
+
             return
         } else {
             Alert.alert(`${!target && !ramble ? 'Please provide amount' : amountVal == 0 ? 'Plesae provide amount' : time == '' ? 'Please select time' : 'Something went wrong'}`)
@@ -499,8 +495,8 @@ export default function TicketForm({ navigation }) {
 
 
             setLoading(true)
-            let winWin200 = getConfiguration(users[0], 'withWin200')?.value;
-            let winStraight = getConfiguration(users[0], 'winStraight')?.value
+            let winWin200 = getConfiguration(selectedUser, 'withWin200')?.value;
+            let winStraight = getConfiguration(selectedUser, 'winStraight')?.value
             let validDate = await updateDateTimeIfGreater();
             let selectedUser = await fetchUser(collector)
             if(!validDate){
@@ -527,7 +523,7 @@ export default function TicketForm({ navigation }) {
                         combination: bet.combination,
                         betType: bet.ramble && !bet.target ? 'R' : !bet.ramble && bet.target ? 'T' : bet.target && bet.ramble ? 'R - T' : null,
                         amount: Number(bet.amount),
-                        isWinTo: bet.isWinTo,
+                        is_win_to: bet.is_win_to,
                         targetAmount: Number(bet.target),
                         rambleAmount: Number(bet.ramble),
                     }
@@ -604,7 +600,7 @@ export default function TicketForm({ navigation }) {
                             let { coords } = position;
                             // setMarkerLocation({ ...position.coords });
                             // realm.write(async () => {
-                            //     users[0].coordinates = `${coords.latitude}|${coords.longitude}`;
+                            //     selectedUser.coordinates = `${coords.latitude}|${coords.longitude}`;
                             // })
                         },
                         error => {
@@ -657,18 +653,18 @@ export default function TicketForm({ navigation }) {
                 //         ramble: Number(totalRamble),
                 //         straight: Number(totalStraight),
                 //         isComplete: false,
-                //         owner_id: String(users[0]._id),
+                //         owner_id: String(selectedUser._id),
                 //         gross: Number(gross),
                 //         net: Number(netTotal),
                 //         ticketNo: `${generateTicketNumber()}`,
-                //         collector: users[0].firstName,
-                //         isWinTo: false,
+                //         collector: selectedUser.firstName,
+                //         is_win_to: false,
                 //         isPrint: false,
                 //         isDeleted: false,
                 //         timestamp: date,
                 //         gameTime: time,
                 //         printCopy: 0,
-                //         contact: users[0].mobile,
+                //         contact: selectedUser.mobile,
                 //         // betType: 'straight',
                 //         winning: 0,
                 //         combinations: combinations,
@@ -710,14 +706,14 @@ export default function TicketForm({ navigation }) {
         //     data.combination);
 
 
-        // let totalS = itemComb[0].straightTotal - Number(data.amountTarget);
-        // let totalR = itemComb[0].rambleTotal - Number(data.amountRamble);
+        // let totalS = itemComb[0].straight_total - Number(data.amountTarget);
+        // let totalR = itemComb[0].ramble_total - Number(data.amountRamble);
 
 
 
         // realm.write(() => {
-        //     itemComb[0].straightTotal = Number(totalS) < 0 ? 0 : Number(totalS);
-        //     itemComb[0].rambleTotal = Number(totalR) < 0 ? 0 : Number(totalR);
+        //     itemComb[0].straight_total = Number(totalS) < 0 ? 0 : Number(totalS);
+        //     itemComb[0].ramble_total = Number(totalR) < 0 ? 0 : Number(totalR);
         // });
 
         // console.log(dataList);
@@ -1306,9 +1302,9 @@ console.log(is2pmDisabled, is5pmDisabled, is9pmDisabled)
                                                 renderItem={({ item, index }) => (
                                                     <>
                                                         <View style={{ paddingLeft: 20, flexDirection: 'row', width: '100%', backgroundColor: COLORS.white, alignItems: 'center', justifyContent: 'center', padding: 10 }}>
-                                                            <Text style={{ ...styles.itemText, width: '25%', color: item.isWinTo ? COLORS.danger : COLORS.black, fontSize: 18, fontWeight: '500' }}>{String(item?.combination).split('').join('-')}</Text>
-                                                            <Text style={{ ...styles.itemText, width: '25%', color: item.isWinTo ? COLORS.danger : COLORS.black, fontSize: 18, fontWeight: '500' }}>₱{Number(item?.target) > 0 ? Number(item?.target) : 0}</Text>
-                                                            <Text style={{ ...styles.itemText, width: '25%', color: item.isWinTo ? COLORS.danger : COLORS.black, fontSize: 18, fontWeight: '500' }}>₱{Number(item?.ramble) > 0 ? Number(item?.ramble) : 0}</Text>
+                                                            <Text style={{ ...styles.itemText, width: '25%', color: item.is_win_to ? COLORS.danger : COLORS.black, fontSize: 18, fontWeight: '500' }}>{String(item?.combination).split('').join('-')}</Text>
+                                                            <Text style={{ ...styles.itemText, width: '25%', color: item.is_win_to ? COLORS.danger : COLORS.black, fontSize: 18, fontWeight: '500' }}>₱{Number(item?.target) > 0 ? Number(item?.target) : 0}</Text>
+                                                            <Text style={{ ...styles.itemText, width: '25%', color: item.is_win_to ? COLORS.danger : COLORS.black, fontSize: 18, fontWeight: '500' }}>₱{Number(item?.ramble) > 0 ? Number(item?.ramble) : 0}</Text>
                                                             <View style={{ width: '20%' }}>
                                                                 <TouchableOpacity onPress={() => removeItemByRamble(item)} style={{ width: 30, borderWidth: 1, height: 30, alignItems: 'center', justifyContent: 'center', borderColor: COLORS.white }}>
                                                                     <Image
@@ -1432,8 +1428,8 @@ console.log(is2pmDisabled, is5pmDisabled, is9pmDisabled)
                         setAmountTarget('');
                         setSelectedActive('combi');
                         // realm.write(() => {
-                        //     comb[0].straightTotal = Number(comb[0]?.straightTotal) + Number(pendingBet.amountTarget);
-                        //     comb[0].rambleTotal = Number(comb[0]?.rambleTotal) + Number(pendingBet.amountRamble);
+                        //     comb[0].straight_total = Number(comb[0]?.straight_total) + Number(pendingBet.amountTarget);
+                        //     comb[0].ramble_total = Number(comb[0]?.ramble_total) + Number(pendingBet.amountRamble);
                         // });
                     }
                     setShowWin200Modal(false);

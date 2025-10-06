@@ -4,13 +4,13 @@ import NetInfo from '@react-native-community/netinfo';
 import { PermissionsAndroid } from 'react-native';
 // import { useOfflineSync } from "./context/OfflineSyncProvider";
 import { useOffline } from "./context/OfflineProvider";
-import {  forceFullResync } from './utils/batchPull';
+// import {  forceFullResync } from './utils/batchPull';
 
 
 
 
 const SyncComponent = () => {
-  const {  syncing, lastSync, online } = useOffline();
+  const {  syncing, lastSync, online, fullResync } = useOffline();
 
   
 
@@ -25,7 +25,7 @@ const SyncComponent = () => {
         <ActivityIndicator size="small" color="#fff" />
       ) : (
       <TouchableOpacity
-      onPress={forceFullResync}
+      onPress={fullResync}
       >
         <Text style={styles.text}>
           {online ? `Synced` : 'Offline'}
