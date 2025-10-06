@@ -128,6 +128,28 @@ export const readFileFromExternalStorage = async () => {
   }
 };
 
+export function getDayRange(date, end) {
+  const d = new Date(date);
+  const e = new Date(end || date)
+  // Start of the day (00:00:00.000)
+  const start_of_day = new Date(
+    d.getFullYear(),
+    d.getMonth(),
+    d.getDate(),
+    0, 0, 0, 0
+  ).toISOString();
+
+  // End of the day (23:59:59.999)
+  const end_of_day = new Date(
+    e.getFullYear(),
+    e.getMonth(),
+    e.getDate(),
+    23, 59, 59, 999
+  ).toISOString();
+
+  return { start_of_day, end_of_day };
+}
+
 export const formatNumberWithComma = (num) => {
   // Round the number to two decimal places to handle rounding
   const roundedNum = Math.round(num * 100) / 100;

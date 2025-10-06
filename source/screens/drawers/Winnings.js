@@ -9,6 +9,7 @@ import { COLORS, icons } from '../../constants'
 import { formatNumberWithComma, getConfiguration } from '../../utils/helpers';
 import Animated, { BounceOutDown, FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { fetchBettings, fetchWinningBettings } from '../../utils/offlineSync';
+import { useOffline } from '../../context/OfflineProvider';
 
 
 const drawTimes = [
@@ -32,29 +33,21 @@ const drawTimes = [
 
 const Winnings = ({ navigation }) => {
     const dispatch = useDispatch()
-    const { collector, user } = useSelector(({ user }) => user);
-    let number;
+    const { collector, user, selectedUser } = useSelector(({ user }) => user);
+    const { dataVersion, api, fetchUser } = useOffline()
     const [date, setDate] = useState(new Date())
-    const [drawTime, setDrawTime] = useState('')
-    const [searchString, setSearchString] = useState('');
-    const [grandTotal, setGrandTotal] = useState(0);
     const [show, setShowDate] = useState(false);
     const [selectedTime, setSelectedTime] = useState(null);
     const [time, setTime] = useState(new Date())
     const [showTime, setShowTime] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [filteredData, setFilteredData] = useState([]);
-    const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(Number(10));
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [includeAll, setIncludeAll] = useState(false);
     const [filterTime, setFilterTime] = useState('')
     const [items, setItems] = useState([]);
-    const [loading, setLoading] = useState(false);
     
-    const userNow = user ? user.id : "";
-
-    const totalPages = Math.ceil(filteredData.length / itemsPerPage);
 
     // DATE
     const onChangeDate = (event, selectedDate) => {
@@ -140,6 +133,7 @@ const Winnings = ({ navigation }) => {
 
             return (
                 <Animated.View
+                    key={index}
                     entering={FadeInDown.delay(index * 100).duration(500)} // Staggered animation
                     exiting={FadeOutDown.delay(index * 100).duration(500)}
                 >
@@ -183,7 +177,7 @@ const Winnings = ({ navigation }) => {
                 </View>
                 <FlatList
                     data={listData}
-                    keyExtractor={(item, index) => item._id}
+                    keyExtractor={(item, index) => item.id}
                     renderItem={renderItem}
                     showsHorizontalScrollIndicator={false}
                     showsVerticalScrollIndicator={false}
@@ -222,14 +216,59 @@ const Winnings = ({ navigation }) => {
     }, [])
 
 
-    useEffect(() => {
-    const load = async () => {
-        const data = await fetchWinningBettings({ includeAll, date, user,  });
-        setItems(data);
-        setLoading(false);
-    };
-    load();
-    }, [date, userNow, user, includeAll]);
+
+    
+      useEffect(() => {
+        (async () => {
+          if (!collector) return;
+            let selectedCollector = await fetchUser(collector);
+    
+    
+    //   const today = new Date().toISOString(); 
+    
+    // Start and end of the day
+    const start_of_day = moment(new Date(date)).tz("Asia/Manila").startOf('day').toISOString();
+    const end_of_day = moment(new Date(date)).tz("Asia/Manila").endOf('day').toISOString();
+    
+    // Build filters
+    let filters = {};
+    
+    if (includeAll) {
+      filters = {
+        ...filters,
+        uplines: { op: "contains", value: selectedCollector.id },
+        timestamp: { op: "between", from: start_of_day, to: end_of_day },
+        winning: {op: ">", value: 0},
+        winning: {op: "!=", value: "0"}
+      };
+    } else {
+      filters = {
+        ...filters,
+        owner_id: selectedCollector.id,
+        timestamp: { op: "between", from: start_of_day, to: end_of_day },
+         winning: {op: ">", value: 0},
+        winning: {op: "!=", value: "0"}
+      };
+    }
+    
+    
+    
+          let localBettings = await api.listBettings({
+            filters: filters,
+            orderBy: 'timestamp DESC',
+            // limit: 20,
+          });
+          
+          setItems(localBettings);
+        })();
+        
+        return () => {
+    
+    
+        }
+      }, [date, includeAll, collector, dataVersion]);
+    
+    
     
     
     function renderHeader() {
@@ -286,7 +325,7 @@ const Winnings = ({ navigation }) => {
 
     let filteredList = filterTime == 'All Time' ? items : items.filter(a => a.game_time == filterTime);
     filteredList = searchQuery ? items.filter(a => String(a.ticket_no).includes(String(searchQuery))) : filteredList
-    let totalWins = filteredList.reduce((n, { is_win_to, winning }) => n + (Number(winning) * (is_win_to ? getConfiguration(user, 'withWin200').value : getConfiguration(user, 'winStraight').value)), 0);
+    let totalWins = filteredList.reduce((n, { is_win_to, winning }) => n + (Number(winning) * (is_win_to ? getConfiguration(selectedUser, 'withWin200').value : getConfiguration(selectedUser, 'winStraight').value)), 0);
 
     return (
         <SafeAreaProvider style={styles.wrapper}>
@@ -300,7 +339,7 @@ const Winnings = ({ navigation }) => {
                         mode="date"
                         display="default"
                         onChange={onChangeDate}
-                        minimumDate={new Date(user?.lastSummary)}
+                        minimumDate={new Date(selectedUser?.last_summary)}
                         maximumDate={new Date(moment().toDate())}
                         negativeButton={{ label: "Cancel", }}
                         neutralButton={{ label: "Clear", }}

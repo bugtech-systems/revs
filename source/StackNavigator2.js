@@ -31,6 +31,8 @@ import Receipt from './screens/Receipt';
 import ViewTicket from './screens/ViewTicket';
 import VoidScreen from './screens/VoidScreen';
 import PermissionScreen from './screens/PermissionScreen';
+import TipScreen from './screens/TipScreen';
+import ViewSoldOuts from './screens/ViewSoldOuts';
 
 
 
@@ -216,6 +218,25 @@ export const StackNavigator = () => {
 					// 	<CustomDrawerIcon route={null} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'Winning Ticket'} />
 					// ),
 				})}
+			/>
+						<Stack.Screen name="ViewSoldOut" component={ViewSoldOuts}
+				options={({ navigation }) => ({
+					headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
+					headerTitle: '',
+					headerLeft: () => (
+						<CustomDrawerIcon route={null} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'View Sold-out'} />
+					),
+				})}
+			/>
+ 			<Stack.Screen name="ViewTip" component={TipScreen}
+				options={({ navigation }) => ({
+					headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
+					headerTitle: '',
+					headerLeft: () => (
+						<CustomDrawerIcon route={null} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'View Tip'} />
+					)
+				})
+				}
 			/>
  
           <Stack.Screen

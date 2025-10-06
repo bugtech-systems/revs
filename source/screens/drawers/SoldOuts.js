@@ -6,13 +6,13 @@ import { CLOSE_CONFIRMATION_MODAL, OPEN_CONFIRMATION_MODAL, SET_LOADING, STOP_LO
 import axios from 'axios';
 import { COLORS, icons, SIZES } from '../../constants'
 import Config from 'react-native-config';
-import { formatNumberWithComma } from '../../utils/helpers';
+import { formatNumberWithComma, getDayRange } from '../../utils/helpers';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import ConfirmationModal from '../../components/ConfirmationModal';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import SelectDropdown from 'react-native-select-dropdown'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
-import SQLite from 'react-native-sqlite-storage';
+import { useOffline } from '../../context/OfflineProvider';
 
 const drawTimes = [
   { id: 0, name: 'All Time' },
@@ -21,10 +21,10 @@ const drawTimes = [
   { id: 3, name: '9pm' },
 ]
 
-const db = SQLite.openDatabase({ name: 'localDB.db', location: 'default' });
 
 const SoldOuts = ({ navigation }) => {
-  const { collector, selectedUser } = useSelector(({ user }) => user);
+  const { api, dataVersion } = useOffline()
+  const { collector, selectedUser, user } = useSelector(({ user }) => user);
   const { loading, confirmationModal } = useSelector(({ ui }) => ui);
   const dispatch = useDispatch();
 
@@ -43,19 +43,10 @@ const SoldOuts = ({ navigation }) => {
 
   // Derived States
   const [filteredData, setFilteredData] = useState([]);
+  const ownUser = selectedUser?.id ? selectedUser?.id : user?.id
 
   /** Fetch Users */
-  const fetchUsers = async () => {
-    const emailToFetch = selectedUser || collector;
-    db.transaction(tx => {
-      tx.executeSql(
-        'SELECT * FROM Users WHERE email = ? LIMIT 1',
-        [emailToFetch],
-        (_, { rows }) => setUsers(rows.raw()),
-        (t, error) => console.log('Error fetching users', error)
-      );
-    });
-  };
+
 
   /** Fetch Draws */
   const fetchDraws = async () => {
@@ -73,35 +64,43 @@ const SoldOuts = ({ navigation }) => {
   };
 
   /** Fetch Items */
-  const fetchItems = async () => {
-    if (!users[0]) return;
-    const startOfDay = moment(startDate).startOf('day').toISOString();
-    const endOfDay = moment(endDate).endOf('day').toISOString();
-    const ownerId = users[0]._id;
+  const fetchItems = useCallback(async () => {
+    if (!ownUser) return;
+    
+    const { start_of_day, end_of_day  } = getDayRange(startDate, endDate)
+    // Start and end of the day
+    
+  console.log(start_of_day, end_of_day, 'date range')
+    
+    let filters = {
+        timestamp: { op: "between", from: start_of_day, to: end_of_day },
+        input_type: 'sold',
+    }
 
-    db.transaction(tx => {
-      tx.executeSql(
-        `SELECT * FROM Betting WHERE isDeleted = 0 AND inputType = 'sold' AND timestamp >= ? AND timestamp <= ? AND owner_id = ? ORDER BY timestamp DESC`,
-        [startOfDay, endOfDay, ownerId],
-        (_, { rows }) => setItems(rows.raw()),
-        (t, error) => console.log('Error fetching items', error)
-      );
-    });
-  };
+
+
+
+      let localBettings = await api.listBettings({
+        filters: filters,
+        orderBy: 'created_at DESC',
+        // limit: 20,
+      });
+
+    
+      setItems(localBettings);
+      // setLoading(false);
+
+  }, [startDate, endDate,  ownUser, dataVersion]);
+
 
   /** Filtered Data */
   useEffect(() => {
-    let filteredList = filterTime === 'All Time' ? items : items.filter(a => a.gameTime === filterTime);
+    let filteredList = filterTime === 'All Time' ? items : items.filter(a => a.game_time === filterTime);
     if (searchQuery) {
-      filteredList = filteredList.filter(a => String(a.ticketNo).includes(String(searchQuery)));
+      filteredList = filteredList.filter(a => String(a.ticket_no).includes(String(searchQuery)));
     }
     setFilteredData(filteredList);
   }, [items, filterTime, searchQuery]);
-
-  /** Fetch data whenever user or date changes */
-  useEffect(() => {
-    fetchUsers();
-  }, [collector, selectedUser]);
 
   useEffect(() => {
     fetchDraws();
@@ -230,8 +229,7 @@ const SoldOuts = ({ navigation }) => {
 
   function renderTickerList(listData) {
     const renderItem = ({ item, index }) => {
-      let total = 0;
-      item?.combinations?.forEach(data => total += data.amount);
+      let total = item?.combinations?.reduce((n, { amount }) => Number(n) + Number(amount), 0)
       const backgroundColor = index % 2 === 0 ? COLORS.gray200 : COLORS.gray300;
 
       return (
@@ -241,14 +239,14 @@ const SoldOuts = ({ navigation }) => {
             onPress={() => navigation.navigate('ViewSoldOut', JSON.stringify(item))}
             style={{ paddingHorizontal: SIZES.padding, borderColor: COLORS.gray600, width: '100%', flexDirection: 'row', paddingVertical: SIZES.padding * 2, alignItems: 'flex-start', justifyContent: 'space-around', backgroundColor: backgroundColor }}
           >
-            <Text style={{ fontWeight: '600', fontSize: 18, width: '33%', textAlign: 'left', color: COLORS.black600, overflow: 'hidden' }}>
-              {moment(item?.timestamp).format('MMM DD, YYYY hh:mm A')}
+            <Text style={{ fontWeight: '600', fontSize: 15, width: '40%', textAlign: 'left', color: COLORS.black600, overflow: 'hidden' }}>
+              {moment(item.timestamp).tz("Asia/Manila").format('MM-DD-YYYY hh:mm a')}
             </Text>
-            <Text style={{ textAlign: 'center', paddingRight: 10, fontSize: 18, width: '33%', fontWeight: 'bold', color: item.gameTime == '2pm' ? '#3897e7'
-: item.gameTime == '5pm' ? '#ff9f1c' : '#2ec4b6' }}>
-              {item.gameTime?.toUpperCase()}
+            <Text style={{width: '30%', textAlign: 'center', paddingRight: 10, fontSize: 18, width: '33%', fontWeight: 'bold', color: item.game_time == '2pm' ? '#3897e7'
+: item.game_time == '5pm' ? '#ff9f1c' : '#2ec4b6' }}>
+              {item.game_time?.toUpperCase()}
             </Text>
-            <Text style={{ textAlign: 'right', fontSize: 18, width: '33%', fontWeight: 'bold', color: COLORS.black }}>
+            <Text style={{ textAlign: 'left', fontSize: 18, width: '20%', fontWeight: 'bold', color: COLORS.black }}>
               {formatNumberWithComma(total)}
             </Text>
           </TouchableOpacity>
@@ -259,7 +257,7 @@ const SoldOuts = ({ navigation }) => {
     return (
       <FlatList
         data={listData}
-        keyExtractor={(item, index) => `${item._id}_${index}`}
+        keyExtractor={(item, index) => `${item.id}_${index}`}
         renderItem={renderItem}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       />
@@ -267,13 +265,12 @@ const SoldOuts = ({ navigation }) => {
   }
 
   
-  let filteredList = filterTime == 'All Time' ? items : items.filter(a => a.gameTime == filterTime);
-  filteredList = searchQuery ? items.filter(a => String(a.ticketNo).includes(String(searchQuery))) : filteredList
+  let filteredList = filterTime == 'All Time' ? items : items.filter(a => a.game_time == filterTime);
+  filteredList = searchQuery ? items.filter(a => String(a.ticket_no).includes(String(searchQuery))) : filteredList
 
-  let totalGross = filteredList.reduce((n, { gross }) => n + gross, 0);
-  let totalWins = filteredList.reduce((n, { winning }) => n + winning, 0);
+  let totalGross = filteredList.reduce((n, { gross }) => Number(n) + Number(gross), 0);
+  let totalWins = filteredList.reduce((n, { winning }) => Number(n) + Number(winning), 0);
 
-  let totalWinsDummy = 3.34
 
 
   return (

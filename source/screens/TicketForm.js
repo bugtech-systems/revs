@@ -69,7 +69,7 @@ let keyPad = [
 ]
 
 export default function TicketForm({ navigation }) {
-    const { fetchUser, api } = useOffline();
+    const { fetchUser, api, dataVersion } = useOffline();
     const { collector, user } = useSelector(({ user }) => user);
     const [amountVal, setAmountVal] = useState('')
     const [time, setSelectedTime] = useState('2pm')
@@ -112,14 +112,6 @@ export default function TicketForm({ navigation }) {
     };
 
 
-
-    let users = []
-
-    
-    
-    let comb = []
-
-    let combs = []
 
     // let comb = useQuery(Combinations).filtered('digit == $0', combinationString)
     // , digit => { return digit.filtered('digit == $0', values.digit )}, [values.digit])
@@ -339,7 +331,7 @@ export default function TicketForm({ navigation }) {
         const now = new Date();
         const hours = now.getHours();
 
-        if ((getGameTime == '2pm' || user?.isAdmin)) {
+        if ((getGameTime == '2pm' || user?.is_admin)) {
             setSelectedTime('2pm')
             setGameTime('2pm');
             setIs2pmDisabled(false);
@@ -370,9 +362,9 @@ export default function TicketForm({ navigation }) {
         const currentTime = new Date();
         const currentHour = currentTime.getHours();
         const currentMins = currentTime.getMinutes();
-        let card2pm = ((currentHour >= 13 && currentMins >= 55) || draws.filter(a => a.gameTime == '2pm')[0]);
-        let card5pm = ((currentHour >= 16 && currentMins >= 55) || draws.filter(a => a.gameTime == '5pm')[0]);
-        let card9pm = ((currentHour >= 20 && currentMins >= 55) || draws.filter(a => a.gameTime == '9pm')[0]);
+        let card2pm = ((currentHour >= 13 && currentMins >= 55) || draws.filter(a => a.game_time == '2pm')[0]);
+        let card5pm = ((currentHour >= 16 && currentMins >= 55) || draws.filter(a => a.game_time == '5pm')[0]);
+        let card9pm = ((currentHour >= 20 && currentMins >= 55) || draws.filter(a => a.game_time == '9pm')[0]);
 
 
 
@@ -882,12 +874,11 @@ export default function TicketForm({ navigation }) {
 
     useEffect(() => {
         initializeGameTime()
-    }, [draws])
+    }, [draws, dataVersion])
 
     useEffect(() => {
     const start_of_day = moment(new Date()).startOf('day').toISOString();
     const end_of_day = moment(new Date()).endOf('day').toISOString();
-    
     
     const initData = async () => {
        let localDraws = await api.listDraws({
@@ -907,13 +898,13 @@ export default function TicketForm({ navigation }) {
     initData()
     
         return () => {
-            setIs2pmDisabled(false)
-            setIs5pmDisabled(false)
-            setIs9pmDisabled(false)
-            setGameTime('')
-            setSelectedTime('')
+            // setIs2pmDisabled(false)
+            // setIs5pmDisabled(false)
+            // setIs9pmDisabled(false)
+            // setGameTime('')
+            // setSelectedTime('')
         }
-    }, [])
+    }, [dataVersion])
 
 
 
@@ -926,11 +917,31 @@ export default function TicketForm({ navigation }) {
         }, intervalTime);
 
         // Clean up the interval when the component is unmounted
+        return () => {
+            setIs2pmDisabled(false)
+            setIs5pmDisabled(false)
+            setIs9pmDisabled(false)
+            setGameTime('')
+            setSelectedTime('')
+        clearInterval(interval);
+        }
+    }, []);
+    
+    
+        useEffect(() => {
+        // Set up the interval to trigger every 3 minutes
+        const interval = setInterval(() => {
+            triggerAction();
+        }, intervalTime);
+
+        // Clean up the interval when the component is unmounted
         return () => clearInterval(interval);
     }, []);
+    
 
     const triggerAction = async () => {
         // You can put any logic you want to trigger here
+        initializeGameTime();
         let validDate = await updateDateTimeIfGreater();
         console.log(validDate, 'VALID DATE?')
         if (!validDate) {
@@ -944,7 +955,7 @@ export default function TicketForm({ navigation }) {
 
     let curDraw = (draws.find(a => !a.combination) || ((hoursNow == 13 && minNow >= 55) || (hoursNow == 16 && minNow >= 55) || (hoursNow == 20 && minNow >= 55)));
 
-
+console.log(is2pmDisabled, is5pmDisabled, is9pmDisabled)
 
 
     return (

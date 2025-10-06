@@ -7,14 +7,16 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import Animated, { ZoomIn } from 'react-native-reanimated';
-import { formatNumber, getConfiguration } from '../../utils/helpers';
+import { formatNumber, getConfiguration, getDayRange } from '../../utils/helpers';
 import SQLite from 'react-native-sqlite-storage';
 import supabase from '../../utils/supabaseClient';
+import { useOffline } from '../../context/OfflineProvider';
 
 const db = SQLite.openDatabase('localDB.db');
 
 const SummaryReport = ({ navigation }) => {
-  const { collector, user } = useSelector(({ user }) => user);
+  const { collector, user, selectedUser } = useSelector(({ user }) => user);
+  const { api, dataVersion, bumpVersion } = useOffline();
 
   const [includeAll, setIncludeAll] = useState(false);
   const [startDate, setStartDate] = useState(new Date());
@@ -23,7 +25,7 @@ const SummaryReport = ({ navigation }) => {
 
   // const [user, setUser] = useState(null);
   const [items, setItems] = useState([]);
-
+  const ownUser = selectedUser?.id ? selectedUser?.id : user?.id
   // Fetch user from SQLite or Supabase
   // useEffect(() => {
   //   const fetchUser = async () => {
@@ -59,97 +61,41 @@ const SummaryReport = ({ navigation }) => {
 
   // Fetch bettings from SQLite
   const fetchItems = useCallback(async () => {
-    if (!user) return;
-    const userNow = user.id;
+    if (!ownUser) return;
     
-    let startOfDay = moment(startDate).startOf('day').toISOString();
-    let endOfDay = moment(endDate).endOf('day').toISOString();
-
-
-
-    console.log(startOfDay, endOfDay, "DATES")
+    const { start_of_day, end_of_day  } = getDayRange(startDate, endDate)
+    // Start and end of the day
     
-    if (new Date(startOfDay) <= new Date(user?.last_summary)) {
-      startOfDay = moment(user?.last_summary).endOf('day').toISOString();
-    }
-    if (new Date(endOfDay) <= new Date(user?.last_summary)) {
-      startOfDay = moment().add(1, 'd').endOf('day').toISOString();
-      endOfDay = moment().add(1, 'd').endOf('day').toISOString();
-    }
-
-    // Query SQLite
-    // db.transaction(tx => {
-    //   let query = `SELECT * FROM bettings WHERE is_deleted = FALSE AND input_type = 'normal' AND owner_id = ? AND timestamp >= ? AND timestamp < ?`;
-    //   let params = [String(userNow), startOfDay, endOfDay];
-
-    //   if (includeAll) {
-    //     query = `SELECT * FROM bettings WHERE is_deleted = FALSE AND input_type = 'normal' AND uplines LIKE '%' || ? || '%' AND timestamp >= ? AND timestamp < ?`;
-    //     params = [String(userNow), startOfDay, endOfDay];
-    //   }
-
-    //   query += ` ORDER BY timestamp DESC`;
-
-    //   tx.executeSql(
-    //     query,
-    //     params,
-    //     (_, { rows }) => setItems(rows._array),
-    //     (_, error) => console.log('SQLite fetchItems error:', error)
-    //   );
-    // });
-
-    db.transaction(tx => {
-  let query = `
-    SELECT * FROM bettings
-    WHERE is_deleted = FALSE
-    AND input_type = 'normal'
-    AND owner_id = ?
-    AND timestamp >= ?
-    AND timestamp < ?
-  `;
-  let params = [String(userNow), startOfDay, endOfDay];
-
-  if (includeAll) {
-    query = `
-      SELECT * FROM bettings
-      WHERE is_deleted = 0
-      AND input_type = 'normal'
-      AND uplines LIKE '%' || ? || '%'
-      AND timestamp >= ?
-      AND timestamp < ?
-    `;
-    params = [String(userNow), startOfDay, endOfDay];
-  }
-
-  query += ` ORDER BY timestamp DESC`;
-
-  console.log('Running SQL:', query, params);
-
-  tx.executeSql(
-    query,
-    params,
-    (_, { rows }) => setItems(rows._array),
-    (_, {error}) => {
-      console.log('SQLite fetchItems error:', error);
-      return true; // returning true rolls back the transaction
-    }
-  );
-});
-
-    // Optionally, sync from Supabase and merge
-    const { data: supItems, error } = await supabase
-      .from('bettings')
-      .select('*')
-      .eq('is_deleted', false)
-      .gte('timestamp', startOfDay)
-      .lt('timestamp', endOfDay);
+  console.log(start_of_day, end_of_day, 'date range')
+    
+    let filters = {}
+    if (includeAll) {
+  filters = {
+    ...filters,
+    uplines: { op: "contains", value: ownUser },
+    timestamp: { op: "between", from: start_of_day, to: end_of_day },
+  };
+} else {
+  filters = {
+    ...filters,
+    owner_id: ownUser,
+    timestamp: { op: "between", from: start_of_day, to: end_of_day },
+  };
+}
 
 
 
-      // console.log(supItems, "SUP ITEMS")
-      
-      
-    if (supItems) setItems(prev => [...prev.filter(i => !supItems.find(s => s.id === i.id)), ...supItems]);
-  }, [startDate, endDate, includeAll, user]);
+      let localBettings = await api.listBettings({
+        filters: filters,
+        orderBy: 'created_at DESC',
+        // limit: 20,
+      });
+
+    
+      setItems(localBettings);
+      // setLoading(false);
+
+  }, [startDate, endDate, includeAll, ownUser, dataVersion]);
 
   useEffect(() => {
     fetchItems();
@@ -181,16 +127,17 @@ const SummaryReport = ({ navigation }) => {
 
   // Totals calculation
   const renderTotals = useCallback(() => {
-    const totalGross = items.reduce((n, { gross }) => n + gross, 0);
+    const totalGross = items.reduce((n, { gross }) => Number(n) + Number(gross), 0);
     const totalHits = items.reduce((sum, item) => {
-      const winPrize = (isWin200 && item.is_win_to) ? win200Value : winStraightValue;
-      return sum + (item.winning * winPrize);
+      const winPrize = Number(isWin200 && item.is_win_to) ? win200Value : winStraightValue;
+      return Number(sum) + Number(item.winning * winPrize);
     }, 0);
     const totalComms = items.reduce((total, bet) => {
       return total + bet.commissions
-        .filter(coms => String(coms.referral) === String(user?._id))
+        .filter(coms => String(coms.referral) === String(ownUser))
         .reduce((n, { amount }) => n + amount, 0);
     }, 0);
+    
     const genCommsTotal = totalGross * (com_rate / 100);
     const totalNet = totalGross - genCommsTotal;
     const genTotal = totalNet - totalHits;
@@ -233,6 +180,10 @@ const SummaryReport = ({ navigation }) => {
       .sort((a, b) => moment(b).valueOf() - moment(a).valueOf())
       .map(date => ({ date, bets: groups[date] }));
   }, [items]);
+
+
+console.log(com_rate, 'COMM RATE')
+
 
   return (
     <SafeAreaProvider style={styles.wrapper}>
@@ -277,27 +228,27 @@ const SummaryReport = ({ navigation }) => {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ marginHorizontal: 10 }}>
         {groupArrays.map((item, index) => {
           const { date, bets } = item;
-          const grandGross = bets.reduce((n, { gross }) => n + gross, 0);
-          const grandCommsTotal = grandGross * com_rate / 100;
+          const grandGross = bets.reduce((n, { gross }) => Number(n) + Number(gross), 0);
+          const grandCommsTotal = Number(grandGross) * Number(com_rate / 100);
           const grandComm = bets.reduce((total, bet) =>
-            total + bet.commissions
+            Number(total) + bet.commissions
               .filter(coms => String(coms.referral) === String(user?._id))
-              .reduce((n, { amount }) => n + amount, 0), 0);
+              .reduce((n, { amount }) => Number(n) + Number(amount), 0), 0);
           const grandHits = bets.reduce((sum, item) => {
             const winPrize = (isWin200 && item.is_win_to) ? win200Value : winStraightValue;
-            return sum + (item.winning * winPrize);
+            return Number(sum) + Number(item.winning * winPrize);
           }, 0);
-          const net = grandGross - grandHits - grandCommsTotal;
+          const net = Number(grandGross - grandHits - grandCommsTotal);
 
           const game_times = ['2pm', '5pm', '9pm'];
           const gameStats = game_times.map(time => {
             const combos = bets.filter(data => data.game_time === time);
-            const gross = combos.reduce((n, { gross }) => n + gross, 0);
-            const commsTotal = gross * com_rate / 100;
+            const gross = combos.reduce((n, { gross }) => Number(n) + Number(gross), 0);
+            const commsTotal = Number(gross) * Number(com_rate / 100);
             const comm = combos.reduce((total, bet) =>
-              total + bet.commissions
-                .filter(coms => String(coms.referral) === String(user?._id))
-                .reduce((n, { amount }) => n + amount, 0), 0);
+              Number(total) + bet.commissions
+                .filter(coms => String(coms.referral) === String(user?.id))
+                .reduce((n, { amount }) => Number(n) + Number(amount), 0), 0);
             const hits = combos.reduce((sum, data) => {
               const winPrize = (isWin200 && data.is_win_to) ? win200Value : winStraightValue;
               return sum + (data.winning * winPrize);
@@ -411,10 +362,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start'
   },
-  totalsCol: { flex: 1, flexDirection: 'column', paddingHorizontal: 10, alignItems: 'flex-start' },
-  totalsValue: { fontWeight: 'bold', color: COLORS.black, fontSize: 16 },
+  totalsCol: { flex: 1, flexDirection: 'column', paddingHorizontal: 5, alignItems: 'flex-start' },
+  totalsValue: { fontWeight: 'bold', color: COLORS.black, fontSize: 13 },
   fontsHeader: { color: COLORS.black, fontSize: 12, fontWeight: '600', },
-  fontsHeader1: { color: COLORS.black, fontWeight: 'bold', fontSize: 12 },
+  fontsHeader1: { color: COLORS.black, fontWeight: 'bold', fontSize: 11 },
   toggleRow: { flexDirection: 'row', alignItems: 'center', padding: 5 },
   toggleText: { flex: 1, fontSize: 16, color: COLORS.black },
   dayCard: {

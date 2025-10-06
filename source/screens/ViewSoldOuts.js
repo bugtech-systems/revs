@@ -1,18 +1,16 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Image, View, Text, FlatList, TouchableOpacity, StyleSheet, Modal } from 'react-native';
+import { Image, View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, Alert } from 'react-native';
 import moment from 'moment-timezone';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSelector } from 'react-redux';
-import { realmContext } from '../RealmContext';
-import { Betting, Users } from '../Models';
 import SelectDropdown from 'react-native-select-dropdown'
-import { BSON } from 'realm';
 import { COLORS, icons, SIZES } from '../constants';
 import { formatNumberWithComma } from '../utils/helpers';
+import { useOffline } from '../context/OfflineProvider';
+import { nowISO } from '../utils/offlineSync';
 // import { useApp } from '@realm/react';
 
 
-const { useRealm, useQuery } = realmContext;
 
 
 const drawTimes = [
@@ -34,43 +32,23 @@ const ownItemsSubscriptionName = 'ownItems';
 
 const ViewSoldOuts = ({ route, navigation }) => {
   const ticketDetails = JSON.parse(route.params);
-  const realm = useRealm();
+    const { api, dataVersion } = useOffline()
+  
   // const userRealm = useApp();
   const [total, setTotal] = useState(0);
   const [gameTime, setGameTime] = useState('')
   const [show, setShowDate] = useState(false);
   const [date, setDate] = useState(new Date())
-  const [drawTime, setDrawTime] = useState('')
   const [filterTime, setFilterTime] = useState(drawTimes[0].name)
   // const [loading, setLoading] = useState(false)
-  const { collector, user } = useSelector(({ user }) => user);
-
-  const users = useQuery(Users, user => {
-    return user.filtered(
-      'email == $0',
-      collector,
-    );
-  }, [collector, ticketDetails]);
-
-
-  const currentUsers = useQuery(Users, user => {
-    return user.filtered(
-      'email == $0',
-      user?.email,
-    );
-  }, [user, ticketDetails]);
-
-
-  const items = useQuery(Betting, data => {
-    const startOfDay = moment(date).startOf('day').toDate();
-    const endOfDay = moment(date).endOf('day').toDate();
-
-    return data.filtered('inputType == $0 && isDeleted == false && timestamp >= $1 && timestamp < $2', "sold", startOfDay, endOfDay)
-  }, [date]);
+  const { collector, user, selectedUser } = useSelector(({ user }) => user);
 
 
 
-  console.log(items, 'ITEMS')
+
+
+
+  console.log(ticketDetails, 'ITEMS')
 
   const showDatePicker = () => {
     setShowDate(true);
@@ -113,95 +91,24 @@ const ViewSoldOuts = ({ route, navigation }) => {
 
 
   const handleCancelTicket = useCallback(
-    (_id: BSON.ObjectId) => {
+    async (id) => {
       // if the realm exists, get the Item with a particular _id and delete it
-      const item = realm.objectForPrimaryKey(Betting, BSON.ObjectId(_id)); // search for a realm object with a primary key that is an objectId
+      const item = await api.getBetting(id) ; // search for a realm object with a primary key that is an objectId
       if (item) {
-        if (item.owner_id != users[0]._id) {
-          Alert.alert("You can't delete someone else's task!");
-        } else {
-          realm.write(() => {
-            item.isDeleted = true;
-          });
+        if (item.owner_id != selectedUser.id && !user.is_admin) {
+          Alert.alert("You can't delete someone else's ticket!");
+        } else {    
+         await api.updateBetting(id, {is_deleted: true, updated_at: nowISO()}) ; // search for a realm object with a primary key that is an objectId
           //   console.log(dataExplorerMessage);
         }
         navigation.goBack()
       }
     },
-    [realm, users],
+    [collector, ticketDetails],
   );
 
 
 
-  // function renderHeader() {
-  //   return (
-  //     <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%' }}>
-  //       <TouchableOpacity
-  //         activeOpacity={1}
-  //         onPress={() => showDatePicker(true)}
-  //         // onPress={() => navigation.navigate('TestPaginate', {})}
-  //         style={{ width: '48%', }}
-  //       >
-  //         <View style={{ height: 40, borderColor: COLORS.gray600, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderRadius: 8, width: '100%', padding: 5 }}>
-  //           <Text style={{ paddingLeft: 4, fontSize: 20, color: COLORS.black, fontWeight: '500' }}>{date == undefined || '' ? '' : moment(date).format('MM/DD/YYYY')}</Text>
-  //           <Image
-  //             source={icons.calendar}
-  //             style={{ height: 30, width: 30, tintColor: COLORS.black }}
-  //           />
-  //         </View>
-  //       </TouchableOpacity>
-  //       <SelectDropdown
-  //         data={drawTimes}
-  //         onSelect={(selectedItem, index) => {
-  //           handleTimeSelect(selectedItem.name)
-  //           // Alert.alert(selectedItem, index)
-  //         }}
-
-  //         style={{ width: '48%', alignItems: 'center', justifyContent: 'center' }}
-  //         defaultValueByIndex={0}
-  //         renderButton={(selectedItem, isOpened) => {
-  //           return (
-  //             <TouchableOpacity
-  //               // disabled={true}
-  //               style={{ width: '48%', alignItems: 'center', justifyContent: 'center' }
-  //               }>
-  //               <View style={{ height: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: COLORS.gray600, borderRadius: 8, width: '100%', paddingLeft: 10 }}>
-  //                 <Text style={{ paddingLeft: 4, fontSize: 20, color: COLORS.black, fontWeight: '500' }}>{filterTime !== '' ? filterTime : 'Select Time'}</Text>
-  //               </View>
-  //             </TouchableOpacity>
-  //           );
-  //         }}
-  //         renderItem={(item, index, isSelected) => {
-  //           return (
-  //             <View style={{ ...styles.dropdownItemStyle, ...(isSelected && { backgroundColor: '#D2D9DF' }) }}>
-  //               <Text style={styles.dropdownItemTxtStyle}>{item.name}</Text>
-  //             </View>
-  //           );
-  //         }}
-  //         showsVerticalScrollIndicator={false}
-  //         dropdownStyle={styles.dropdownMenuStyle}
-  //       />
-
-
-  //     </View>
-  //   )
-  // }
-
-
-
-
-
-  // function renderHeader() {
-
-  //   return (
-  //     <View style={{ flex: 1, flexDirection: 'row', width: '100%', alignItems: 'flex-start', justifyContent: ''}}>
-
-  //     </View>
-  //   )
-    
-    
-    
-  // }
 
   const renderBet = ({ item }) => (
     <View style={styles.item}>
@@ -260,10 +167,10 @@ const ViewSoldOuts = ({ route, navigation }) => {
         columnWrapperStyle={styles.row}
         keyExtractor={(item, index) => index.toString()}
       />
-      {user?.isAdmin &&
+      {user?.is_admin &&
         <View style={{ flexDirection: 'row', flex: 1, width: '100%', alignItems: 'flex-end', justifyContent: 'center', }}>
           <TouchableOpacity activeOpacity={.6}
-            onPress={() => handleCancelTicket(ticketDetails._id)}
+            onPress={() => handleCancelTicket(ticketDetails.id)}
             style={{ elevation: 10, shadowRadius: SIZES.radius, borderRadius: SIZES.radius, width: '40%', }}>
             <LinearGradient colors={['#d85a58', '#bb473a', '#892c2f']} style={styles.linearGradientCancel}>
               <Text style={styles.buttonTextCancel}>

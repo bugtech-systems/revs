@@ -5,9 +5,11 @@ import { useSelector } from 'react-redux';
 import { COLORS } from '../constants';
 import { getBettingByTicketNo } from '../utils/offlineSync';
 import { formatNumberWithComma, getConfiguration } from '../utils/helpers';
+import { useOffline } from '../context/OfflineProvider';
 
 
 const ViewTicket = ({ route }) => {
+  const { api, dataVersion } = useOffline()
   const { user } = useSelector(({ user }) => user);
   const ticketDetails = JSON.parse(route.params); // data passed from WinningScreen
   const [betting, setBetting] = useState(null);
@@ -17,17 +19,30 @@ const ViewTicket = ({ route }) => {
   useEffect(() => {
     const fetchBettingDetails = async () => {
       try {
-        const data = await getBettingByTicketNo(ticketDetails.ticket_no);
+        const data = await api.getBetting(ticketDetails.id);
         if (data && data.length > 0) {
-          setBetting(data[0]);
-          setHits(JSON.parse(data[0].hits)); // assuming hits stored as JSON string
+          setBetting(ticketDetails);
+          setHits(ticketDetails?.hits); // assuming hits stored as JSON string
         }
+        
+        console.log(data[0]?.hits, 'TICKET DAT',ticketDetails.id,  ticketDetails.ticket_no, ticketDetails?.hits)
       } catch (error) {
         console.error('Error fetching betting details:', error);
       }
     };
-    fetchBettingDetails();
-  }, [ticketDetails]);
+    
+    
+    
+    // fetchBettingDetails();
+    
+          setBetting(ticketDetails);
+          setHits(ticketDetails?.hits); // assuming hits stored as JSON string
+    
+    return () => {
+              setBetting(null);
+      }
+    
+  }, [ticketDetails.ticket_no]);
 
   // Compute winnings, totals, etc.
   const winPrize = betting?.is_win_to
@@ -41,6 +56,8 @@ const ViewTicket = ({ route }) => {
     totalGross += Number(hit.amount);
     totalWins += Number(hit.winning) * Number(winPrize);
   });
+
+   
 
   const renderBet = ({ item }) => {
     const itemWin = Number(item.winning) * Number(winPrize);
@@ -69,6 +86,9 @@ const ViewTicket = ({ route }) => {
       </View>
     );
   }
+  
+  
+console.log(betting, 'BETTTING')
 
   return (
     <View style={styles.container}>

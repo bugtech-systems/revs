@@ -3,16 +3,13 @@ import { View, Image, ToastAndroid, TouchableOpacity, StyleSheet, Dimensions, Te
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import axios from 'axios';
 import { file_server_token, file_server_url, file_download_url, file_upload_url } from '../../commonData.json';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { realmContext } from '../RealmContext';
 import { useSelector } from 'react-redux';
 import { Users, Draws } from '../Models';
 import moment from 'moment-timezone';
 import { COLORS, icons, SIZES } from '../constants';
-import RNFS from 'react-native-fs';
-import * as Progress from 'react-native-progress';
 import Config from 'react-native-config';
-import { getConfiguration } from '../utils/helpers';
+import { getConfiguration, getDayRange } from '../utils/helpers';
+import { useOffline } from '../context/OfflineProvider';
 
 
 
@@ -20,62 +17,36 @@ import { getConfiguration } from '../utils/helpers';
 
 const { width, height } = Dimensions.get('window');
 
-const { useRealm, useQuery } = realmContext;
 
 
 const TipScreen = ({ navigation, route }) => {
-  const realm = useRealm()
+    const { api } = useOffline()
   const { resultDate } = route.params;
-  const { collector, user } = useSelector(({ user }) => user);
+  const { collector, user, selectedUser } = useSelector(({ user }) => user);
   const [selectedImage, setSelectedImage] = useState(null)
   const [progress, setProgress] = useState(0);
-  const [downloading, setDownloading] = useState(false);
+  const [draws, setDraws] = useState([]);
 
-  const showToastStarted = () => {
-    ToastAndroid.showWithGravity(
-      'Downloading started.',
-      ToastAndroid.SHORT,
-      ToastAndroid.BOTTOM,
-    );
-  };
+ 
 
-  const showToastDownloadComplete = () => {
-    ToastAndroid.showWithGravityAndOffset(
-      'Download completed.',
-      ToastAndroid.LONG,
-      ToastAndroid.BOTTOM,
-      25,
-      50,
-    );
-  };
-  
+  const uploadTip = getConfiguration(selectedUser, 'uploadTip').isCheck;
 
-  let users = useQuery(Users, doc => {
-    return doc.filtered(
-      'email == $0',
-      collector
-    );
-  }, [collector])
+  // const draws = useQuery(Draws, digit => {
+  //   const startOfDay = moment(resultDate).startOf('day').toDate();
+  //   const endOfDay = moment(resultDate).endOf('day').toDate();
 
-
-  const uploadTip = getConfiguration(users[0], 'uploadTip').isCheck;
-
-  const draws = useQuery(Draws, digit => {
-    const startOfDay = moment(resultDate).startOf('day').toDate();
-    const endOfDay = moment(resultDate).endOf('day').toDate();
-
-    if (resultDate) {
-      return digit.filtered(
-        'drawDate >= $0 && drawDate < $1 && gameTime = $2',
-        startOfDay, endOfDay, '9pm'
-      ).sorted('drawDate');
-    } else {
-      return digit.filtered(
-        'gameTime = $0',
-        '9pm'
-      ).sorted('drawDate', true);
-    }
-  }, [resultDate]);
+  //   if (resultDate) {
+  //     return digit.filtered(
+  //       'drawDate >= $0 && drawDate < $1 && gameTime = $2',
+  //       startOfDay, endOfDay, '9pm'
+  //     ).sorted('drawDate');
+  //   } else {
+  //     return digit.filtered(
+  //       'gameTime = $0',
+  //       '9pm'
+  //     ).sorted('drawDate', true);
+  //   }
+  // }, [resultDate]);
 
   // Download image using RNFS
   // const handleDownloadTipImg = () => {
@@ -140,6 +111,7 @@ const TipScreen = ({ navigation, route }) => {
 //     ToastAndroid.show("Error opening link.", ToastAndroid.SHORT);
 //   }
 // };
+
 
 
 const handleDownloadTipImg = async () => {
@@ -233,7 +205,7 @@ const handleDownloadTipImg = async () => {
       const formData = new FormData();
       const fileExtension = String(image.fileName).split('.')
 
-      const dateName = moment(resultDate ? resultDate : draws[0].drawDate).tz('Asia/Manila').format('MM_DD_YYYY')
+      const dateName = moment(resultDate ? resultDate : draws[0].draw_date).tz('Asia/Manila').format('MM_DD_YYYY')
 
 
       console.log(dateName)
@@ -253,10 +225,12 @@ const handleDownloadTipImg = async () => {
 
 
       console.log(response.data, 'UPLOAD RESPONSE')
+       
+
 
       setSelectedImage({ uri: `${Config.FILE_UPLOAD_URL}/apiv2/assets/${response.data.filename}` });
       await realm.write(async () => {
-        draws[0].tipUrl = `${Config.FILE_UPLOAD_URL}/apiv2/assets/${response.data.filename}`;
+        draws[0].tip_url = `${Config.FILE_UPLOAD_URL}/apiv2/assets/${response.data.filename}`;
       })
     } catch (error) {
       console.error('Error uploading image:', error);
@@ -312,8 +286,8 @@ const handleDownloadTipImg = async () => {
 
   useEffect(() => {
 
-    if (draws[0] && draws[0].tipUrl) {
-      setSelectedImage({ uri: draws[0].tipUrl });
+    if (draws[0] && draws[0].tip_url) {
+      setSelectedImage({ uri: draws[0].tip_url });
     }
 
 
@@ -321,8 +295,23 @@ const handleDownloadTipImg = async () => {
 
 
   useEffect(() => {
-
-
+  
+  
+    (async () => {
+      let {  start_of_day, end_of_day } = getDayRange(resultDate);
+      console.log(start_of_day, end_of_day, 'range')
+        let result = await api.listDraws({
+          filters: {
+            draw_date: { op: "between", from: start_of_day, to: end_of_day },
+            game_time: "9pm"
+          }
+        })
+        
+        
+        console.log(result, 'RESSULT')
+        setDraws(result)
+    })()
+    
     return () => {
       setSelectedImage(null)
     }
@@ -330,7 +319,7 @@ const handleDownloadTipImg = async () => {
 
 
 
-  console.log(progress, "PROG")
+  console.log(progress, "PROG", resultDate)
   
   
 

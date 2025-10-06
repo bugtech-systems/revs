@@ -3,7 +3,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import supabase from './supabaseClient';
 import { 
   TABLES, 
-  LAST_PULLED_KEY, 
   BATCH_SIZE,
   getAllLocalIds,
   localGet,
@@ -12,6 +11,9 @@ import {
   normalizeForSQLite,
   nowISO
 } from './offlineSync';
+
+
+let LAST_PULLED_KEY = 'batching';
 
 // Batched fetch from Supabase with pagination
 const fetchBatchedData = async (tableName, lastPulledAt, batchSize = BATCH_SIZE) => {
@@ -28,7 +30,7 @@ const fetchBatchedData = async (tableName, lastPulledAt, batchSize = BATCH_SIZE)
 
     // Only get records updated since last pull
     if (lastPulledAt) {
-      query = query.gte('updated_at', lastPulledAt);
+      query = query.gt('updated_at', lastPulledAt);
     }
 
     const { data, error, count } = await query;
@@ -62,7 +64,7 @@ const processBatch = async (tableName, remoteData, localIds) => {
   let inserted = 0;
   let updated = 0;
   let deleted = 0;
-
+console.log(localIds[1], 'local id')
   // Process each remote record
   for (const remoteRow of remoteData) {
     remoteIds.add(remoteRow.id);
@@ -94,7 +96,6 @@ const processBatch = async (tableName, remoteData, localIds) => {
   }
 
   // Remove local records not present in Supabase
-  if(tableName == 'bettings'){
 
       for (const localId of localIds) {
         if (!remoteIds.has(localId)) {
@@ -113,11 +114,10 @@ const processBatch = async (tableName, remoteData, localIds) => {
           console.log("CHECK ROW", localId, checkRow);
     
           // Row not in Supabase OR explicitly deleted → remove locally
-          if (!checkRow ) {
+          if (!checkRow) {
             console.log(`Removing orphaned row from ${tableName}: ${localId}`);
             await runSql(`DELETE FROM ${tableName} WHERE id = ?`, [localId]);
           }
-        }
       }
   }
 
@@ -159,14 +159,18 @@ export const pullFromSupabase = async (userId, options = {}) => {
       
       // Step 2: Fetch all remote data with batching
       const remoteData = await fetchBatchedData(table, lastPulledAt, batchSize);
-      
+      let batchResult = {}
       console.log(`Processing ${table}: ${localIds.length} local, ${remoteData.length} remote records`);
-
+      if(remoteData.length){
       // Step 3: Process the batch
-      const batchResult = await processBatch(table, remoteData, localIds);
       
-      // Step 4: Update last pulled timestamp
-      await AsyncStorage.setItem(key, nowISO());
+      batchResult = await processBatch(table, remoteData, localIds);
+         // Step 4: Update last pulled timestamp
+      await AsyncStorage.setItem(key, nowISO()); 
+      } else {
+      console.log('Nothing to Pull')
+      
+      }
 
       // Store results
       pullResults.tables[table] = {

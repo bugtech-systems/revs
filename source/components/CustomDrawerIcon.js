@@ -49,7 +49,6 @@ const CustomDrawerIcon = ({ route, navigation, navType, headerTitle }) => {
 
 
 
-console.log(selectedUser?.id,  user?.id, 'ssuuuu')
 
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>

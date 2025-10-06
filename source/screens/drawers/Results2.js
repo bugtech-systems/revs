@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, FlatList, SafeAreaView } from 'react-native';
+import { StyleSheet, Text, View, FlatList, SafeAreaView, TouchableOpacity } from 'react-native';
 import moment from 'moment-timezone';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
-import { executeSql } from '../../utils/db';
+// import { executeSql } from '../../utils/db';
 import { COLORS } from '../../constants';
+import { useOffline } from '../../context/OfflineProvider';
 
 export default function Results2({ navigation }) {
+  const { api, dataVersion } = useOffline()
   const today = moment().tz('Asia/Manila').toDate();
-  const startDate = moment(today).startOf('day').toDate();
 
   const [draws, setDraws] = useState([]);
   const [winningDigits, setWinningDigits] = useState(new Set());
@@ -16,16 +17,22 @@ export default function Results2({ navigation }) {
   useEffect(() => {
     const fetchDraws = async () => {
       try {
-        // Get all draws ordered by drawDate DESC
-        const results = await executeSql('SELECT * FROM draws ORDER BY drawDate DESC', []);
-        const drawsArray = results.rows._array;
+        const results = await api.listDraws({
+            limit: 300,
+            orderBy: 'draw_date DESC'
+            
+        })
+      
+        // Get all draws ordered by draw_date DESC
+        // const results2 = await executeSql('SELECT * FROM draws ORDER BY draw_date DESC', []);
+        // const drawsArray = results.rows._array;
 
-        // Convert drawDate string/timestamp to Date object
-        const parsedDraws = drawsArray.map(draw => ({
+        // Convert draw_date string/timestamp to Date object
+        const parsedDraws = results.map(draw => ({
           ...draw,
-          drawDate: new Date(draw.drawDate),
+          draw_date: new Date(draw.draw_date),
           combination: draw.combination, // assuming combination column exists
-          isWinTo: draw.isWinTo === 1 // boolean stored as 0/1
+          is_win_to: draw.is_win_to // boolean stored as 0/1
         }));
 
         setDraws(parsedDraws);
@@ -36,12 +43,17 @@ export default function Results2({ navigation }) {
 
     const fetchWinningDigits = async () => {
       try {
-        // Get all winning combinations
-        const results = await executeSql('SELECT * FROM combinations WHERE isWinTo = 1', []);
-        const combos = results.rows._array;
-
+      
+        const results = await api.listMasterCombinations({
+            filters: { is_win_to: true}
+        })
+      
+        // // Get all winning combinations
+        // const results = await executeSql('SELECT * FROM combinations WHERE isWinTo = 1', []);
+        // const combos = results.rows._array;
+  console.log(results, 'RESULTS')
         // Store digits as Set for fast lookup
-        setWinningDigits(new Set(combos.map(c => String(c.digit))));
+        setWinningDigits(new Set(results.map(c => String(c.digit))));
       } catch (err) {
         console.error('Error fetching winning combinations:', err);
       }
@@ -49,8 +61,10 @@ export default function Results2({ navigation }) {
 
     fetchDraws();
     fetchWinningDigits();
-  }, []);
+  }, [dataVersion]);
 
+
+// console.log(draws, 'DRWS', winningDigits)
   function renderHeaderDatePicker() {
     return (
       <View style={{ flexDirection: 'row', borderTopWidth: 1, justifyContent: 'space-between', paddingVertical: 4, paddingHorizontal: 10, borderBottomWidth: 1, borderColor: COLORS.gray600, backgroundColor: COLORS.gray400 }}>
@@ -70,18 +84,19 @@ export default function Results2({ navigation }) {
         entering={FadeInDown.delay(index * 100).duration(500)}
         exiting={FadeOutDown.delay(index * 100).duration(500)}
       >
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'flex-start',
-            justifyContent: 'space-around',
-            paddingVertical: 14,
-            backgroundColor: backgroundColor,
-            width: '100%',
-          }}
-        >
+				<TouchableOpacity
+					onPress={() => navigation.navigate('ViewTip', { resultDate: item.date })}
+					style={{
+						flexDirection: 'row',
+						alignItems: 'flex-start',
+						justifyContent: 'space-around',
+						paddingVertical: 14,
+						backgroundColor: backgroundColor,
+						width: '100%'
+					}}
+				>
           <Text style={{ ...styles.rowHeader, paddingHorizontal: 10, width: '40%', color: index ? COLORS.black : '#1a90ff' }}>
-            {moment(item.date).isSame(startDate) ? 'Today' : moment(item.date).format('MM/DD/YYYY')}
+            {moment(item.date).isSame(new Date()) ? 'Today' : moment(item.date).format('MM/DD/YYYY')}
           </Text>
 
           {[0, 1, 2].map((game, i) => {
@@ -96,18 +111,19 @@ export default function Results2({ navigation }) {
               </Text>
             );
           })}
-        </View>
+      </TouchableOpacity>
+
       </Animated.View>
     );
   }
 
   // Group draws by date
   const groups = draws.reduce((groups, draw) => {
-    const date = moment(draw.drawDate).format('YYYY-MM-DD');
+    const date = moment(draw.draw_date).format('YYYY-MM-DD');
     if (!groups[date]) {
       groups[date] = [];
     }
-    groups[date].unshift({ digit: draw.combination, isWinTo: draw.isWinTo });
+    groups[date].unshift({ digit: draw.combination, is_win_to: draw.is_win_to });
     return groups;
   }, {});
 

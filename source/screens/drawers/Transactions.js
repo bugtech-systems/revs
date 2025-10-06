@@ -8,7 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { useSelector, useDispatch } from 'react-redux'
 import Animated, { BounceOutDown, FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { COLORS, icons } from '../../constants'
-import { formatNumberWithComma, getConfiguration } from '../../utils/helpers';
+import { formatNumberWithComma, getConfiguration, getDayRange } from '../../utils/helpers';
 import { useOffline } from '../../context/OfflineProvider';
 
 const drawTimes = [
@@ -172,27 +172,6 @@ const Transactions = ({ navigation }) => {
   //   }
   // }, [date, users, selectedUser, includeAll]);
 
- function getDayRange(date) {
-  const d = new Date(date);
-
-  // Start of the day (00:00:00.000)
-  const start_of_day = new Date(
-    d.getFullYear(),
-    d.getMonth(),
-    d.getDate(),
-    0, 0, 0, 0
-  ).toISOString();
-
-  // End of the day (23:59:59.999)
-  const end_of_day = new Date(
-    d.getFullYear(),
-    d.getMonth(),
-    d.getDate(),
-    23, 59, 59, 999
-  ).toISOString();
-
-  return { start_of_day, end_of_day };
-}
 
     useEffect(() => {
     const load = async () => {

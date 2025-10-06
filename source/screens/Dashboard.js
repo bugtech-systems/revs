@@ -24,7 +24,7 @@ const Dashboard = ({ navigation }) => {
 
 
 
-  const able_to_set_last_summary = getConfiguration(user ? user : { isAdmin: false, role: 'teller', configurations: [] }, 'last_summary_report')?.isCheck;
+  const able_to_set_last_summary = getConfiguration(user ? user : { isAdmin: false, role: 'teller', configurations: [] }, 'lastSummaryReport')?.isCheck;
 
 
   // Load bettings & draws offline-first
@@ -59,7 +59,8 @@ const Dashboard = ({ navigation }) => {
 
   const handle_last_summary = async () => {
     // Update local DB last_summary
-    await own_user && update_local_user_last_summary(own_user.id, date);
+    console.log('Last Summary Updated')
+    await api.updateUser(own_user.id, {last_summary: moment(new Date(date)).tz("Asia/Manila").endOf('day').toISOString()});
     setOwnUser({ ...own_user, last_summary: date });
   };
 
@@ -80,7 +81,7 @@ const Dashboard = ({ navigation }) => {
       <View style={{ width: '15%', justifyContent: 'center', alignItems: 'flex-end' }}>
         <TouchableOpacity
           activeOpacity={0.9}
-          onLongPress={() => own_user?.is_admin && able_to_set_last_summary && handle_last_summary()}
+          onLongPress={() => (user?.is_admin || able_to_set_last_summary) && handle_last_summary()}
           style={{
             alignItems: 'center',
             justifyContent: 'center',
@@ -277,8 +278,9 @@ const Dashboard = ({ navigation }) => {
   };
 
   useEffect(() => {
+    setOwnUser(selectedUser)
     request_notification_permission();
-  }, []);
+  }, [selectedUser]);
   
   useEffect(() => {
     (async () => {
@@ -330,7 +332,6 @@ if (includeAll) {
         }}
       });
       
-
       setBettings(localBettings);
       setDraws(localDraws);
     })();
@@ -342,7 +343,6 @@ if (includeAll) {
   }, [date, includeAll, collector, dataVersion]);
 
 
-console.log(dataVersion, 'DATA VERSION DASHBOARD', draws, date)
 
   return (
   	<SafeAreaView style={{ ...styles.wrapper }}>

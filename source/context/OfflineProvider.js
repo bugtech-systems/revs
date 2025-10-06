@@ -36,7 +36,7 @@ export const OfflineProvider = ({ session, children }) => {
   // Initialize DB + run initial sync
   useEffect(() => {
     const bootstrap = async () => {
-      clearAllStorage()
+      // clearAllStorage()
       await init();
       bumpVersion()
     };
@@ -65,17 +65,36 @@ export const OfflineProvider = ({ session, children }) => {
   const syncNow = useCallback(async () => {
     try {
       // init();
+      if(syncing) return console.log('Sync ongoing!');
       setSyncing(true);
       await forceSync(session?.user?.email);
       // await forceFullResync();
       bumpVersion();
       setLastSync(new Date().toISOString());
+            setSyncing(false);
+
     } catch (err) {
       console.warn("Manual sync failed", err);
-    } finally {
-      setSyncing(false);
+            setSyncing(false);
     }
+    
+  }, []);
+  
+    const fullResync = useCallback(async () => {
+    try {
+      // init();
+      if(syncing) return console.log('Full Sync ongoing!');
+      setSyncing(true);
+      await forceFullResync(session?.user?.email);
+      // await forceFullResync();
+      bumpVersion();
+      setLastSync(new Date().toISOString());
+      setSyncing(false);
 
+    } catch (err) {
+      console.warn("Manual sync failed", err);
+            setSyncing(false);
+    }
     
   }, []);
 
@@ -88,10 +107,11 @@ export const OfflineProvider = ({ session, children }) => {
       startAutoSyncOnReconnect(session?.user?.email);
       bumpVersion();
      
-    const interval = setInterval(syncNow, 120000); // background sync every 10s
-    // const fullSyncInterval = setInterval(fullSync, 300000); // background sync every 5m
+    const interval = setInterval(syncNow, 60000); // background sync every 10s
+    const fullSyncInterval = setInterval(fullResync, 300000); // background sync every 5m
     return () => {
     clearInterval(interval);
+    clearInterval(fullSyncInterval);
      stopAutoSyncOnReconnect(session?.user?.email);
     }    
       }
@@ -143,6 +163,6 @@ export const OfflineProvider = ({ session, children }) => {
 // Hook to consume the context
 export const useOffline = () => {
   const ctx = useContext(OfflineSyncContext);
-  if (!ctx) throw new Error("useOfflineSync must be used inside OfflineSyncProvider");
+  if (!ctx) throw new Error("useOffline must be used inside OfflineSyncProvider");
   return ctx;
 };

@@ -22,7 +22,7 @@ import NetInfo from '@react-native-community/netinfo';
 import supabase from './supabaseClient';
 import { schema } from './schema';
 import { generateObjectId } from './helpers';
-import {  pullFromSupabase, forceFullResync } from './batchPull';
+import { forceFullResync } from './batchPull';
 
 import moment from 'moment-timezone';
 
@@ -38,7 +38,7 @@ export const LAST_PULLED_KEY = 'offline:lastPulledAt';
 
 // Table list (as used in Supabase). Must match Supabase table names.
 export const TABLES = [
-// 'users', 
+'users', 
 'bettings', 
 'master_combinations',
 'draws'
@@ -483,7 +483,7 @@ async function localInsert(tableName, record) {
   // Generate id + timestamps if missing
   const id = record.id || generateObjectId();
   const createdAt = record.created_at || nowISO();
-  const updatedAt = record.updated_at || createdAt;
+  const updatedAt = nowISO();
 
   record = { ...record, id, created_at: createdAt, updated_at: updatedAt };
 
@@ -503,10 +503,10 @@ async function localInsert(tableName, record) {
   await enqueueSync('insert', tableName, id, normalized);
 
   // Return freshly inserted row
-  const updated = await localGet(tableName, id);
-  console.log(`[localInsert] Inserted into ${tableName}:`, updated);
+  // const updated = await localGet(tableName, id);
+  await pushQueueToSupabase();
 
-  return updated;
+  return record;
 }
 
 async function localUpdate(tableName, id, patch) {
@@ -538,6 +538,10 @@ async function localUpdate(tableName, id, patch) {
   await runSql(sql, values);
 
   await enqueueSync('update', tableName, id, updated);
+  
+  
+  await pushQueueToSupabase();
+  
   return updated;
 }
 
@@ -545,6 +549,8 @@ async function localDelete(tableName, id) {
   // For soft delete preference depends on table; we queue a delete operation and also remove local row
   await runSql(`DELETE FROM ${tableName} WHERE id = ?;`, [id]);
   await enqueueSync('delete', tableName, id, null);
+  await pushQueueToSupabase();
+  
   return true;
 }
 
@@ -618,7 +624,7 @@ async function localQuery(tableName, query = {}) {
   const rows = [];
   for (let i = 0; i < res.rows.length; i++) {
     let row = res.rows.item(i);
-
+console.log(row?.hits, 'HITSSS')
     // parse JSON fields
     if (tableName === "users") {
       row.configuration = parseJsonText(row.configuration);
@@ -657,6 +663,7 @@ async function pushQueueToSupabase() {
         const insertPayload = normalizeForSupabase(tableName, payloadObj);
         
         
+          console.log(insertPayload, 'INSERTING PAYLOAD TO SUPABASE')
         // Remove local-only fields if necessary
         const { data, error } = await supabase.from(tableName).upsert(insertPayload, { onConflict: 'id' }).select().limit(1);
         if (error) throw error;
@@ -664,9 +671,12 @@ async function pushQueueToSupabase() {
         await removeQueueItem(queueId);
       } else if (op === 'update') {
                 const updatePayload = normalizeForSupabase(tableName, payloadObj);
+          console.log(updatePayload, 'UPDATING PAYLOAD TO SUPABASE')
 
         // Use update where id = rowId
         const { data, error } = await supabase.from(tableName).update(updatePayload).eq('id', rowId);
+        
+        
         if (error) throw error;
         await removeQueueItem(queueId);
       } else if (op === 'delete') {
@@ -687,81 +697,94 @@ async function pushQueueToSupabase() {
 
 // pull: fetch remote changes since lastPulledAt for each table and write to local
 // ---------- PULL FROM SUPABASE (always source of truth) ----------
-// async function pullFromSupabase(userId) {
+async function pullFromSupabase(userId) {
 
 
-//   for (const table of TABLES) {
-//     try {
-//       const key = `${LAST_PULLED_KEY}:${table}`;
-//       const lastPulledAt = (await AsyncStorage.getItem(key)) || null;
+  for (const table of TABLES) {
+    try {
+      const key = `${LAST_PULLED_KEY}:${table}`;
+      const lastPulledAt = (await AsyncStorage.getItem(key)) || null;
 
-//       // ✅ Step 1: get all local IDs
-//       const localIds = await getAllLocalIds(table);
+      // ✅ Step 1: get all local IDs
+      const localIds = await getAllLocalIds(table);
 
-//       // ✅ Step 2: fetch remote rows (always Supabase-first)
-//       let query = supabase.from(table).select("*").order("updated_at", { ascending: true }).limit(10000);
-//       if (lastPulledAt) {
-//         query = query.gte('updated_at', lastPulledAt);
-//       }
+      // ✅ Step 2: fetch remote rows (always Supabase-first)
+      let query = supabase.from(table).select("*").order("updated_at", { ascending: false });
       
+      if (lastPulledAt) {
+        query = query.gte('updated_at', lastPulledAt);
+      } else {
+      query = query.limit(500);
+      }
 
-//       const { data: remoteData, error } = await query;
-//       if (error) {
-//         console.warn(`Pull error for ${table}`, error);
-//         continue;
-//       }
+      const { data: remoteData, error } = await query;
+      if (error) {
+        console.warn(`Pull error for ${table}`, error);
+        continue;
+      }
+      console.log(remoteData[0], 'remote data', table)
+      // ✅ Step 3: build a map of Supabase IDs
+      const remoteIds = new Set(remoteData.map(r => r.id));
 
-//       // ✅ Step 3: build a map of Supabase IDs
-//       const remoteIds = new Set(remoteData.map(r => r.id));
+      // ✅ Step 4: sync Supabase rows into local
+      for (const remoteRow of remoteData) {
+           remoteIds.add(remoteRow.id);
 
-//       // ✅ Step 4: sync Supabase rows into local
-//       for (const remoteRow of remoteData) {
+    // Handle deleted records
+    if (remoteRow.is_deleted) {
+      await runSql(`DELETE FROM ${tableName} WHERE id = ?`, [remoteRow.id]);
+      continue;
+    }
+
+    // Check if record exists locally and compare timestamps
+    const local = await localGet(table, remoteRow.id);
+    const remoteUpdatedAt = remoteRow.updated_at || nowISO();
+    const localUpdatedAt = local ? local.updated_at || null : null;
+
+    if (!local) {
+      // New record - insert
+      const toInsert = normalizeForSQLite(table, remoteRow);
+      await insertOrReplace(table, toInsert);
+    } else if (!localUpdatedAt || remoteUpdatedAt > localUpdatedAt) {
+      // Updated record - replace
+      const toInsert = normalizeForSQLite(table, remoteRow);
+      await insertOrReplace(table, toInsert);
+    }
+    // Else: local is newer or same, keep local version
+  }
+  
+  
+  
+      let locals = localIds.slice(0, 500);
+
+      // ✅ Step 5: verify "orphaned" local rows before deletion
+      // for (const localId of locals) {
+      //   if (!remoteIds.has(localId)) {
+      //     // double check Supabase directly by ID
+      //     const { data: checkRow, error: checkError } = await supabase
+      //       .from(table)
+      //       .select("id, is_deleted")
+      //       .eq("id", localId)
+      //       .single();
+
+      //     console.log(checkRow, 'CHECKKING PULL DATA', table)
+
+
+      //     if (!checkRow || checkRow?.is_deleted) {
+      //       console.log(`Removing orphaned row from ${table}: ${localId}`);
+      //       await runSql(`DELETE FROM ${table} WHERE id = ?`, [localId]);
+      //     }
+      //   }
+      // }
+
+      // ✅ Step 6: update lastPulledAt
       
-//         if (remoteRow.is_deleted) {
-//           // delete locally if remote says deleted
-//           await runSql(`DELETE FROM ${table} WHERE id = ?`, [remoteRow.id]);
-//           continue;
-//         }
-
-//         const local = await localGet(table, remoteRow.id);
-//         const remoteUpdatedAt = remoteRow.updated_at || nowISO();
-//         const localUpdatedAt = local ? local.updated_at || null : null;
-
-//         if (!local) {
-//           // new in supabase → insert
-//           const toInsert = normalizeForSQLite(table, remoteRow);
-//           await insertOrReplace(table, toInsert);
-//         } else if (!localUpdatedAt || remoteUpdatedAt > localUpdatedAt) {
-//           // newer in supabase → replace local
-//           const toInsert = normalizeForSQLite(table, remoteRow);
-//           await insertOrReplace(table, toInsert);
-//         }
-//              await AsyncStorage.setItem(key, nowISO());
-//       }
-
-//       // ✅ Step 5: verify "orphaned" local rows before deletion
-//       // for (const localId of localIds) {
-//       //   if (!remoteIds.has(localId)) {
-//       //     // double check Supabase directly by ID
-//       //     const { data: checkRow, error: checkError } = await supabase
-//       //       .from(table)
-//       //       .select("id, is_deleted")
-//       //       .eq("id", localId)
-//       //       .single();
-
-//       //     if (!checkRow || checkRow?.is_deleted) {
-//       //       console.log(`Removing orphaned row from ${table}: ${localId}`);
-//       //       await runSql(`DELETE FROM ${table} WHERE id = ?`, [localId]);
-//       //     }
-//       //   }
-//       // }
-
-//       // ✅ Step 6: update lastPulledAt
-//     } catch (err) {
-//       console.warn('Pull error', err);
-//     }
-//   }
-// }
+            await AsyncStorage.setItem(key, nowISO()); 
+    } catch (err) {
+      console.warn('Pull error', err);
+    }
+  }
+}
 
 // ---------- FETCH HELPER (Supabase first, fallback local) ----------
 export async function fetchWithFallback(table, query = {}) {
@@ -803,9 +826,11 @@ async function syncWithSupabase(id) {
   }
   console.log('Starting sync...');
   try {
-    await pushQueueToSupabase(id);
+    await pushQueueToSupabase(id)
+      await pullFromSupabase();
+    
     // await force
-    await pullFromSupabase();
+    
     console.log('Sync completed.');
     return { ok: true };
   } catch (err) {
@@ -972,7 +997,7 @@ function buildWhereClause(filters = {}) {
 };
 
 export async function getAllLocalIds(table) {
-  const res = await runSql(`SELECT id FROM ${table}`);
+  const res = await runSql(`SELECT id FROM ${table} ORDER BY updated_at ASC;`);
   const ids = [];
   if (res && res.rows) {
     for (let i = 0; i < res.rows.length; i++) {
@@ -980,7 +1005,7 @@ export async function getAllLocalIds(table) {
     }
   }
   return ids;
-};
+}
 
 export async function insertOrReplace(table, row) {
   const cols = Object.keys(row);
