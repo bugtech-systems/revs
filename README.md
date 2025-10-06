@@ -62,3 +62,4 @@ adb install android/app/build/outputs/apk/debug/app-debug.apk
 
 ✅ **You’re done!**  
 Your debug APK is now ready for local testing on Android devices.
+
