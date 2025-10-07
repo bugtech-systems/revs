@@ -33,6 +33,9 @@ import VoidScreen from './screens/VoidScreen';
 import PermissionScreen from './screens/PermissionScreen';
 import TipScreen from './screens/TipScreen';
 import ViewSoldOuts from './screens/ViewSoldOuts';
+import TestPrinter2 from './screens/TestPrinter2';
+import TicketForm3 from './screens/TicketForm3';
+import Messenger from './screens/Messenger';
 
 
 
@@ -80,7 +83,7 @@ const DrawerNavigation = () => {
         </>
       )}
 
-      {!curUser?.isAdmin &&
+      {!curUser?.is_admin &&
         <>
           <Drawer.Screen name="CancelledTickets" component={CancelledTickets} options={({ navigation }) => generateDrawerScreenOptions('Cancelled Tickets', icons.cancelled_ticket, 'Cancelled Tickets', navigation)} />
 
@@ -132,7 +135,7 @@ export const StackNavigator = () => {
   const { session } = useContext(SessionContext);
   const dispatch = useDispatch();
   const userRedux = useSelector(state => state.user.user);
-  const [user, setUser] = useState(userRedux);
+  const [selectedUser, setUser] = useState(userRedux);
 
   const notif = new NotifService(reg => console.log('Push registered', reg));
 
@@ -165,85 +168,104 @@ export const StackNavigator = () => {
               headerTitle: '',
               headerTitleStyle: { color: COLORS.white },
               headerStyle: { backgroundColor: COLORS.secondary },
-              headerShown: true
-              // headerLeft: () => (
-              //   <CustomDrawerIcon route={route} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'View Ticket'} />
-              // ),
+              headerShown: true,
+              headerLeft: () => (
+                <CustomDrawerIcon route={route} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'View Ticket'} />
+              ),
             })}
           />
           <Stack.Screen
-				name="VoidScreen"
-				component={VoidScreen}
-				options={({ navigation, route }) => ({
-					headerTitle: '',
-					headerTitleStyle: { color: COLORS.white },
-					headerStyle: { backgroundColor: COLORS.secondary },
-					headerLeft: () => (
-						<CustomDrawerIcon route={route} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'View Ticket'} />
-					),
-				})}
-			/>
-			<Stack.Screen
-				name="Receipt"
-				component={Receipt}
-				options={({ navigation }) => ({
-					title: 'Receipt Template',
-					headerTitleStyle: { color: COLORS.white },
-					headerStyle: { backgroundColor: COLORS.secondary },
-					headerLeft: () => (
-						<TouchableOpacity
-							onPress={() => navigation.goBack()}
-							style={{ padding: 10, alignItems: 'center', justifyContent: 'center', }}
-						>
-							<Image
-								source={icons.back}
-								style={{
-									height: 20,
-									width: 20,
-									tintColor: COLORS.white
-								}} />
-						</TouchableOpacity>),
-        })}
-        />
-					
-  <Stack.Screen
-				name="Winning Ticket"
-				component={ViewTicket}
-				options={({ navigation }) => ({
-					headerTitle: '',
-					headerTitleStyle: { color: COLORS.black, fontWeight: 'bold' },
-					headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
-          headerShown: true
-					// headerLeft: () => (
-					// 	<CustomDrawerIcon route={null} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'Winning Ticket'} />
-					// ),
-				})}
-			/>
-						<Stack.Screen name="ViewSoldOut" component={ViewSoldOuts}
-				options={({ navigation }) => ({
-					headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
-					headerTitle: '',
-					headerLeft: () => (
-						<CustomDrawerIcon route={null} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'View Sold-out'} />
-					),
-				})}
-			/>
- 			<Stack.Screen name="ViewTip" component={TipScreen}
-				options={({ navigation }) => ({
-					headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
-					headerTitle: '',
-					headerLeft: () => (
-						<CustomDrawerIcon route={null} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'View Tip'} />
-					)
-				})
-				}
-			/>
- 
-          <Stack.Screen
-            name="Permissions"
-            component={PermissionScreen}
-            options={{ headerShown: false }}
+            name="VoidScreen"
+            component={VoidScreen}
+            options={({ navigation, route }) => ({
+              headerTitle: '',
+              headerTitleStyle: { color: COLORS.white },
+              headerStyle: { backgroundColor: COLORS.secondary },
+              headerLeft: () => (
+                <CustomDrawerIcon route={route} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'View Ticket'} />
+              ),
+            })}
           />
+          <Stack.Screen
+            name="Receipt"
+            component={Receipt}
+            options={({ navigation }) => ({
+              title: 'Receipt Template',
+              headerTitleStyle: { color: COLORS.white },
+              headerStyle: { backgroundColor: COLORS.secondary },
+              headerLeft: () => (
+                <TouchableOpacity
+                  onPress={() => navigation.goBack()}
+                  style={{ padding: 10, alignItems: 'center', justifyContent: 'center', }}
+                >
+                  <Image
+                    source={icons.back}
+                    style={{
+                      height: 20,
+                      width: 20,
+                      tintColor: COLORS.white
+                    }} />
+                </TouchableOpacity>),
+            })}
+          />
+          <Stack.Screen
+            name="Winning Ticket"
+            component={ViewTicket}
+            options={({ navigation }) => ({
+              headerTitle: '',
+              headerTitleStyle: { color: COLORS.black, fontWeight: 'bold' },
+              headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
+              headerShown: true,
+              headerLeft: () => (
+                <CustomDrawerIcon route={null} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'Winning Ticket'} />
+              ),
+            })}
+          />
+          <Stack.Screen name="ViewSoldOut" component={ViewSoldOuts}
+            options={({ navigation }) => ({
+              headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
+              headerTitle: '',
+              headerLeft: () => (
+                <CustomDrawerIcon route={null} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'View Sold-out'} />
+              ),
+            })}
+          />
+          <Stack.Screen name="ViewTip" component={TipScreen}
+            options={({ navigation }) => ({
+              headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
+              headerTitle: '',
+              headerLeft: () => (
+                <CustomDrawerIcon route={null} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'View Tip'} />
+              )
+            })}
+          />
+          <Stack.Screen name="TestPrinter" component={TestPrinter2} options={({ navigation, route }) => ({
+            headerShown: true,
+            headerTitle: '',
+            headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
+            headerLeft: () => (
+              <CustomDrawerIcon route={null} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'Test Printer'} />
+            ),
+          })}
+          />
+          <Stack.Screen name="Messenger" component={Messenger}
+            options={({ navigation }) => ({
+              headerShown: false,
+            })
+            }
+          />
+          <Stack.Screen name="Permissions" component={PermissionScreen} options={{ headerShown: false }}/>
+         <Stack.Screen
+            name="UpdateTicket"
+            component={TicketForm3}
+            options={({ navigation }) => ({
+              headerTitle: '',
+              headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
+              // headerLeft: () => (
+              //   <CustomDrawerIcon route={null} navigation={navigation} navType={'screen'} selectedUser={null} headerTitle={'Update Ticket'} />
+              // ),
+            })}
+          /> 
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

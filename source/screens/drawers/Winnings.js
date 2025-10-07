@@ -254,7 +254,7 @@ const Winnings = ({ navigation }) => {
     
     
           let localBettings = await api.listBettings({
-            filters: filters,
+        filters: {...filters, input_type: 'normal'},
             orderBy: 'timestamp DESC',
             // limit: 20,
           });

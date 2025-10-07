@@ -143,7 +143,7 @@ const UserOptionsForm = ({ route, navigation }) => {
           {renderToggle('Show Application Users', 'Grant access for all Users.', 'appUsers')}
           {renderToggle('Last Summary Report', 'Allows configuration of a user’s latest summary report.', 'lastSummaryReport')}
 
-          {userConfig?.role === 'coordinator' && userConfig?.isAdmin &&
+          {userConfig?.role === 'coordinator' && userConfig?.is_admin &&
             renderToggle('Cash Flow', 'Enable viewing of Cash Flow reports.', 'cashFlow')
           }
         </View>

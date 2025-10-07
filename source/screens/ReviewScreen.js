@@ -3,20 +3,21 @@ import { Image, View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, Alert
 import moment from 'moment-timezone';
 import LinearGradient from 'react-native-linear-gradient';
 import { useDispatch, useSelector } from 'react-redux';
-import { BSON } from 'realm';
 import { CLOSE_CONFIRMATION_MODAL, CLOSE_WARNING_MODAL, OPEN_CONFIRMATION_MODAL, OPEN_WARNING_MODAL } from '../redux/actions/types';
 import { COLORS, icons, SIZES } from '../constants';
-import { Betting, Draws, Users } from '../Models';
 import WarningModal from '../components/WarningModal';
 import ConfirmationModal from '../components/ConfirmationModal';
 import TestScreen from './TestScreen';
 import { getConfiguration } from '../utils/helpers';
+import { useOfflineSync } from '../context/OfflineSyncProvider';
+import { nowISO } from '../utils/offlineSync';
 
 
 
 
 const ReviewScreen = ({ route, navigation, onPress }) => {
   const ticketDetails = JSON.parse(route.params);
+  const {  api, dataVersion } = useOfflineSync();
   const [total, setTotal] = useState(0);
   const [game_time, setgame_time] = useState('')
   const [isPrint, setIsPrint] = useState(false);
@@ -26,6 +27,7 @@ const ReviewScreen = ({ route, navigation, onPress }) => {
   const { collector, user } = useSelector(({ user }) => user);
   const { warningModal, confirmationModal } = useSelector(({ ui }) => ui);
   const [confirmTicket, setConfirmTecket] = useState(null);
+
 
 
   const updateTickets =  getConfiguration(user, 'updateTickets')?.isCheck;
@@ -45,7 +47,7 @@ const ReviewScreen = ({ route, navigation, onPress }) => {
 
   const handleCancelTicket = (ticket) => {
 
-    if (!user?.isAdmin && !updateTickets) {
+    if (!user?.is_admin && !updateTickets) {
       setWarningType('unauthorize')
       return dispatch({ type: OPEN_WARNING_MODAL })
     } else {
@@ -68,26 +70,31 @@ const ReviewScreen = ({ route, navigation, onPress }) => {
     }
   }
 
-  const handleConfirmButton = useCallback(async (_id) => {
+  const handleConfirmButton = useCallback(async (item) => {
 
-    const item = realm.objectForPrimaryKey(Betting, BSON.ObjectId(_id)); // search for a realm object with a primary key that is an objectId
+    // const item = realm.objectForPrimaryKey(Betting, BSON.ObjectId(_id)); // search for a realm object with a primary key that is an objectId
 
     try {
+    console.log(item, 'ITEMM')
+    
       if (item) {
-        realm.write(() => {
+        /* realm.write(() => {
           item.is_deleted = true;
-        });
+        }); */
         setConfirmTecket(null);
-        navigation.goBack()
+        await api.updateBetting(item?.id, {is_deleted: true, updated_at: nowISO});
+        
+        navigation.goBack();
       }
     } catch (error) {
       console.log(error, `Something went wrong.`)
       return
     }
     dispatch({ type: CLOSE_CONFIRMATION_MODAL });
-  })
+  }, [ticketDetails?.id])
 
   const handleConfirmWarning = () => {
+  
     dispatch({ type: CLOSE_WARNING_MODAL })
   }
 
@@ -136,7 +143,7 @@ const ReviewScreen = ({ route, navigation, onPress }) => {
         title={'Confirmation'}
         message={`Ticket can only be deleted before 3 minutes after submittion, Are you sure you want to delete this Ticket?`}
         handleConfirm={() => {
-          handleConfirmButton(confirmTicket._id)
+          handleConfirmButton(confirmTicket)
         }}
       />
 
@@ -153,11 +160,11 @@ const ReviewScreen = ({ route, navigation, onPress }) => {
 
         <View style={{ width: '100%', justifyContent: 'space-between', flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: COLORS.gray400, paddingVertical: 6 }}>
           <Text style={styles.detailText}>Bet Date/Time:</Text>
-          <Text style={styles.detailValue}>{moment(ticketDetails.timestamp).format('MMM DD, YYYY - hh:ss A')}</Text>
+          <Text style={styles.detailValue}>{moment(ticketDetails.created_at).format('MMM DD, YYYY - hh:ss A')}</Text>
         </View>
         <View style={{ width: '100%', justifyContent: 'space-between', flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: COLORS.gray400, paddingVertical: 6 }}>
           <Text style={styles.detailText}>Draw Date:</Text>
-          <Text style={styles.detailValue}>{moment(ticketDetails.timestamp).format('MMM DD, YYYY')}</Text>
+          <Text style={styles.detailValue}>{moment(ticketDetails.created_at).format('MMM DD, YYYY')}</Text>
         </View>
         <View style={{ width: '100%', justifyContent: 'space-between', flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: COLORS.gray400, paddingVertical: 6 }}>
           <Text style={styles.detailText}>Status</Text>
@@ -183,7 +190,7 @@ const ReviewScreen = ({ route, navigation, onPress }) => {
         keyExtractor={(item, index) => index.toString()}
       />
       <View style={styles.buttonRow}>
-        {(user?.isAdmin && !ticketDetails?.is_deleted) ?
+        {(user?.is_admin && !ticketDetails?.is_deleted) ?
           <TouchableOpacity
             disabled={disableDeleteButton}
             activeOpacity={.6}
@@ -211,7 +218,7 @@ const ReviewScreen = ({ route, navigation, onPress }) => {
             </LinearGradient>
           </TouchableOpacity>
         }
-        {user?.isAdmin ?
+        {user?.is_admin ?
 
           <TouchableOpacity activeOpacity={.6} onPress={() => console.log('Reprint Not Available!')} style={{ width: '30%' }}>
             <TestScreen data={ticketDetails} isPrint={false} onPrint={() => setIsPrint(true)} />

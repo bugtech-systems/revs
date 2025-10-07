@@ -161,7 +161,7 @@ export function SyncComponent() {
 
   return (
     <View style={{ alignItems: 'center', justifyContent: 'flex-start', flexDirection: 'column' }}>
-      {user?.isAdmin && analytics ?
+      {user?.is_admin && analytics ?
         <TouchableOpacity 
           disabled={dataAnalytics ? false : true}
           onPress={() => navigation.navigate('Combinations', {})} 

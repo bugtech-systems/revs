@@ -5,12 +5,12 @@ import { syncAll } from "./sync";
 export const useAutoSync = () => {
   useEffect(() => {
     // On network reconnect → trigger sync
-    const unsubscribe = NetInfo.addEventListener(state => {
-      if (state.isConnected) {
-        console.log("Connected → syncing...");
-        syncAll().then(() => console.log("✅ Sync complete"));
-      }
-    });
+    // const unsubscribe = NetInfo.addEventListener(state => {
+    //   if (state.isConnected) {
+    //     console.log("Connected → syncing...");
+    //     syncAll().then(() => console.log("✅ Sync complete"));
+    //   }
+    // });
 
     // Background periodic sync (every 2 mins)
     const interval = setInterval(() => {
@@ -18,7 +18,7 @@ export const useAutoSync = () => {
     }, 2 * 60 * 1000);
 
     return () => {
-      unsubscribe();
+      // unsubscribe();
       clearInterval(interval);
     };
   }, []);

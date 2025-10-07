@@ -27,7 +27,7 @@ const Dashboard = ({ navigation }) => {
 
 
 
-  const able_to_set_last_summary = getConfiguration(user ? user : { isAdmin: false, role: 'teller', configurations: [] }, 'lastSummaryReport')?.isCheck;
+  const able_to_set_last_summary = getConfiguration(user ? user : { is_admin: false, role: 'teller', configurations: [] }, 'lastSummaryReport')?.isCheck;
 
 
   // Load bettings & draws offline-first
@@ -132,15 +132,18 @@ const Dashboard = ({ navigation }) => {
 			let { game_time, bettings, gross, hits, comm } = a;
 			let currentDraw = draws.filter(dr => dr.game_time == game_time)[0];
 			
-			let isWin200 = currentDraw?.is_win_to ? getConfiguration(user, 'withWin200')?.isCheck : false;
-			let winPrize = isWin200 ? getConfiguration(user, 'withWin200').value : getConfiguration(user, 'winStraight').value
+			let isWin200 = currentDraw?.is_win_to ? getConfiguration(selectedUser, 'withWin200')?.isCheck : false;
+			let winPrize = isWin200 ? getConfiguration(selectedUser, 'withWin200').value : getConfiguration(selectedUser, 'winStraight').value
 				
 			// grand_gross = Number(grand_gross) + Number(gross);
 			let commsTotal = 0
 			let genCommsTotal = 0;
 
 			for (let bet of bettings) {
-				commsTotal += bet.commissions?.filter(coms => String(coms.referral) == String(user?.id)).reduce((n, { amount }) => n + amount, 0);
+			console.log(bet?.commissions, 'COMMSS')
+				if(bet?.commissions){
+						commsTotal += bet?.commissions?.filter(coms => String(coms.referral) == String(selectedUser?.id)).reduce((n, { amount }) => n + amount, 0);
+				}
 			}
 			genCommsTotal += gross * (user?.com_rate / 100);
 			let comms = commsTotal ? commsTotal : 0;
@@ -303,7 +306,9 @@ const start_of_day = moment(new Date(date)).tz("Asia/Manila").startOf('day').toI
 const end_of_day = moment(new Date(date)).tz("Asia/Manila").endOf('day').toISOString();
 
 // Build filters
-let filters = {};
+let filters = {
+	
+};
 
 if (includeAll) {
   filters = {
@@ -322,7 +327,7 @@ if (includeAll) {
 
 
       let localBettings = await api.listBettings({
-        filters: filters,
+        filters: {...filters, input_type: 'normal'},
         orderBy: 'timestamp DESC',
         bulk: true
         // limit: 20,

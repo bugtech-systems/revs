@@ -44,12 +44,12 @@ export const OfflineProvider = ({ session, children }) => {
   }, []);
 
   // Track network
-  useEffect(() => {
-    const unsub = NetInfo.addEventListener((state) => {
-      setOnline(state.isConnected);
-    });
-    return () => unsub();
-  }, []);
+  // useEffect(() => {
+  //   const unsub = NetInfo.addEventListener((state) => {
+  //     setOnline(state.isConnected);
+  //   });
+  //   return () => unsub();
+  // }, []);
 
   // Auto sync when reconnect
   // useEffect(() => {

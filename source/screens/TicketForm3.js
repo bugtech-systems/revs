@@ -1,30 +1,25 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import Realm, { BSON, internals } from 'realm';
 import axios from 'axios';
 import { StyleSheet, Text, Keyboard, View, ScrollView, TouchableOpacity, FlatList, TextInput, Image, Button, TouchableWithoutFeedback, Alert, Modal } from 'react-native'
-// import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
-import { useUser, useApp } from '@realm/react';
-import { realmContext } from '../RealmContext';
-import { Betting, Users, Draws, Combinations } from '../Models';
 import moment from 'moment-timezone';
 import { useSelector, useDispatch } from 'react-redux';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons'; // or any other icon library
-import { permuteDigits, getConfiguration } from '../utils/helpers';
+import { permuteDigits, getConfiguration, getDayRange } from '../utils/helpers';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, icons } from '../constants';
 import Config from 'react-native-config';
+import { api } from '../utils/offlineSync';
 
 
 
-const { useRealm, useQuery } = realmContext;
 
 export default function TicketForm3({ navigation, route }) {
   const ticketDetails = JSON.parse(route.params);
 
   const dispatch = useDispatch()
   const { collector, user } = useSelector(({ user }) => user);
-  const realm = useRealm()
+  // const realm = useRealm()
   const [error, setError] = useState(null);
   const [amountVal, setAmountVal] = useState('')
   const [time, setSelectedTime] = useState('2pm')
@@ -53,52 +48,89 @@ export default function TicketForm3({ navigation, route }) {
     ramble: ''
   })
 
+  const [draws, setDraws] = useState([]);
+  const [comb, setComb] = useState([]);
+  const [combs, setCombs] = useState([]);
+  const [item, setItem] = useState();
+
   let isWinTo = false;
   const current = new Date();
   const hoursNow = current.getHours();
   const minNow = current.getMinutes();
 
 
-  let users = useQuery(Users, doc => {
-    let curUser = collector ? collector : user?.email
-    return doc.filtered(
-      'email == $0',
-      curUser
-    );
-  }, [collector, user])
+  // let users = useQuery(Users, doc => {
+  //   let curUser = collector ? collector : user?.email
+  //   return doc.filtered(
+  //     'email == $0',
+  //     curUser
+  //   );
+  // }, [collector, user])
 
-  const draws = useQuery(Draws, draw => {
-    const startOfDay = moment(date).startOf('day').toDate();
-    const endOfDay = moment(date).endOf('day').toDate();
-
-
-    return draw.filtered(
-      'drawDate >= $0 && drawDate < $1',
-      startOfDay, endOfDay
-    ).sorted('gameTime');
-  }, [users, date])
+  // const draws = useQuery(Draws, draw => {
+  //   const startOfDay = moment(date).startOf('day').toDate();
+  //   const endOfDay = moment(date).endOf('day').toDate();
 
 
+  //   return draw.filtered(
+  //     'drawDate >= $0 && drawDate < $1',
+  //     startOfDay, endOfDay
+  //   ).sorted('gameTime');
+  // }, [user, date])
 
-  let comb = useQuery(Combinations, digit => {
-    return digit.filtered(
-      'digit == $0',
-      combinationString,
-    );
-  }, [combinationString, collector])
 
-  let combs = useQuery(Combinations, combination => {
-    return combination.filtered('straightTotal == 0 && rambleTotal == 0');
-  })
+
+  // let comb = useQuery(Combinations, digit => {
+  //   return digit.filtered(
+  //     'digit == $0',
+  //     combinationString,
+  //   );
+  // }, [combinationString, collector])
+
+  // let combs = useQuery(Combinations, combination => {
+  //   return combination.filtered('straightTotal == 0 && rambleTotal == 0');
+  // })
   // let comb = useQuery(Combinations).filtered('digit == $0', combinationString)
   // , digit => { return digit.filtered('digit == $0', values.digit )}, [values.digit])
-  const items = useQuery(Betting, betting => {
-    const startOfDay = moment(current).startOf('day').toDate();
-    const endOfDay = moment(current).endOf('day').toDate();
+  // const items = useQuery(Betting, betting => {
+  //   const startOfDay = moment(current).startOf('day').toDate();
+  //   const endOfDay = moment(current).endOf('day').toDate();
 
-    return betting.filtered(
-      'isComplete == false && inputType == "sold" && gameTime == $0 && timestamp >= $1 && timestamp < $2', time, startOfDay, endOfDay).sorted('timestamp');
-  }, [time]);
+  //   return betting.filtered(
+  //     'isComplete == false && inputType == "sold" && gameTime == $0 && timestamp >= $1 && timestamp < $2', time, startOfDay, endOfDay).sorted('timestamp');
+  // }, [time]);
+
+  useEffect(() => {
+    const load = async () => {
+      const { start_of_day, end_of_day  } = getDayRange(date)
+      let filters = {
+        timestamp: { op: "between", from: start_of_day, to: end_of_day },
+      }
+      
+
+      let localDraws = await api.listDraws({
+        filters: { 
+          draw_date: { 
+          op: "between",
+          from: start_of_day,
+          to: end_of_day,
+          }
+        }
+      });
+
+      let localComb = await api.listMasterCombinations({
+        filters: {
+          digit: combinationString,
+        }
+      })
+
+      setDraws(localDraws);
+      setComb(localComb)
+  }
+
+  load();
+  
+  },[user, combinationString, collector, date])
 
 
 
@@ -109,7 +141,7 @@ export default function TicketForm3({ navigation, route }) {
     const now = new Date();
     const hours = now.getHours();
 
-    if ((getGameTime == '2pm' || user?.isAdmin)) {
+    if ((getGameTime == '2pm' || user?.is_admin)) {
       setSelectedTime('2pm')
       setIs2pmDisabled(false);
       setIs5pmDisabled(false);
@@ -153,6 +185,9 @@ export default function TicketForm3({ navigation, route }) {
     }
   }
 
+
+
+  console.log(draws, comb, "INITIAL VAL")
 
 
   let keyPad = [
@@ -251,22 +286,6 @@ export default function TicketForm3({ navigation, route }) {
     let totalR = comb[0]?.rambleTotal + Number(amountRamble);
 
 
-
-    // if((items[0] || (currentHour == 13 || currentHour == 16 || currentHour == 20) && currentMins > 40)){
-    // 	if(totalS > (comb[0]?.straightLimit * (comb[0].isWinTo ? 2 : 1))){
-    // 				let minTotal = (comb[0]?.straightLimit * (comb[0].isWinTo ? 2 : 1)) - comb[0]?.straightTotal
-    // 				let tryBet = minTotal > 5 ? `Try ₱${minTotal}` : '';
-    // 		Alert.alert(`Sold Out for Straight ${combination.split('').join('-')} \n ${tryBet}`)
-    // 	return 
-    // 	}
-
-    // 	if(totalR > (comb[0]?.rambleLimit * (comb[0].isWinTo ? 2 : 1))){
-    // 				let minTotal = (comb[0]?.rambleLimit * (comb[0].isWinTo ? 2 : 1)) - comb[0]?.rambleTotal
-    // 				let tryBet = minTotal > 5 ? `Try ₱${minTotal}` : '';
-    // 		Alert.alert(`Sold Out for Ramble ${combination.split('').join('-')} \n ${tryBet}`)
-    // 	return 
-    // 	}
-    // 	}
     if (((combs.length > 1 && combs.length < 300) && (!comb[0]?.straightTotal && !comb[0]?.rambleTotal))) {
       Alert.alert(`Sold Out Combination!`)
       return;
@@ -288,19 +307,19 @@ export default function TicketForm3({ navigation, route }) {
     }
 
 
-    let withWin200 = getConfiguration(users[0], 'withWin200').isCheck;
+    let withWin200 = getConfiguration(user, 'withWin200').isCheck;
 
 
     if (amount != 0 || !combination) {
-      setBetting(prevState => [...prevState, { ...item, isWinTo: withWin200 ? comb[0].isWinTo : false }]);
+      setBetting(prevState => [...prevState, { ...item, isWinTo: withWin200 ? comb[0]?.isWinTo : false }]);
       setCombination('')
       setAmountRamble('')
       setAmountTarget('')
       setSelectedActive('combi')
-      realm.write(() => {
-        comb[0].straightTotal = Number(totalS);
-        comb[0].rambleTotal = Number(totalR);
-      });
+      // realm.write(() => {
+      //   comb[0].straightTotal = Number(totalS);
+      //   comb[0].rambleTotal = Number(totalR);
+      // });
       return
     } else {
       Alert.alert(`${!target && !ramble ? 'Please provide amount' : amountVal == 0 ? 'Plesae provide amount' : time == '' ? 'Please select time' : 'Something went wrong'}`)
@@ -322,7 +341,7 @@ export default function TicketForm3({ navigation, route }) {
     let totalStraight = 0;
     let totalAmount = 0;
     try {
-      const item = realm.objectForPrimaryKey(Betting, BSON.ObjectId(ticketDetails._id)); // search for a realm object with a primary key that is an objectId
+      // const item = realm.objectForPrimaryKey(Betting, BSON.ObjectId(ticketDetails._id)); // search for a realm object with a primary key that is an objectId
 
 
       setLoading(true)
@@ -346,7 +365,7 @@ export default function TicketForm3({ navigation, route }) {
             betType: bet.ramble && !bet.target ? 'R' : !bet.ramble && bet.target ? 'T' : bet.target && bet.ramble ? 'R - T' : null,
             winning: sWinning + rWinning,
             amount: Number(bet.amount),
-            isWinTo: bet.isWinTo,
+            isWinTo: bet.is_win_to,
             targetAmount: Number(bet.target),
             rambleAmount: Number(bet.ramble),
           }
@@ -358,11 +377,11 @@ export default function TicketForm3({ navigation, route }) {
 
 
         let commissions = [];
-        let uplines = users[0]?.uplines ? users[0]?.uplines : [];
+        let uplines = user?.uplines ? user?.uplines : [];
         let newUplines = [];
-        // let comUplines = [...uplines, users[0]];
+        // let comUplines = [...uplines, user];
 
-        let netRate = 100 - users[0]?.uplines[0]?.comRate ? users[0]?.uplines[0]?.comRate : 0;
+        let netRate = 100 - user?.uplines[0]?.comRate ? user?.uplines[0]?.comRate : 0;
 
 
 
@@ -375,8 +394,8 @@ export default function TicketForm3({ navigation, route }) {
           newUplines.push(String(line._id))
         });
 
-        newUps.push(users[0])
-        newUplines.push(String(users[0]._id));
+        newUps.push(user)
+        newUplines.push(String(user.id));
 
         for (let i = 0; i < newUps.length; i++) {
           let agentComAmnt = Math.floor((newUps[i].comRate / 100) * gross);
@@ -413,25 +432,25 @@ export default function TicketForm3({ navigation, route }) {
 
         let drawResult = draws.find(a => a.gameTime == time);
 
-        await realm.write(async () => {
-          item.ramble = Number(totalRamble);
-          item.straight = Number(totalStraight);
-          item.isComplete = false;
-          item.gross = Number(gross);
-          item.net = Number(netTotal);
-          item.gameTime = time;
-          item.winning = 0;
-          item.combinations = combinations;
-          item.commissions = newComms;
-          item.uplines = newUplines;
+        // await realm.write(async () => {
+        //   item.ramble = Number(totalRamble);
+        //   item.straight = Number(totalStraight);
+        //   item.isComplete = false;
+        //   item.gross = Number(gross);
+        //   item.net = Number(netTotal);
+        //   item.gameTime = time;
+        //   item.winning = 0;
+        //   item.combinations = combinations;
+        //   item.commissions = newComms;
+        //   item.uplines = newUplines;
 
-          setLoading(false)
-          // dispatch({type: SET_LOADING})
-          setSelectedTab('keypads')
-          setBetting([]);
-          setDate(new Date());
-          navigation.navigate('ViewTicket', JSON.stringify(item))
-        })
+        //   setLoading(false)
+        //   // dispatch({type: SET_LOADING})
+        //   setSelectedTab('keypads')
+        //   setBetting([]);
+        //   setDate(new Date());
+        //   navigation.navigate('ViewTicket', JSON.stringify(item))
+        // })
       } else {
         Alert.alert('No tickets to submit')
       }
@@ -441,7 +460,7 @@ export default function TicketForm3({ navigation, route }) {
     }
     setLoading(false)
 
-  }, [users, ticketDetails, arrayBetting])
+  }, [user, ticketDetails, arrayBetting])
 
   function removeItemByRamble(data) {
 
@@ -703,7 +722,7 @@ export default function TicketForm3({ navigation, route }) {
   //   }, [draws])
 
   useEffect(() => {
-    if (ticketDetails && ticketDetails._id) {
+    if (ticketDetails && ticketDetails.id) {
       console.log(ticketDetails, 'TICKET')
       let { combinations, gameTime } = ticketDetails;
 
@@ -765,7 +784,7 @@ export default function TicketForm3({ navigation, route }) {
               flexDirection: 'row',
             }}>
             <TouchableOpacity
-              onPress={() => user?.isAdmin ? setShowDate(true) : console.log('Not Admin')}
+              onPress={() => user?.is_admin ? setShowDate(true) : console.log('Not Admin')}
             >
               <Image
                 source={icons.clock}
@@ -1073,9 +1092,9 @@ export default function TicketForm3({ navigation, route }) {
                         renderItem={({ item, index }) => (
                           <>
                             <View style={{ paddingLeft: 20, flexDirection: 'row', width: '100%', backgroundColor: COLORS.white, alignItems: 'center', justifyContent: 'center', padding: 10 }}>
-                              <Text style={{ ...styles.itemText, width: '25%', color: item.isWinTo ? COLORS.danger : COLORS.black, fontSize: 18, fontWeight: '500' }}>{String(item?.combination).split('').join('-')}</Text>
-                              <Text style={{ ...styles.itemText, width: '25%', color: item.isWinTo ? COLORS.danger : COLORS.black, fontSize: 18, fontWeight: '500' }}>₱{item?.target}</Text>
-                              <Text style={{ ...styles.itemText, width: '25%', color: item.isWinTo ? COLORS.danger : COLORS.black, fontSize: 18, fontWeight: '500' }}>₱{item?.ramble}</Text>
+                              <Text style={{ ...styles.itemText, width: '25%', color: item.is_win_to ? COLORS.danger : COLORS.black, fontSize: 18, fontWeight: '500' }}>{String(item?.combination).split('').join('-')}</Text>
+                              <Text style={{ ...styles.itemText, width: '25%', color: item.is_win_to ? COLORS.danger : COLORS.black, fontSize: 18, fontWeight: '500' }}>₱{item?.target}</Text>
+                              <Text style={{ ...styles.itemText, width: '25%', color: item.is_win_to ? COLORS.danger : COLORS.black, fontSize: 18, fontWeight: '500' }}>₱{item?.ramble}</Text>
                               <View style={{ width: '20%' }}>
                                 <TouchableOpacity onPress={() => removeItemByRamble(item)} style={{ width: 30, borderWidth: 1, height: 30, alignItems: 'center', justifyContent: 'center', borderColor: COLORS.white }}>
                                   <Image

@@ -10,6 +10,7 @@ import Animated, { BounceOutDown, FadeInDown, FadeOutDown } from 'react-native-r
 import { COLORS, icons } from '../../constants'
 import { formatNumberWithComma, getConfiguration, getDayRange } from '../../utils/helpers';
 import { useOffline } from '../../context/OfflineProvider';
+import { forceFullResync } from '../../utils/batchPull';
 
 const drawTimes = [
   {
@@ -51,130 +52,12 @@ const Transactions = ({ navigation }) => {
 
   const userNow = selectedUser ? selectedUser.id : user.id;
 
-
-  console.log(userNow, "THE USER REDUX")
-
-
-  // const fetchUserData = useMemo(async () => {
-  //   try {
-  //     const { data: users, error } = await supabase
-  //       .from('users')
-  //       .select("*")
-  //       .eq('email', collectorName)
-  //       if (error) {
-  //         setUsers([]);
-  //         return null;
-  //       } else {
-  //         setUsers(users)
-  //       }
-  //   } catch (err) {
-  //     console.log(err)
-  //     return;
-  //   }
-  
-  // }, [selectedUser, collector]);
-
-
-  // let userQuery = fetchUserData;
-
-
-
-  // useEffect(() => {
-
-
-  // }, [fetchUserData])
-
-
-
-
   
   
   const updateTickets =  getConfiguration(selectedUser, 'updateTickets')?.isCheck;
 
 
-  console.log(updateTickets, "CAN EDIT?")
-
-  
-  
-  
-  // const fetchBettings = useMemo(async () => {
-  //   let userNow = selectedUser ? selectedUser._id : "";
-  //   let { data: bettings, error } = await supabase
-  //     .from('bettings')
-  //     .select("*")
-
-
-  // }, [])
-  
-
-//   async function fetchBettings({ includeAll, date, userNow, user }) {
-//   // compute day range
-//   let startOfDay = moment(date).startOf('day').toISOString(); // ISO timestamps for supabase
-//   let endOfDay = moment(date).endOf('day').toISOString();
-
-//   // replicate your "if date <= user.lastSummary" branch
-//   if (!includeAll && new Date(date) <= new Date(user?.lastSummary || 0)) {
-//     // advance to next day (your original used add(1,'d').endOf('day') for both start & end - preserved)
-//     startOfDay = moment().add(1, 'd').startOf('day').toISOString();
-//     endOfDay = moment().add(1, 'd').endOf('day').toISOString();
-//   }
-
-//   if (includeAll) {
-//     // includeAll branch:
-//     // filter: ANY uplines == $0 && isDeleted == false && inputType == "normal" && timestamp >= $1 && timestamp <= $2
-//     // supabase doesn't support "ANY uplines == 'value'" directly for jsonb arrays; use filter on JSONB field with contains or Postgres operator.
-//     // Assuming `uplines` is a JSONB array of strings, we can query with: uplines::text LIKE '%"userNow"%'
-//     // Or better: use contains — uplines @> '["userNow"]'
-//     const { data, error } = await supabase
-//       .from('bettings')
-//       .select('*')
-//       .eq('is_deleted', false)
-//       .eq('input_type', 'normal')
-//       .gte('timestamp', startOfDay)
-//       .lte('timestamp', endOfDay)
-//       .filter('uplines', 'cs', JSON.stringify([String(userNow)])) // 'cs' = contains (array containment) for Postgres arrays/JSONB
-//       .order('timestamp', { ascending: true });
-
-//     if (error) throw error;
-//     return data;
-//   } else {
-//     // non-includeAll branch:
-//     // filter: isDeleted == false && inputType == "normal" && timestamp >= $0 && timestamp < $1 && owner_id == $2
-//     const { data, error } = await supabase
-//       .from('bettings')
-//       .select('*')
-//       .eq('is_deleted', false)
-//       .eq('input_type', 'normal')
-//       .gte('timestamp', startOfDay)
-//       .lt('timestamp', endOfDay)
-//       .eq('owner_id', String(userNow))
-//       .order('timestamp', { ascending: false }); // sorted('timestamp', true) — descending
-
-//     if (error) throw error;
-//     return data;
-//   }
-// }
-
-
-
-
-
-
-  // const items = useQuery(Betting, data => {
-  //   if (includeAll) {
-  //     return data.filtered('ANY uplines == $0 &&  isDeleted == false && inputType == "normal" && timestamp >= $1 && timestamp <= $2', String(userNow), startOfDay, endOfDay).sorted('timestamp');
-  //   } else {
-  //     if (new Date(date) <= new Date(user?.lastSummary)) {
-  //       startOfDay = moment().add(1, 'd').endOf('day').toDate();
-  //       endOfDay = moment().add(1, 'd').endOf('day').toDate();
-  //     }
-  //     return data.filtered('isDeleted == false && inputType == "normal" && timestamp >= $0 && timestamp < $1 && owner_id == $2', startOfDay, endOfDay, String(userNow)).sorted('timestamp', true)
-  //   }
-  // }, [date, users, selectedUser, includeAll]);
-
-
-    useEffect(() => {
-    const load = async () => {
+  const load = async () => {
     console.log(date, 'LOOOADED')
     const { start_of_day, end_of_day  } = getDayRange(date)
     // Start and end of the day
@@ -182,6 +65,7 @@ const Transactions = ({ navigation }) => {
   console.log(start_of_day, end_of_day, 'date range')
     
     let filters = {}
+    // filters.is_deleted = false;
     if (includeAll) {
   filters = {
     ...filters,
@@ -199,7 +83,7 @@ const Transactions = ({ navigation }) => {
 
 
       let localBettings = await api.listBettings({
-        filters: filters,
+        filters: {...filters, input_type: 'normal'},
         orderBy: 'created_at DESC',
         // limit: 20,
       });
@@ -208,6 +92,13 @@ const Transactions = ({ navigation }) => {
       setItems(localBettings);
       setLoading(false);
     };
+
+
+
+  console.log(updateTickets, "CAN EDIT?")
+
+    useEffect(() => {
+  
     load();
   }, [date, userNow, includeAll, dataVersion]);
   
@@ -250,6 +141,7 @@ const Transactions = ({ navigation }) => {
     setLoading(true);
     setTimeout(() => {
       setRefreshing(false);
+      load();
       bumpVersion();
       setSearchQuery('');
       // setFilteredData(items)
@@ -354,7 +246,7 @@ const Transactions = ({ navigation }) => {
       })
 
       delete item.uplines;
-      const backgroundColor = index % 2 === 0 ? COLORS.gray200 : COLORS.gray300;
+      const backgroundColor = index % 2 === 0 ? COLORS.gray300 : COLORS.gray200;
 
 
 
@@ -534,31 +426,42 @@ const Transactions = ({ navigation }) => {
           />
         )}
 
-        <View style={{ paddingLeft: 10, height: 50, paddingTop: 10, paddingBottom: 10, marginTop: 10, marginBottom: 10, borderBottomWidth: 1, borderTopWidth: 1, borderColor: COLORS.gray600, justifyContent: 'space-between', flexDirection: 'row', alignItems: 'flex-start' }}>
-          <View style={{ flex: 1, flexDirection: 'column', width: '100%', alignItems: 'flex-start' }}>
-            <Text style={styles.fontsHeader}>Total Tickets</Text>
-            <Text style={{ fontWeight: 'bold', color: COLORS.black, fontSize: 16 }}>{formatNumberWithComma(filteredList.length)}</Text>
-
+        <View style={{ paddingLeft: 10, paddingTop: 10, marginTop: 10, marginBottom: 10, borderBottomWidth: 1, borderTopWidth: 1, borderColor: COLORS.gray600, justifyContent: 'space-between', flexDirection: 'row', alignItems: 'flex-start' }}>
+          <View style={{ flex: 1, flexDirection: 'column', width: '30%', }}>
+            <Text style={{ fontWeight: 'bold', color: COLORS.black, fontSize: 16}}>{`Total Tickets`}</Text>
+            <Text style={{ fontWeight: 'bold', color: COLORS.black, fontSize: 16, }}>{`${formatNumberWithComma(filteredList.length)}`}</Text>
+            {/* <Text style={{ fontWeight: 'bold', color: COLORS.black, fontSize: 16 }}>{formatNumberWithComma(filteredList.length)}</Text> */}
+            {/* <Text style={{ fontWeight: 'bold', color: COLORS.black, fontSize: 16 }}>{formatNumberWithComma(totalGross)}</Text> */}
 
           </View>
-
-          <View style={{ flex: 1, flexDirection: 'column', width: '40%', alignItems: 'flex-start' }}>
-            <Text style={styles.fontsHeader}>Total Sales</Text>
-            <Text style={{ fontWeight: 'bold', color: COLORS.black, fontSize: 16 }}>{formatNumberWithComma(totalGross)}</Text>
+          <View style={{ flex: 1, flexDirection: 'column', width: '30%',  }}>
+<Text style={{ fontWeight: 'bold', color: COLORS.black, fontSize: 16}}>{`Total Sales`}</Text>
+<Text style={{ fontWeight: 'bold', color: COLORS.black, fontSize: 16 }}>{`${formatNumberWithComma(totalGross)}`}</Text>
           </View>
-        </View>
-        {(selectedUser && selectedUser.role !== 'teller' && getConfiguration(selectedUser, 'showAllData')?.isCheck) &&
-          <View style={{ ...styles.toggleRow, justifyContent: 'flex-start' }}>
-            <Switch
+          
+
+{(selectedUser && selectedUser.role !== 'teller' && getConfiguration(selectedUser, 'showAllData')?.isCheck) &&
+          <View style={{ width: '30%', alignItems: 'flex-end', flexDirection: 'column' }}>
+            <View style={{ alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10}}>
+            <Text style={{ color: COLORS.black900, fontSize: 12, fontWeight: 'bold' }}>Show All</Text>
+          <Switch
               trackColor={{ true: '#00ED64' }}
               onValueChange={() => {
               console.log(!includeAll)
                 setIncludeAll(!includeAll);
               }}
               value={includeAll}
-            />
-            <Text style={{ ...styles.toggleText, color: COLORS.black, fontWeight: '500' }}>Show All</Text>
-          </View>}
+            />   
+          </View>
+            </View>
+         
+          }
+
+          {/* <View style={{ flex: 1, flexDirection: 'column', width: '40%', alignItems: 'flex-start' }}>
+            
+          </View> */}
+        </View>
+        
         {renderTickerList(filteredList)}
 
       </View>

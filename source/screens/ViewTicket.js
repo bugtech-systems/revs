@@ -87,8 +87,6 @@ const ViewTicket = ({ route }) => {
     );
   }
   
-  
-console.log(betting, 'BETTTING')
 
   return (
     <View style={styles.container}>

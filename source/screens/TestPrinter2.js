@@ -1,297 +1,306 @@
-import React, {useCallback, useEffect, useState} from 'react';
-import { results, cloudSync, feedBack, pushNotifOn } from '../constants/icons';
-import { COLORS } from '../constants/theme';
-import icons from '../constants/icons';
-import { View, Text, Image, Button, TouchableOpacity, FlatList, Alert, ScrollView, StyleSheet, NativeModules, Platform, PermissionsAndroid } from 'react-native';
-import { useDispatch, useSelector } from 'react-redux';
-import { realmContext } from '../RealmContext';
-import { useUser } from '@realm/react';
-import { Betting, Users } from '../Models';
-import { SET_COLLECTOR, SET_USER } from '../redux/actions/type';
-import { SET_LOADING, STOP_LOADING } from '../redux/actions/type';
-
-import UpdateModal from '../components/UpdateModal';
-import axios from 'axios';
-import {commonData} from '../constants/commonData';
-// import BleManager from 'react-native-ble-plx';
+import React, { useEffect, useState } from 'react';
+import {
+	View,
+	Text,
+	TouchableOpacity,
+	FlatList,
+	Alert,
+	StyleSheet,
+	Platform,
+	PermissionsAndroid,
+} from 'react-native';
 import BleManager from 'react-native-ble-manager';
+import { NativeEventEmitter, NativeModules } from 'react-native';
+import { COLORS } from '../constants/theme';
+import RawbtApi, { RawBTPrintJob } from 'react-native-rawbt-api';
 
+const BleManagerModule = NativeModules.BleManager;
+const bleManagerEmitter = new NativeEventEmitter(BleManagerModule);
 
+const showError = (error) => {
+	Alert.alert('Bluetooth Error', error, [{ text: 'OK', style: 'cancel' }]);
+};
 
-import RawbtApi,
-{
-	RawBTPrintJob,
-	AttributesString,
-	AttributesBarcode,
-	AttributesQRcode,
-	AttributesImage,
-	CommandBarcode,
-	FONT_C,
-	FONT_A,
-	FONT_B,
-	FONT_TRUE_TYPE,
-	ALIGNMENT_LEFT,
-	ALIGNMENT_CENTER,
-	ALIGNMENT_RIGHT,
-	HRI_ABOVE,
-	HRI_BELOW,
-	HRI_BOTH,
-	BARCODE_UPC_A,
-	BARCODE_UPC_E,
-	BARCODE_EAN13,
-	BARCODE_JAN13,
-	BARCODE_EAN8,
-	BARCODE_JAN8,
-	BARCODE_CODE39,
-	BARCODE_ITF,
-	BARCODE_CODABAR,
-	BARCODE_CODE93,
-	BARCODE_CODE128,
-	BARCODE_GS1_128,
-	BARCODE_GS1_DATABAR_OMNIDIRECTIONAL,
-	BARCODE_GS1_DATABAR_TRUNCATED,
-	BARCODE_GS1_DATABAR_LIMITED,
-	BARCODE_GS1_DATABAR_EXPANDED,
-} from 'react-native-rawbt-api';
-
-const { useRealm, useQuery } = realmContext;
-const usersSubscriptionName = 'users';
-
-
-const showError = (error: string) => {
-	Alert.alert('Print error', error, [
-		{
-			text: 'Cancel',
-			style: 'cancel',
-		},
-	]);
-}
-
-
-
-
-
-
- const TestPrinter2 = ({navigation}) => {
-	// const [manager] = useState(new BleManager());
+const TestPrinter2 = () => {
 	const [devices, setDevices] = useState([]);
+	const [connectedDeviceId, setConnectedDeviceId] = useState(null);
+	const [scanning, setScanning] = useState(false);
 	const [connecting, setConnecting] = useState(null);
-  
-	const printHello = async () => {
-		let job = new RawBTPrintJob();
-	
-		job.println("Test Print!");
-		job.drawLine("_");
-	
-		RawbtApi.printJob(job.GSON()).catch((err) => showError(err.message));
+
+	// ------------------ PERMISSIONS ------------------
+	async function requestBluetoothPermissions() {
+		if (Platform.OS === 'android') {
+			const permissions = [];
+			if (Platform.Version >= 23 && Platform.Version <= 30) {
+				permissions.push(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION);
+			} else if (Platform.Version >= 31) {
+				permissions.push(
+					PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+					PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT
+				);
+			}
+
+			if (permissions.length === 0) return true;
+			const granted = await PermissionsAndroid.requestMultiple(permissions);
+			return Object.values(granted).every(
+				result => result === PermissionsAndroid.RESULTS.GRANTED
+			);
+		}
+		return true;
+	}
+
+	// ------------------ SCAN FOR DEVICES ------------------
+	const scanForDevices = async () => {
+		const hasPermission = await requestBluetoothPermissions();
+		if (!hasPermission) {
+			Alert.alert('Permission required', 'Bluetooth permissions not granted.');
+			return;
+		}
+
+		try {
+			setScanning(true);
+			setDevices([]);
+			await BleManager.start({ showAlert: false });
+			await BleManager.scan([], 5, true);
+			console.log('Scanning started...');
+
+			setTimeout(async () => {
+				const discovered = await BleManager.getDiscoveredPeripherals();
+				console.log('Discovered devices:', discovered);
+				setDevices(discovered);
+				setScanning(false);
+			}, 5000);
+		} catch (error) {
+			console.error('Scan error:', error);
+			setScanning(false);
+		}
+	};
+
+	// --------- CANCEL SCAN FOR AVAILABLE DEVICES -------------
+	// ADD this new function beside scanForDevices
+	const cancelScanForDevices = async () => {
+		try {
+			await BleManager.stopScan();
+			console.log('Scan cancelled by user.');
+			setScanning(false);
+			Alert.alert('Scan Stopped', 'Bluetooth scanning has been cancelled.');
+		} catch (error) {
+			console.error('Cancel scan error:', error);
+			Alert.alert('Error', 'Failed to stop scan.');
+		}
 	};
 	
-  
 
-	const requestBluetoothPermissions = async () => {
+	// ------------------ CONNECT TO DEVICE ------------------
+	const connectToDevice = async (device: any) => {
 		try {
-		  const granted = await PermissionsAndroid.requestMultiple([
-			PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
-			PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
-		  ]);
-	  
-		  if (
-			granted[PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT] === PermissionsAndroid.RESULTS.GRANTED &&
-			granted[PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN] === PermissionsAndroid.RESULTS.GRANTED
-		  ) {
-			console.log("Bluetooth permissions granted.");
-		  } else {
-			console.log("Bluetooth permissions denied.");
-		  }
+			setConnecting(device.id);
+			await BleManager.connect(device.id);
+			console.log('Connected to:', device.name || device.id);
+			setConnectedDeviceId(device.id);
+			Alert.alert('Connected', `Connected to ${device.name || device.id}`);
 		} catch (error) {
-		  console.log("Permission request error:", error);
+			console.error('Connection error:', error);
+			showError(error.message);
+		} finally {
+			setConnecting(null);
 		}
-	  };
+	};
 
-		const scanAndConnectPrinter = async () => {
+	// ------------------ DISCONNECT FROM DEVICE ------------------
+	const disconnectFromDevice = async (device: any) => {
+		try {
+			await BleManager.disconnect(device.id);
+			console.log('Disconnected from:', device.name || device.id);
+			if (connectedDeviceId === device.id) setConnectedDeviceId(null);
+			Alert.alert('Disconnected', `Disconnected from ${device.name || device.id}`);
+		} catch (error) {
+			console.error('Disconnection error:', error);
+			showError(error.message);
+		}
+	};
 
-			requestBluetoothPermissions();
-			
-			try {
-			  await BleManager.start();
-			  await BleManager.scan([], 5, true);
-		  
-			  setTimeout(async () => {
-				const devices = await BleManager.getDiscoveredPeripherals();
+	// ------------------ PRINT SAMPLE ------------------
+	const printHello = async () => {
+		try {
+			let job = new RawBTPrintJob();
+			job.println('Test Print!');
+			job.drawLine('_');
+			await RawbtApi.printJob(job.GSON());
+		} catch (err) {
+			showError(err.message);
+		}
+	};
 
-				setDevices(devices);
-
-
-				console.log(devices, "THE DEVICES")
-				// const printer = devices.find(d => d.name.includes("Printer")); // Change "Printer" to match your printer name
-		  
-				// if (printer) {
-				//   await BleManager.connect(printer.id);
-				//   console.log("Connected to printer:", printer);
-				// } else {
-				//   console.log("Printer not found.");
-				// }
-			  }, 5000);
-			} catch (error) {
-			  console.error("Error connecting to printer:", error);
-			}
-		  };
-		
-		
-	// const scanForDevices = () => {
-	//   setDevices([]);
-	//   manager.startDeviceScan(null, null, (error, device) => {
-	// 	if (error) {
-	// 	  console.error(error);
-	// 	  return;
-	// 	}
-  
-	// 	if (device && device.name) {
-	// 	  setDevices((prevDevices) => {
-	// 		if (!prevDevices.find((d) => d.id === device.id)) {
-	// 		  return [...prevDevices, device];
-	// 		}
-	// 		return prevDevices;
-	// 	  });
-	// 	}
-	//   });
-  
-	//   // Stop scanning after 10 seconds
-	//   setTimeout(() => {
-	// 	manager.stopDeviceScan();
-	//   }, 10000);
-	// };
-  
-	const connectToDevice = async (device) => {
-
-
-		console.log(device.name, "THE DEVICE")
-
-		// const printer = devices.find(d => d.name.includes(device.name)); // Change "Printer" to match your printer name
-			  setConnecting(device.id);
-
-		  
-				if (device) {
-				  await BleManager.connect(device.id);
-				  console.log("Connected to printer:", device.name);
-				} else {
-				  console.log("Printer not found.");
-				}
-
-						setConnecting(null);
-
-		
-			}
-		
-	//   setConnecting(device.id);
-	//   try {
-	// 	await device.connect();
-	// 	Alert.alert('Connected', `Successfully connected to ${device.name}`);
-	//   } catch (error) {
-	// 	console.error('Connection failed', error);
-	// 	Alert.alert('Error', 'Failed to connect to device');
-	//   } finally {
-	// 	setConnecting(null);
-	//   }
-	// };
-  
-	const renderItem = ({ item }) => (
-	  <TouchableOpacity
-		style={styles.deviceItem}
-		onPress={() => connectToDevice(item)}
-		disabled={connecting === item.id}
-	  >
-		<Text style={styles.deviceName}>{item.name || 'Unknown Device'}</Text>
-		{connecting === item.id && <Text>Connecting...</Text>}
-	  </TouchableOpacity>
-	);
-
-	// 	useEffect(() => {
-	//   const handleStateChange = (state) => {
-	// 	if (state === 'PoweredOn') {
-	// 	  scanForDevices();
-	// 	}
-	//   };
-  
-	//   manager.onStateChange(handleStateChange, true);
-  
-	//   return () => {
-	// 	manager.destroy();
-	//   };
-	// }, [manager]);
-  
-	
-	
-	
+	// ------------------ EVENT LISTENERS ------------------
 	useEffect(() => {
+		BleManager.start({ showAlert: false });
 		RawbtApi.init();
-		// printPDF()
-		requestBluetoothPermissions()
-	}, [])
-	
-	
+
+		const handleDisconnect = peripheral => {
+			console.log('Device disconnected:', peripheral.peripheral);
+			if (connectedDeviceId === peripheral.peripheral) {
+				setConnectedDeviceId(null);
+			}
+		};
+
+		const disconnectListener = bleManagerEmitter.addListener(
+			'BleManagerDisconnectPeripheral',
+			handleDisconnect
+		);
+
+		return () => {
+			disconnectListener.remove();
+		};
+	}, []);
+
+	// ------------------ RENDER EACH DEVICE ------------------
+	const renderItem = ({ item }) => {
+		const isConnected = connectedDeviceId === item.id;
+
+		return (
+			<View style={styles.deviceItem}>
+				<Text style={styles.deviceName}>{item.name || 'Unnamed Device'}</Text>
+				<Text style={styles.deviceId}>{item.id}</Text>
+
+				<View style={styles.buttonRow}>
+					{!isConnected ? (
+						<TouchableOpacity
+							style={[styles.btn, styles.connectBtn]}
+							onPress={() => connectToDevice(item)}
+							disabled={connecting === item.id}
+						>
+							<Text style={styles.btnText}>
+								{connecting === item.id ? 'Connecting...' : 'Connect'}
+							</Text>
+						</TouchableOpacity>
+					) : (
+						<TouchableOpacity
+							style={[styles.btn, styles.disconnectBtn]}
+							onPress={() => disconnectFromDevice(item)}
+						>
+							<Text style={styles.btnText}>Disconnect</Text>
+						</TouchableOpacity>
+					)}
+				</View>
+			</View>
+		);
+	};
+
 	return (
-		<View style={{ flex: 1, padding: 10 }}>
-		<TouchableOpacity style={{ paddingVertical: 10 }} onPress={printHello}>
-	<View style={{
-		backgroundColor: COLORS.primary,
-		padding: 10,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center'
-		// borderRadius: rowList === 0 ? 10 : rowList === lists.length - 1 ? 10 : 0,
-		// borderTopRightRadius: rowList === 0 ? 10 : 0,
-		// borderTopLeftRadius: rowList === 0 ? 10 : 0,
-		// borderBottomRightRadius: rowList === lists.length - 1 ? 10 : 0,
-		// borderBottomLeftRadius: rowList === lists.length - 1 ? 10 : 0,
-	}}>
-		<Text style={{ fontSize: 18, color: COLORS.white }}>
-			Test Printer
-		</Text>
-	</View>
-	</TouchableOpacity>	
-	<TouchableOpacity style={{ paddingVertical: 10 }} onPress={scanAndConnectPrinter}>
-	<View style={{
-		backgroundColor: COLORS.primary,
-		padding: 10,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center'
-		// borderRadius: rowList === 0 ? 10 : rowList === lists.length - 1 ? 10 : 0,
-		// borderTopRightRadius: rowList === 0 ? 10 : 0,
-		// borderTopLeftRadius: rowList === 0 ? 10 : 0,
-		// borderBottomRightRadius: rowList === lists.length - 1 ? 10 : 0,
-		// borderBottomLeftRadius: rowList === lists.length - 1 ? 10 : 0,
-	}}>
-		<Text style={{ fontSize: 18, color: COLORS.white }}>
-			Scan Printer
-		</Text>
-	</View>
-	</TouchableOpacity>	
-	<FlatList
-	data={devices}
-	renderItem={renderItem}
-	keyExtractor={(item) => item.id}
-	ListEmptyComponent={<Text>No devices found</Text>}
-  />
+		<View style={styles.container}>
+			{/* PRINT BUTTON */}
+			<TouchableOpacity style={styles.actionButton} onPress={printHello}>
+				<Text style={styles.actionText}>Test Print</Text>
+			</TouchableOpacity>
+
+			{/* SCAN BUTTON */}
+			<TouchableOpacity
+				style={[styles.actionButton, scanning && styles.disabled]}
+				onPress={scanForDevices}
+				disabled={scanning}
+			>
+				<Text style={styles.actionText}>
+					{scanning ? 'Scanning...' : 'Scan for Devices'}
+				</Text>
+			</TouchableOpacity>
+
+			{/* DEVICE LIST */}
+			<FlatList
+				data={devices}
+				keyExtractor={item => item.id}
+				renderItem={renderItem}
+				contentContainerStyle={{
+					flex: 1,
+				}}
+				ListEmptyComponent={
+					<View style={{flex: 1, width: '100%', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between' }}>
+						<View>
+							<Text style={styles.emptyText}>
+								{scanning ? 'Scanning for devices...' : 'No devices found.'}
+							</Text>
+						</View>
+{
+	scanning &&
+	<TouchableOpacity
+							onPress={cancelScanForDevices}
+						>
+							<Text>
+								STOP
+							</Text>
+						</TouchableOpacity>
+}
+						
+					</View>
+				}
+			/>
 		</View>
 	);
 };
 
+export default TestPrinter2;
+
+// ------------------ STYLES ------------------
 const styles = StyleSheet.create({
 	container: {
-	  flex: 1,
-	  padding: 16,
+		flex: 1,
+		padding: 12,
+		backgroundColor: '#fff',
+	},
+	actionButton: {
+		backgroundColor: COLORS.primary,
+		padding: 12,
+		borderRadius: 10,
+		marginBottom: 12,
+	},
+	actionText: {
+		color: '#fff',
+		fontSize: 16,
+		fontWeight: 'bold',
+		textAlign: 'center',
+	},
+	disabled: {
+		backgroundColor: '#888',
 	},
 	deviceItem: {
-	  padding: 16,
-	  borderBottomWidth: 1,
-	  borderBottomColor: '#ccc',
+		backgroundColor: '#f7f7f7',
+		padding: 12,
+		borderRadius: 10,
+		marginVertical: 6,
 	},
 	deviceName: {
-	  fontSize: 16,
+		fontSize: 16,
+		fontWeight: 'bold',
+		color: '#333',
 	},
-  });
-
-
-export default TestPrinter2
+	deviceId: {
+		fontSize: 12,
+		color: '#777',
+		marginBottom: 8,
+	},
+	buttonRow: {
+		flexDirection: 'row',
+		justifyContent: 'flex-start',
+		gap: 10,
+	},
+	btn: {
+		paddingVertical: 8,
+		paddingHorizontal: 16,
+		borderRadius: 8,
+	},
+	connectBtn: {
+		backgroundColor: '#007bff',
+	},
+	disconnectBtn: {
+		backgroundColor: '#ff3b30',
+	},
+	btnText: {
+		color: '#fff',
+		fontWeight: 'bold',
+	},
+	emptyText: {
+		textAlign: 'center',
+		color: '#555',
+		marginTop: 20,
+	},
+});

@@ -4,9 +4,6 @@ import { StyleSheet, Text, Keyboard, View, ScrollView, TouchableOpacity, FlatLis
 import moment from 'moment-timezone';
 import { useSelector, useDispatch } from 'react-redux';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-// import { file_server_token, file_server_url, file_download_url } from '../../commonData.json';
-// import ImageUploader from '../components/ImageUploader';
-// import { SPrize, Win2Prize } from '../utils/commonData';
 import { checkSoldOutParts, generateObjectId, getConfiguration, getWithWin200Config, updateDateTimeIfGreater } from '../utils/helpers';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Geolocation from 'react-native-geolocation-service';
@@ -452,13 +449,13 @@ export default function TicketForm({ navigation }) {
             // showToastWin200Bet();
             setPendingBet({
                 ...item,
-                is_win_to: withWin200 ? comb[0].is_win_to : false
+                is_win_to: withWin200 ? comb[0]?.is_win_to : false
             });
             setShowWin200Modal(true);
             return;
         } 
         if (amount != 0 || !combination) {
-            setBetting(prevState => [...prevState, { ...item, is_win_to: withWin200 ? comb[0].is_win_to : false }]);
+            setBetting(prevState => [...prevState, { ...item, is_win_to: withWin200 ? comb[0]?.is_win_to : false }]);
             setCombination('')
             setAmountRamble('')
             setAmountTarget('')
@@ -597,12 +594,16 @@ export default function TicketForm({ navigation }) {
                         } */
                 if (collector == user?.email) {
                     Geolocation.getCurrentPosition(
-                        position => {
+                       async (position) => {
                             let { coords } = position;
                             // setMarkerLocation({ ...position.coords });
                             // realm.write(async () => {
                             //     selectedUser.coordinates = `${coords.latitude}|${coords.longitude}`;
                             // })
+                            await api.updateUser(user?.id, {
+                                coordinates: `${coords.latitude}|${coords.longitude}`
+                            })
+
                         },
                         error => {
                             // See error code charts below.
@@ -625,7 +626,7 @@ export default function TicketForm({ navigation }) {
                         is_win_to: false,
                         is_print: false,
                         is_deleted: false,
-                        timestamp: moment().tz("Asia/Manila").toISOString(),
+                        timestamp: new Date().toISOString(),
                         game_time: time,
                         print_copy: 0,
                         input_type: 'normal',
@@ -637,45 +638,8 @@ export default function TicketForm({ navigation }) {
                         created_at: moment().tz("Asia/Manila").toISOString(),
                         updated_at: moment().tz("Asia/Manila").toISOString()
                     }
-
-                    
-                    let placedBet = await api.createBetting(newBet)
-                    
-                    
-                    console.log(placedBet, 'PLACEDD BETSS')
-                    
-                    // await syncBettings()
-                // await realm.write(async () => {
-
-
-                //     let betCreated = new Betting(realm, {
-                //         // amount: data.amount,
-                //         // gameTime: data.gameTime,
-                //         ramble: Number(totalRamble),
-                //         straight: Number(totalStraight),
-                //         isComplete: false,
-                //         owner_id: String(selectedUser._id),
-                //         gross: Number(gross),
-                //         net: Number(netTotal),
-                //         ticketNo: `${generateTicketNumber()}`,
-                //         collector: selectedUser.firstName,
-                //         is_win_to: false,
-                //         isPrint: false,
-                //         isDeleted: false,
-                //         timestamp: date,
-                //         gameTime: time,
-                //         printCopy: 0,
-                //         contact: selectedUser.mobile,
-                //         // betType: 'straight',
-                //         winning: 0,
-                //         combinations: combinations,
-                //         commissions: newComms,
-                //         uplines: newUplines
-                //     })
-
-
-
-                        console.log('Navigate')
+                    console.log('Navigate')
+                    await api.createBetting(newBet)
                     setLoading(false)
                     setSelectedTab('keypads')
                     setBetting([]);
@@ -695,29 +659,8 @@ export default function TicketForm({ navigation }) {
     }, [collector, draws, arrayBetting])
 
     function removeItemByRamble(data) {
-
-
-
         let dataList = arrayBetting.filter(item => item?.id !== data.id);
         setBetting(dataList);
-
-
-        // const itemComb = realm.objects(Combinations).filtered(
-        //     'digit == $0',
-        //     data.combination);
-
-
-        // let totalS = itemComb[0].straight_total - Number(data.amountTarget);
-        // let totalR = itemComb[0].ramble_total - Number(data.amountRamble);
-
-
-
-        // realm.write(() => {
-        //     itemComb[0].straight_total = Number(totalS) < 0 ? 0 : Number(totalS);
-        //     itemComb[0].ramble_total = Number(totalR) < 0 ? 0 : Number(totalR);
-        // });
-
-        // console.log(dataList);
     }
 
     const handleBackspace = () => {
@@ -952,7 +895,9 @@ export default function TicketForm({ navigation }) {
 
     let curDraw = (draws.find(a => !a.combination) || ((hoursNow == 13 && minNow >= 55) || (hoursNow == 16 && minNow >= 55) || (hoursNow == 20 && minNow >= 55)));
 
-console.log(is2pmDisabled, is5pmDisabled, is9pmDisabled)
+    console.log(`Current Draw:, ${JSON.stringify(curDraw)},\n2PM DRAW:${is2pmDisabled},\n5PM DRAW:${is5pmDisabled},\n9PM DRAW:${is9pmDisabled}`)
+
+    console.log(closeDraw, "CLOSE DRAW?")
 
 
     return (
@@ -982,7 +927,7 @@ console.log(is2pmDisabled, is5pmDisabled, is9pmDisabled)
                         }}>
                         <TouchableOpacity
                             onLongPress={() => handleTimeZone()}
-                            onPress={() => user?.isAdmin ? setShowDate(true) : console.log('Not Admin')}
+                            onPress={() => user?.is_admin ? setShowDate(true) : console.log('Not Admin')}
                         >
                             <Image
                                 source={icons.clock}
@@ -1246,7 +1191,6 @@ console.log(is2pmDisabled, is5pmDisabled, is9pmDisabled)
                                     {keyPad.map(renderButton)}
                                     <View style={{ width: '100%', alignItems: 'center', flexDirection: 'row', justifyContent: 'space-around', backgroundColor: COLORS.transparent, marginTop: 10 }}>
                                         {!curDraw ?
-
                                             <TouchableOpacity
                                                 disabled={combinationString.length < 3 && !arrayBetting.length ? true : false}
                                                 onPress={() =>
@@ -1275,6 +1219,7 @@ console.log(is2pmDisabled, is5pmDisabled, is9pmDisabled)
                                                     style={{ padding: 10, elevation: 6, borderRadius: 50, borderWidth: 1, backgroundColor: COLORS.darkgray, borderColor: '#4ba643', width: '90%', padding: 10, alignItems: 'center', justifyContent: 'center' }}>
                                                     <Text style={{ fontWeight: 'bold', fontSize: 22, color: COLORS.white }}>CUT-OFF</Text>
                                                 </TouchableOpacity>
+                                            
                                         }
                                     </View>
                                 </View>

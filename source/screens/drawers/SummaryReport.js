@@ -26,34 +26,6 @@ const SummaryReport = ({ navigation }) => {
   // const [user, setUser] = useState(null);
   const [items, setItems] = useState([]);
   const ownUser = selectedUser?.id ? selectedUser?.id : user?.id
-  // Fetch user from SQLite or Supabase
-  // useEffect(() => {
-  //   const fetchUser = async () => {
-  //     // First, check local SQLite
-  //     db.transaction(tx => {
-  //       tx.executeSql(
-  //         `SELECT * FROM Users WHERE email = ? LIMIT 1`,
-  //         [collector],
-  //         (_, { rows }) => {
-  //           if (rows.length > 0) setUser(rows._array[0]);
-  //         },
-  //         (_, error) => console.log('SQLite user fetch error:', error)
-  //       );
-  //     });
-
-  //     // Optionally, sync from Supabase
-  //     const { data: userData, error } = await supabase
-  //       .from('Users')
-  //       .select('*')
-  //       .eq('email', collector)
-  //       .limit(1)
-  //       .single();
-  //     if (userData) setUser(userData);
-  //   };
-  //   fetchUser();
-  // }, [collector]);
-
-  // Memoized config values
   const isWin200 = useMemo(() => getConfiguration(user, 'withWin200')?.isCheck, [user]);
   const win200Value = useMemo(() => getConfiguration(user, 'withWin200')?.value, [user]);
   const winStraightValue = useMemo(() => getConfiguration(user, 'winStraight')?.value, [user]);

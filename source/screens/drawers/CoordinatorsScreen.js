@@ -6,71 +6,39 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import moment from 'moment-timezone';
 import NetInfo from "@react-native-community/netinfo";
 // import { supabase } from '../../lib/supabaseClient'; // 🔹 your Supabase client
-import { executeSql } from '../../utils/db';
 import supabase from '../../utils/supabaseClient';
 import { COLORS, icons } from '../../constants';
+import { useOffline } from '../../context/OfflineProvider';
 
 const CoordinatorsScreen = ({ navigation }) => {
   const dispatch = useDispatch();
+    const { api } = useOffline();
   const { collector, user, selectedUser } = useSelector(({ user }) => user);
 
   const [usersCoord, setUsersCoord] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const userNow = selectedUser ? selectedUser : collector;
 
   const today = moment().tz('Asia/Manila').toDate();
 
-  // 🔹 Fetch coordinators (Supabase online / SQLite offline)
-  const fetchCoordinators = async () => {
-    try {
-      const userNow = selectedUser ? selectedUser : collector;
+const fetchCoordinators = async () => {
+  let filters = {};
 
-      console.log(userNow, "THE USER NOW")
+  filters.is_deleted = false;
+  filters.role = 'coordinator';
+  filters.referral = userNow.id;
 
-      // check connectivity
-      const net = await NetInfo.fetch();
+  const localCoordinators = await api.listUsers({
+    filters: filters
+  });
+  console.log(userNow, "LOCAL COORDINATORS")
 
-      if (net.isConnected) {
-        // ✅ Online → fetch from Supabase
-        const { data, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('is_deleted', false)
-          .eq('role', 'coordinator')
-          .eq('referral', userNow)
-          .order('email', { ascending: false });
+  if (localCoordinators) {
+    setUsersCoord(localCoordinators);
+  }
+  
+}
 
-        if (error) throw error;
-
-        setUsersCoord(data || []);
-
-        // also update SQLite cache
-        if (data && data.length > 0) {
-          await executeSql("DELETE FROM users WHERE role = 'coordinator' AND referral = ?", [userNow]);
-          for (let u of data) {
-            await executeSql(
-              `INSERT OR REPLACE INTO users 
-                (id, email, address, role, referral, is_deleted) 
-               VALUES (?, ?, ?, ?, ?, ?)`,
-              [u.id, u.email, u.address, u.role, u.referral, u.is_deleted ? 1 : 0]
-            );
-          }
-        }
-      } else {
-        // 🚫 Offline → fallback to SQLite
-        const result = await executeSql(
-          "SELECT * FROM users WHERE is_deleted = 0 AND role = 'coordinator' AND referral = ? ORDER BY email ASC",
-          [userNow]
-        );
-        const rows = [];
-      for (let i = 0; i < result.rows.length; i++) {
-          rows.push(result.rows.item(i));
-        }
-        setUsersCoord(rows);
-      }
-    } catch (err) {
-      console.error("Error fetching coordinators:", err);
-    }
-  };
 
   const handleSearch = (query) => {
     setSearchQuery(query);
@@ -121,7 +89,7 @@ const CoordinatorsScreen = ({ navigation }) => {
 
   // 🔹 Navigate to View User
   const handleDoublePress = (val) => {
-    if (user && user.isAdmin) {
+    if (user && user.is_admin) {
       navigation.navigate('View User', JSON.stringify(val));
     } else {
       console.log('Not Admin');
@@ -136,7 +104,7 @@ const CoordinatorsScreen = ({ navigation }) => {
         .select('*')
         .eq('is_deleted', false)
         .eq('recepient', recepientId)
-        .eq('createdBy', user?._id);
+        .eq('created_by', user?.id);
 
       if (error) throw error;
 
@@ -160,7 +128,7 @@ const CoordinatorsScreen = ({ navigation }) => {
         entering={FadeInDown.delay(index * 100).duration(500)} // Staggered animation
       >
         <TouchableOpacity
-          onLongPress={() => (user && user.isAdmin) ? handleDoublePress(item) : console.log('Not Admin')}
+          onLongPress={() => (user && user.is_admin) ? handleDoublePress(item) : console.log('Not Admin')}
           onPress={() => handleSelectCollector(item)}
           style={{
             paddingVertical: 1,
@@ -198,7 +166,7 @@ const CoordinatorsScreen = ({ navigation }) => {
           >
             <TouchableOpacity
               style={{ paddingHorizontal: 10 }}
-              onPress={() => handleMessageNavigation(item._id)}
+              onPress={() => handleMessageNavigation(item.id)}
             >
               <Image
                 source={icons.send_message}
@@ -224,6 +192,9 @@ const CoordinatorsScreen = ({ navigation }) => {
       )
     : filteredList;
 
+
+
+    console.log(usersCoord, "usersCoordusersCoordusersCoordusersCoordusersCoordusersCoord")
   return (
     <View style={{ flex: 1, padding: 10, backgroundColor: COLORS.gray300 }}>
       {renderSearchInput()}

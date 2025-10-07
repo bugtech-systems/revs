@@ -494,7 +494,7 @@ const [inputType, setInputType] = useState('Expense');
                     exiting={FadeOutDown.delay(index * 100).duration(500)}
                 >
                     <TouchableOpacity
-                        onLongPress={() => user.isAdmin && console.log(item, "ON LONG PRESS DUDE.")}
+                        onLongPress={() => user.is_admin && console.log(item, "ON LONG PRESS DUDE.")}
                         onPress={() => handleViewModal(item)}
                         style={{
                             paddingLeft: 10,

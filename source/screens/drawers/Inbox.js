@@ -1,6 +1,6 @@
-import { 
-  FlatList, SafeAreaView, StyleSheet, Image, Text, 
-  TextInput, TouchableOpacity, View, RefreshControl 
+import {
+  FlatList, SafeAreaView, StyleSheet, Image, Text,
+  TextInput, TouchableOpacity, View, RefreshControl
 } from 'react-native';
 import React, { useEffect, useState, useCallback } from 'react';
 import moment from 'moment-timezone';
@@ -9,12 +9,13 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import SQLite from 'react-native-sqlite-storage';
 import supabase from '../../utils/supabaseClient';
 import { COLORS, icons, SIZES } from '../../constants';
+import { useOffline } from '../../context/OfflineProvider';
 
 // Open SQLite
-const db = SQLite.openDatabase({ name: 'local.db', location: 'default' });
 
 const Inbox = ({ navigation }) => {
   const { user } = useSelector(({ user }) => user);
+  const { api, dataVersion } = useOffline()
 
   const [searchQuery, setSearchQuery] = useState('');
   const [messages, setMessages] = useState([]);
@@ -23,90 +24,120 @@ const Inbox = ({ navigation }) => {
   // -------------------------------
   // Fetch messages from SQLite
   // -------------------------------
-  const fetchMessages = useCallback(() => {
-    db.transaction(tx => {
-      tx.executeSql(
-        `
-        SELECT * FROM messages
-        WHERE isDeleted = 0 
-        AND (createdBy = ? OR recepient = ?)
-        ORDER BY updated_at DESC
-        `,
-        [String(user?.id), String(user?.id)],
-        (txObj, { rows }) => {
-          let data = [];
-          for (let i = 0; i < rows.length; i++) {
-            data.push(rows.item(i));
-          }
-          setMessages(data);
-        }
-      );
-    });
-  }, [user]);
+  // const fetchMessages = useCallback(() => {
+  //   db.transaction(tx => {
+  //     tx.executeSql(
+  //       `
+  //       SELECT * FROM messages
+  //       WHERE isDeleted = 0 
+  //       AND (createdBy = ? OR recepient = ?)
+  //       ORDER BY updated_at DESC
+  //       `,
+  //       [String(user?.id), String(user?.id)],
+  //       (txObj, { rows }) => {
+  //         let data = [];
+  //         for (let i = 0; i < rows.length; i++) {
+  //           data.push(rows.item(i));
+  //         }
+  //         setMessages(data);
+  //       }
+  //     );
+  //   });
+  // }, [user]);
 
   // -------------------------------
   // Sync from Supabase -> SQLite
   // -------------------------------
-  const syncWithSupabase = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select(`
-          id, createdBy, recepient, recepientName, updated_at, isDeleted,
-          conversations (id, owner_id, message, created_at, isViewed)
-        `)
-        .or(`createdBy.eq.${user?.id}, recepient.eq.${user?.id}`)
-        .order('updated_at', { ascending: false });
+  // const syncWithSupabase = async () => {
+  //   try {
+  //     const { data, error } = await supabase
+  //       .from('messages')
+  //       .select(`
+  //         id, createdBy, recepient, recepientName, updated_at, isDeleted,
+  //         conversations (id, owner_id, message, created_at, isViewed)
+  //       `)
+  //       .or(`createdBy.eq.${user?.id}, recepient.eq.${user?.id}`)
+  //       .order('updated_at', { ascending: false });
 
-      if (error) throw error;
+  //     if (error) throw error;
 
-      db.transaction(tx => {
-        data.forEach(msg => {
-          tx.executeSql(
-            `INSERT OR REPLACE INTO messages 
-              (id, createdBy, recepient, recepientName, updated_at, isDeleted)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [
-              msg.id,
-              msg.createdBy,
-              msg.recepient,
-              msg.recepientName,
-              msg.updated_at,
-              msg.isDeleted ? 1 : 0,
-            ]
-          );
+  //     db.transaction(tx => {
+  //       data.forEach(msg => {
+  //         tx.executeSql(
+  //           `INSERT OR REPLACE INTO messages 
+  //             (id, createdBy, recepient, recepientName, updated_at, isDeleted)
+  //            VALUES (?, ?, ?, ?, ?, ?)`,
+  //           [
+  //             msg.id,
+  //             msg.createdBy,
+  //             msg.recepient,
+  //             msg.recepientName,
+  //             msg.updated_at,
+  //             msg.isDeleted ? 1 : 0,
+  //           ]
+  //         );
 
-          // store conversations in local table too
-          msg.conversations?.forEach(conv => {
-            tx.executeSql(
-              `INSERT OR REPLACE INTO conversations 
-                (id, message_id, owner_id, message, created_at, isViewed)
-               VALUES (?, ?, ?, ?, ?, ?)`,
-              [
-                conv.id,
-                msg.id,
-                conv.owner_id,
-                conv.message,
-                conv.created_at,
-                conv.isViewed ? 1 : 0,
-              ]
-            );
-          });
-        });
-      });
+  //         // store conversations in local table too
+  //         msg.conversations?.forEach(conv => {
+  //           tx.executeSql(
+  //             `INSERT OR REPLACE INTO conversations 
+  //               (id, message_id, owner_id, message, created_at, isViewed)
+  //              VALUES (?, ?, ?, ?, ?, ?)`,
+  //             [
+  //               conv.id,
+  //               msg.id,
+  //               conv.owner_id,
+  //               conv.message,
+  //               conv.created_at,
+  //               conv.isViewed ? 1 : 0,
+  //             ]
+  //           );
+  //         });
+  //       });
+  //     });
 
-      fetchMessages();
-    } catch (err) {
-      console.error('Supabase sync error:', err.message);
-    }
-  };
+  //     fetchMessages();
+  //   } catch (err) {
+  //     console.error('Supabase sync error:', err.message);
+  //   }
+  // };
 
   // -------------------------------
   // Initial load
   // -------------------------------
   useEffect(() => {
-    fetchMessages();
-    syncWithSupabase();
+    // fetchMessages();
+    // syncWithSupabase();
+// isDeleted == false && createdBy == $0 || recepient == $0 && recepient == $1 || createdBy == $1
+    async function load() {
+
+
+      const filters = {
+      is_deleted: false,
+      or: [
+        { created_by: user?.id, recepient: user?.id },
+        { created_by: user?.id, recepient: user?.id }
+      ]
+    };
+
+      const data = await api.listMessages({
+        filters: filters
+      })
+
+
+      console.log(data, "THE INBOX DATA!")
+
+      if (data) {
+        setMessages(data);
+      } else {
+        setMessages([]);
+      }
+      
+
+    }
+
+    load();
+
   }, []);
 
   const onRefresh = () => {
@@ -173,7 +204,7 @@ const Inbox = ({ navigation }) => {
             <View style={styles.lastMessageRow}>
               <Text style={styles.lastMessage}>
                 {/* This will require joining with conversations in SQLite */}
-                {`Last message...`} 
+                {`Last message...`}
               </Text>
               <Text style={styles.time}>
                 {moment(item.updated_at).startOf('minute').fromNow()}

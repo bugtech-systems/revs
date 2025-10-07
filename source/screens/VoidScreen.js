@@ -8,11 +8,13 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import WarningModal from '../components/WarningModal';
 import { COLORS, icons, SIZES } from '../constants';
 import TestScreen from './TestScreen';
+// import { useOffline } from '../context/OfflineProvider';
 import { api } from '../utils/offlineSync';
 
 
 const VoidScreen = ({ route, navigation, onPress }) => {
   const ticketDetails = JSON.parse(route.params);
+  // const { fetchUser, api, dataVersion } = useOffline();
   const dispatch = useDispatch();
   const [disableCancelButton, setDisableCancelButton] = useState(false);
   const [total, setTotal] = useState(0);
@@ -42,7 +44,7 @@ const VoidScreen = ({ route, navigation, onPress }) => {
       if (data?.owner_id !== String(user.id)) {
         Alert.alert("You can't delete someone else's task!");
       } else {
-        let ticketCreated = moment(data?.timestamp).tz('Asia/Manila'); // Set ticketCreated to Philippines timezone
+        let ticketCreated = moment(data?.created_at).tz('Asia/Manila'); // Set ticketCreated to Philippines timezone
         const ticketExpiry = ticketCreated.add(3, 'minutes');
         // Calculate time difference in minutes
         // const diffMinutes = currentTime.isAfter(ticketCreated, 'minutes');
@@ -65,8 +67,14 @@ const VoidScreen = ({ route, navigation, onPress }) => {
 
   const handleConfirmButton = useCallback(async (ticket) => {
     try {
-      console.log('DELETING TICKET', ticket)
-      await api.updateBetting(ticket.id, { is_deleted: true })
+      console.log('DELETING TICKET', ticket.id)
+      console.log('TRIGGER')
+      const update = await api.updateBetting(ticket.id, { is_deleted: true }).then(res => console.log(res)).catch(err => {
+        console.log(err, "THE ERR")
+      })
+
+
+      console.log(update, "UPDATE VARIABLE")
       setConfirmTecket(null);
       navigation.navigate('Play', {})
     } catch (error) {

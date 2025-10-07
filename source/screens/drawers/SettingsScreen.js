@@ -763,6 +763,7 @@ const SettingsScreen = ({ navigation }) => {
             <TouchableOpacity 
               style={{ 
                 paddingVertical: 1,
+                marginVertical: SIZES.padding / 2,
                 backgroundColor: '#ffffff',
                   elevation: 1,
                   padding: 10,
@@ -795,6 +796,42 @@ const SettingsScreen = ({ navigation }) => {
                 </Text>
 
             </TouchableOpacity>
+            {/* <TouchableOpacity 
+              style={{ 
+                paddingVertical: 1,
+                marginVertical: SIZES.padding / 2,
+                backgroundColor: '#ffffff',
+                  elevation: 1,
+                  padding: 10,
+                  paddingVertical: 14,
+                  borderTopRightRadius: 12,
+                  borderTopLeftRadius: 12,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'flex-start',
+                  borderBottomLeftRadius: 12,
+                  borderColor: COLORS.gray200,
+                  borderBottomRightRadius: 12,
+                  borderWidth: 1,
+                  // borderBottomWidth: 1,
+                  borderBottomColor: COLORS.gray600 
+              }} onPress={() => navigation.navigate('LocalData', {})}>
+
+                 <Image 
+                      source={icons.database}
+                      style={{
+                        height: 30,
+                        width: 30,
+                        tintColor: COLORS.secondary,
+                        resizeMode: 'contain',
+                      }}
+                    />
+
+                <Text style={{ fontSize: 18, color: COLORS.secondary, fontWeight: 'bold', paddingHorizontal: 10 }}>
+                  Local Data
+                </Text>
+
+            </TouchableOpacity> */}
           </View>
           {height < 600 &&
 

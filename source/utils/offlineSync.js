@@ -87,6 +87,9 @@ function ensureDB() {
   return db;
 }
 
+
+
+
 /**
  * runSql: wrapper to execute SQL and return a Promise with the result
  * ensures db is opened and handles errors consistently.
@@ -321,35 +324,35 @@ async function createTablesIfNotExists() {
   );
 
 //   // messages
-//   await runSql(
-//     `CREATE TABLE IF NOT EXISTS messages (
-//       id TEXT PRIMARY KEY,
-//       created_by TEXT,
-//       recepient TEXT,
-//       recepient_name TEXT,
-//       conversations TEXT,
-//       is_deleted INTEGER DEFAULT 0,
-//       created_at TEXT NOT NULL,
-//       updated_at TEXT NOT NULL
-//     );`
-//   );
+  await runSql(
+    `CREATE TABLE IF NOT EXISTS messages (
+      id TEXT PRIMARY KEY,
+      created_by TEXT,
+      recepient TEXT,
+      recepient_name TEXT,
+      conversations TEXT,
+      is_deleted INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );`
+  );
 
 //   // cashflow
-//   await runSql(
-//     `CREATE TABLE IF NOT EXISTS cashflow (
-//       id TEXT PRIMARY KEY,
-//       amount TEXT DEFAULT '0',
-//       description TEXT NOT NULL,
-//       input_type TEXT NOT NULL,
-//       is_deleted INTEGER DEFAULT 0,
-//       owner TEXT NOT NULL,
-//       owner_name TEXT,
-//       user TEXT NOT NULL,
-//       updated_by TEXT,
-//       created_at TEXT NOT NULL,
-//       updated_at TEXT NOT NULL
-//     );`
-//   );
+  await runSql(
+    `CREATE TABLE IF NOT EXISTS cashflow (
+      id TEXT PRIMARY KEY,
+      amount TEXT DEFAULT '0',
+      description TEXT NOT NULL,
+      input_type TEXT NOT NULL,
+      is_deleted INTEGER DEFAULT 0,
+      owner TEXT NOT NULL,
+      owner_name TEXT,
+      user TEXT NOT NULL,
+      updated_by TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );`
+  );
 
   // sync_queue: holds operations to push to Supabase
   await runSql(
@@ -900,12 +903,12 @@ export async function forceSync() {
 let unsubscribeNetInfo = null;
 export function startAutoSyncOnReconnect(id) {
   if (unsubscribeNetInfo) return;
-  unsubscribeNetInfo = NetInfo.addEventListener((state) => {
+ /*  unsubscribeNetInfo = NetInfo.addEventListener((state) => {
     if (state.isConnected) {
       console.log('Device reconnected — running sync');
       syncWithSupabase(id).catch((e) => console.warn('Auto sync failed', e));
     }
-  });
+  }); */
 };
 
 export function stopAutoSyncOnReconnect(id) {

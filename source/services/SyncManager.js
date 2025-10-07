@@ -20,12 +20,12 @@ class SyncManager {
     this.appStateSubscription = null;
     
     // Setup app state listener
-    this.setupAppStateListener();
+    // this.setupAppStateListener();
   }
 
   setupAppStateListener() {
     // Use the new subscription API
-    this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange);
+    // this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange);
   }
 
   // Initialize sync manager after database is ready
@@ -711,7 +711,7 @@ console.log(result, "RESULLT", item.id)
       if (result.rows.length > 0) {
         const data = JSON.parse(result.rows[0].value);
         // Only return IDs from the last 7 days to ensure data freshness but allow some history
-        const sevenDaysAgo = Date.now() - (1 * 24 * 60 * 60 * 1000);
+        const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
         if (data.timestamp > sevenDaysAgo) {
           return data.ids || [];
         }

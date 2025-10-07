@@ -268,7 +268,7 @@ const CashFlow = ({ navigation }) => {
                 >
                     <TouchableOpacity
                         onLongPress={() => {
-                            if (user.isAdmin) {
+                            if (user.is_admin) {
                                 handleLongPress(item)
                             }
                         }}

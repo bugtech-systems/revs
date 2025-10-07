@@ -3,13 +3,13 @@ import React from 'react'
 import { COLORS } from '../constants'
 import moment from 'moment-timezone'
 import { getConfiguration } from '../utils/helpers'
-import { Users } from '../Models'
+// import { Users } from '../Models'
 import { useSelector } from 'react-redux'
 
-import { realmContext } from '../RealmContext'
+// import { realmContext } from '../RealmContext'
 import { BarcodeCreatorView, BarcodeFormat } from 'react-native-barcode-creator'
 
-const { useRealm, useQuery } = realmContext;
+// const { useRealm, useQuery } = realmContext;
 
 
 const testData = 
@@ -18,13 +18,14 @@ const testData =
 
 const Receipt = () => {
     const { user } = useSelector(({user}) => user);
+    const [users, setUsers] = useState([]);
     
-        const users = useQuery(Users, doc => {
-            return doc.filtered(
-              'email == $0',
-              user?.email
-            );
-          }, [user])
+        // const users = useQuery(Users, doc => {
+        //     return doc.filtered(
+        //       'email == $0',
+        //       user?.email
+        //     );
+        //   }, [user])
 
     
 

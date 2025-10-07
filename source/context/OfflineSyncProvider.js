@@ -1,6 +1,5 @@
 // src/contexts/OfflineSyncContext.js
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-import NetInfo from "@react-native-community/netinfo";
 import DatabaseService from "../services/DatabaseService";
 import SyncManager from "../services/SyncManager";
 import SupabaseService from "../services/SupabaseService";
@@ -386,7 +385,7 @@ const localQuery = async (tableName, params = {}) => {
   try {
     const result = await DatabaseService.executeQuery(sql, values);
     
-    // console.log(result, )
+    console.log(result, 'LOCALLS')
     console.log(result.rows.map(record => normalizeRecordFromSQLite(tableName, record)),'LOCALL QUERYSS')
     return result.rows.map(record => normalizeRecordFromSQLite(tableName, record));
     
@@ -423,6 +422,7 @@ const fastResponseQuery = async (tableName, params = {}) => {
   console.log(`📱 Querying ${tableName} from local storage...`, !SupabaseService.isConnected());
   const localData = await localQuery(tableName, params);
   
+  console.log(localData, 'LOCAL DATA')
   // 2. If online, sync remote data in background
   if (SupabaseService.isConnected()) {
     syncRemoteDataInBackground(tableName, 'query', params);
