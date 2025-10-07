@@ -86,6 +86,9 @@ function ensureDB() {
   return db;
 }
 
+
+
+
 /**
  * runSql: wrapper to execute SQL and return a Promise with the result
  * ensures db is opened and handles errors consistently.
