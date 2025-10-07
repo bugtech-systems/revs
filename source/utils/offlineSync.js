@@ -86,31 +86,6 @@ function ensureDB() {
   return db;
 }
 
-
-// ✅ Execute SQL queries safely
-export const executeSql = async (query, params = []) => {
-  try {
-    const [results] = await db.executeSql(query, params);
-    return results;
-  } catch (error) {
-    console.error('SQLite query error:', error);
-    throw error;
-  }
-};
-
-// ✅ Helper to read rows easily
-export const getRows = (results) => {
-  if (!results || results.length === 0) return [];
-
-  const rows = results[0].rows;
-  const data = [];
-  for (let i = 0; i < rows.length; i++) {
-    data.push(rows.item(i));
-  }
-  return data;
-};
-
-
 /**
  * runSql: wrapper to execute SQL and return a Promise with the result
  * ensures db is opened and handles errors consistently.
