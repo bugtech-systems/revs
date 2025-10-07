@@ -516,6 +516,11 @@ async function localUpdate(tableName, id, patch) {
   const existing = res.rows.item(0);
   const updated = { ...existing, ...patch, updated_at: nowISO() };
 
+
+
+  console.log(patch, "UPDATING")
+  
+  
   // JSON fields stringify
   if (tableName === 'users') {
     updated.configuration = toJsonText(parseJsonText(updated.configuration) ?? updated.configuration ?? []);
@@ -732,7 +737,7 @@ async function pullFromSupabase(userId) {
 
     // Handle deleted records
     if (remoteRow.is_deleted) {
-      await runSql(`DELETE FROM ${tableName} WHERE id = ?`, [remoteRow.id]);
+      await runSql(`DELETE FROM ${table} WHERE id = ?`, [remoteRow.id]);
       continue;
     }
 

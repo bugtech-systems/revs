@@ -66,11 +66,13 @@ export const mapUsers = require('../../assets/icons/map_users.png')
 export const testPrint = require('../../assets/icons/test_print.png')
 export const android = require('../../assets/icons/android.png')
 export const configuration = require('../../assets/icons/configuration.png')
+export const database = require('../../assets/icons/database.png')
 
 
 
 
 export default {
+    database,
     configuration,
     android,
     testPrint,

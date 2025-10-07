@@ -57,18 +57,14 @@ import RawbtApi,
 
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import moment from 'moment-timezone'
-import { realmContext } from '../RealmContext'
-import { Betting, Draws, Users, Combinations } from '../Models';
 import { getConfiguration } from '../utils/helpers'
 import { COLORS, SIZES } from '../constants/theme';
 import { useDispatch, useSelector } from 'react-redux';
 import { SET_LOADING, STOP_LOADING } from '../redux/actions/types';
 import { DocumentDirectoryPath, downloadFile, writeFile, readDir, stat, readFile, unlink } from 'react-native-fs';
-// import { BSON } from 'realm';
 import { BarcodeCreatorView, BarcodeFormat } from 'react-native-barcode-creator';
 import { useOffline } from '../context/OfflineProvider';
 
-const { useRealm, useQuery } = realmContext;
 const { ReactNativeLoading } = NativeModules;
 
 // --------------------------------
@@ -189,50 +185,50 @@ export default function TestScreen({ data, isPrint, onPrint }) {
     // }
 
     const handlePrint = async () => {
-  setPrintCount(prev => prev + 1);
-  dispatch({ type: SET_LOADING });
+        setPrintCount(prev => prev + 1);
+        dispatch({ type: SET_LOADING });
 
-  const tryCapture = async () => {
-    try {
-      let printHeader = getConfiguration(selectedUser, 'printHeader');
-      const filePath = `${DocumentDirectoryPath}/bwlogo1.png`;
-      const loadImage = Image.resolveAssetSource({ uri: `https://sharewin.pro/apiv2/assets/bwlogo1.png` }).uri;
+        const tryCapture = async () => {
+            try {
+                let printHeader = getConfiguration(selectedUser, 'printHeader');
+                const filePath = `${DocumentDirectoryPath}/bwlogo1.png`;
+                const loadImage = Image.resolveAssetSource({ uri: `https://sharewin.pro/apiv2/assets/bwlogo1.png` }).uri;
 
-      const uri = await viewShotRef.current.capture();
-      const base64StringImage = await RawbtApi.getImageBase64String(loadImage);
-      const base64String = await RawbtApi.getImageBase64String(uri);
+                const uri = await viewShotRef.current.capture();
+                const base64StringImage = await RawbtApi.getImageBase64String(loadImage);
+                const base64String = await RawbtApi.getImageBase64String(uri);
 
-      let job = new RawBTPrintJob();
-      if (printHeader.isCheck && String(selectedUser?.receiptTemplate).toLowerCase() != 'samar') {
-        job.image(base64StringImage, new AttributesImage(ALIGNMENT_CENTER, 16));
-      }
-      job.image(base64String);
-      job.cut();
+                let job = new RawBTPrintJob();
+                if (printHeader.isCheck && String(selectedUser?.receiptTemplate).toLowerCase() != 'samar') {
+                    job.image(base64StringImage, new AttributesImage(ALIGNMENT_CENTER, 16));
+                }
+                job.image(base64String);
+                job.cut();
 
-      await RawbtApi.printJob(job.GSON());
+                await RawbtApi.printJob(job.GSON());
 
- 
 
-      onPrint();
-    } catch (err) {
-      showError(err.message);
-    } finally {
-      dispatch({ type: STOP_LOADING });
-    }
-  };
 
-  // Wait until layout is ready
-  if (viewHeight === 0) {
-    const interval = setInterval(() => {
-      if (viewHeight !== 0) {
-        clearInterval(interval);
-        tryCapture();
-      }
-    }, 100); // poll every 100ms
-  } else {
-    tryCapture();
-  }
-};
+                onPrint();
+            } catch (err) {
+                showError(err.message);
+            } finally {
+                dispatch({ type: STOP_LOADING });
+            }
+        };
+
+        // Wait until layout is ready
+        if (viewHeight === 0) {
+            const interval = setInterval(() => {
+                if (viewHeight !== 0) {
+                    clearInterval(interval);
+                    tryCapture();
+                }
+            }, 100); // poll every 100ms
+        } else {
+            tryCapture();
+        }
+    };
 
     const samarPrint = async ({ data, gameTime, collectorDetails }) => {
         let bets = [];
@@ -250,7 +246,7 @@ export default function TestScreen({ data, isPrint, onPrint }) {
             let job = new RawBTPrintJob();
 
             // Destructure the bets with type Ramble and Target
-            const mapData = data?.combinations.map((item) => {
+            const mapData = datamounta?.combinations.map((item) => {
                 if (item?.rambleAmount && item?.targetAmount) {
                     let newObj1 = {
                         combination: item?.combination,
@@ -308,7 +304,7 @@ export default function TestScreen({ data, isPrint, onPrint }) {
             job.println("Eastern Samar, Ph", attrSmall);
             job.drawLine('-');
 
-            job.leftRightText(`${"Transaction ID:"}`, `${data?.ticketNo}`)
+            job.leftRightText(`${"Transaction ID:"}`, `${data?.ticket_no}`)
             job.leftRightText(`${"Draw Date:"}`, `${moment(moment().toDate()).format('MM/DD/YYYY')}`)
             job.println(`Agent Code: ${agentCode}`, attrSmallLeft);
             job.println(`Agent Name: ${data?.collector}`, attrSmallLeft);
@@ -340,11 +336,11 @@ export default function TestScreen({ data, isPrint, onPrint }) {
             RawbtApi.printJob(job.GSON())
                 .then(() => {
                     console.log('NAG PRINT NAG SUCCESS!!!')
-     /*                realm.write(() => {
-                        item.isPrint = true;
-                        item.printCopy = (item.printCopy ?? 0) + 1;
-                    }); */
-                    
+                    /*                realm.write(() => {
+                                       item.isPrint = true;
+                                       item.printCopy = (item.printCopy ?? 0) + 1;
+                                   }); */
+
                     onPrint();
                 })
                 .catch((err) => {
@@ -353,7 +349,6 @@ export default function TestScreen({ data, isPrint, onPrint }) {
                 );
 
 
-            console.log(item.printCopy, "THE PRINT COPY NOW!")
 
             dispatch({ type: STOP_LOADING })
         } catch (err) {
@@ -376,7 +371,7 @@ export default function TestScreen({ data, isPrint, onPrint }) {
     }, [])
 
 
-console.log(data.combinations.length, 'THE VIEW HEIGHT')
+    console.log(data.combinations.length, 'THE VIEW HEIGHT')
 
 
     return (
@@ -407,8 +402,8 @@ console.log(data.combinations.length, 'THE VIEW HEIGHT')
                                             borderStyle: 'dashed'
                                         }}
                                     >
-                                        <Text style={{...styles.fontStyles2, fontSize: 18, fontWeight: 'normal'}}>FELECITY GAMES & AMUSEMENT CORP.</Text>
-                                        <Text style={{...styles.fontStyles2, fontSize: 18, fontWeight: 'normal'}}>Eastern Samar, Ph</Text>
+                                        <Text style={{ ...styles.fontStyles2, fontSize: 18, fontWeight: 'normal' }}>FELECITY GAMES & AMUSEMENT CORP.</Text>
+                                        <Text style={{ ...styles.fontStyles2, fontSize: 18, fontWeight: 'normal' }}>Eastern Samar, Ph</Text>
                                     </View>
 
                                     <View
@@ -422,19 +417,19 @@ console.log(data.combinations.length, 'THE VIEW HEIGHT')
                                         }}
                                     >
                                         <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between' }}>
-                                            <Text style={{...styles.fontStyles2, fontSize: 18, fontWeight: 'normal'}}>Transaction ID:</Text>
-                                            <Text style={{...styles.fontStyles2, fontSize: 18, fontWeight: 'normal'}}>1231232</Text>
+                                            <Text style={{ ...styles.fontStyles2, fontSize: 18, fontWeight: 'normal' }}>Transaction ID:</Text>
+                                            <Text style={{ ...styles.fontStyles2, fontSize: 18, fontWeight: 'normal' }}>1231232</Text>
                                         </View>
 
 
                                         <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between' }}>
-                                            <Text style={{...styles.fontStyles2, fontSize: 18, fontWeight: 'normal'}}>Draw Date:</Text>
-                                            <Text style={{...styles.fontStyles2, fontSize: 18, fontWeight: 'normal'}}>{moment().format('MM/DD/YYYY')}</Text>
+                                            <Text style={{ ...styles.fontStyles2, fontSize: 18, fontWeight: 'normal' }}>Draw Date:</Text>
+                                            <Text style={{ ...styles.fontStyles2, fontSize: 18, fontWeight: 'normal' }}>{moment().format('MM/DD/YYYY')}</Text>
                                         </View>
-                                        <View style={{ width: '100%'}}>
-                                            <Text style={{...styles.fontStyles2, fontSize: 18, textAlign: 'left', fontWeight: 'normal'}}>Agent Code: RV-0036</Text>
-                                            <Text style={{...styles.fontStyles2, fontSize: 18, textAlign: 'left', fontWeight: 'normal'}}>Agent Name: Revs</Text>
-                                            <Text style={{...styles.fontStyles2, fontSize: 18, textAlign: 'left', fontWeight: 'normal'}}>Printed: {moment().format('MM/DD/YYYY hh:mm:ss A')}</Text>
+                                        <View style={{ width: '100%' }}>
+                                            <Text style={{ ...styles.fontStyles2, fontSize: 18, textAlign: 'left', fontWeight: 'normal' }}>Agent Code: RV-0036</Text>
+                                            <Text style={{ ...styles.fontStyles2, fontSize: 18, textAlign: 'left', fontWeight: 'normal' }}>Agent Name: Revs</Text>
+                                            <Text style={{ ...styles.fontStyles2, fontSize: 18, textAlign: 'left', fontWeight: 'normal' }}>Printed: {moment().format('MM/DD/YYYY hh:mm:ss A')}</Text>
                                         </View>
                                     </View>
 
@@ -444,15 +439,15 @@ console.log(data.combinations.length, 'THE VIEW HEIGHT')
                                         </View>
 
                                         <View style={{ width: '25%', justifyContent: 'center' }}>
-                                            <Text style={{...styles.fontStyles2, fontSize: 18, textAlign: 'center', fontWeight: 'normal'}}>COMB.</Text>
+                                            <Text style={{ ...styles.fontStyles2, fontSize: 18, textAlign: 'center', fontWeight: 'normal' }}>COMB.</Text>
                                         </View>
 
                                         <View style={{ width: '25%', justifyContent: 'right' }}>
-                                            <Text style={{...styles.fontStyles2, fontSize: 18, textAlign: 'center', fontWeight: 'normal'}}>BET</Text>
+                                            <Text style={{ ...styles.fontStyles2, fontSize: 18, textAlign: 'center', fontWeight: 'normal' }}>BET</Text>
                                         </View>
 
                                         <View style={{ width: '25%' }}>
-                                            <Text style={{ ...styles.fontStyles2, fontSize: 18, textAlign: 'left', fontWeight: 'normal'}}>WIN</Text>
+                                            <Text style={{ ...styles.fontStyles2, fontSize: 18, textAlign: 'left', fontWeight: 'normal' }}>WIN</Text>
                                         </View>
                                     </View>
 
@@ -487,18 +482,18 @@ console.log(data.combinations.length, 'THE VIEW HEIGHT')
                                                                     <View style={{ flexDirection: 'row', width: '100%' }}>
                                                                         <View style={{ width: '25%' }}>
                                                                             <Text style={{ ...styles.fontStyles2, fontSize: 18, fontWeight: 'normal', textAlign: 'left' }}>
-                                                                                {String(data.gameTime).toUpperCase() + String('S3')}
+                                                                                {String(data.game_time).toUpperCase() + String('S3')}
                                                                                 {/* {String(testData?.gameTime).toUpperCase() + " " + String(data.betType).toLowerCase() == 'r' ? 'S3r' : 'S3'} */}
                                                                             </Text>
                                                                         </View>
                                                                         <View style={{ width: '25%' }}>
-                                                                            <Text style={{...styles.fontStyles2, fontSize: 18, fontWeight: 'normal', textAlign: 'right'}}>
+                                                                            <Text style={{ ...styles.fontStyles2, fontSize: 18, fontWeight: 'normal', textAlign: 'right' }}>
                                                                                 {val?.combination}
                                                                             </Text>
                                                                         </View>
 
                                                                         <View style={{ width: '20%' }}>
-                                                                            <Text style={{...styles.fontStyles2, fontSize: 18, fontWeight: 'normal', textAlign: 'right'}}>
+                                                                            <Text style={{ ...styles.fontStyles2, fontSize: 18, fontWeight: 'normal', textAlign: 'right' }}>
                                                                                 {val?.targetAmount}
                                                                             </Text>
                                                                         </View>
@@ -512,18 +507,18 @@ console.log(data.combinations.length, 'THE VIEW HEIGHT')
                                                                     <View style={{ flexDirection: 'row', width: '100%' }}>
                                                                         <View style={{ width: '25%' }}>
                                                                             <Text style={{ ...styles.fontStyles2, fontSize: 18, fontWeight: 'normal', textAlign: 'left' }}>
-                                                                                {String(data.gameTime).toUpperCase() + String('S3r')}
+                                                                                {String(data.game_time).toUpperCase() + String('S3r')}
                                                                                 {/* {String(testData?.gameTime).toUpperCase() + " " + String(data.betType).toLowerCase() == 'r' ? 'S3r' : 'S3'} */}
                                                                             </Text>
                                                                         </View>
-                                                                        <View style={{ width: '25%'}}>
-                                                                            <Text style={{...styles.fontStyles2, fontSize: 18, fontWeight: 'normal', textAlign: 'right'}}>
+                                                                        <View style={{ width: '25%' }}>
+                                                                            <Text style={{ ...styles.fontStyles2, fontSize: 18, fontWeight: 'normal', textAlign: 'right' }}>
                                                                                 {val?.combination}
                                                                             </Text>
                                                                         </View>
 
-                                                                        <View style={{ width: '20%'}}>
-                                                                            <Text style={{...styles.fontStyles2, fontSize: 18, fontWeight: 'normal', textAlign: 'right'}}>
+                                                                        <View style={{ width: '20%' }}>
+                                                                            <Text style={{ ...styles.fontStyles2, fontSize: 18, fontWeight: 'normal', textAlign: 'right' }}>
                                                                                 {val?.rambleAmount}
                                                                             </Text>
                                                                         </View>
@@ -541,22 +536,22 @@ console.log(data.combinations.length, 'THE VIEW HEIGHT')
                                                                 <>
                                                                     <View style={{ width: '25%' }}>
                                                                         <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 18, fontWeight: 'normal' }}>
-                                                                            {String(data.gameTime).toUpperCase() + String(val.betType == 'R' ? 'S3r' : 'S3')}
+                                                                            {String(data.game_time).toUpperCase() + String(val.betType == 'R' ? 'S3r' : 'S3')}
                                                                             {/* {String(testData?.gameTime).toUpperCase() + " " + String(data.betType).toLowerCase() == 'r' ? 'S3r' : 'S3'} */}
                                                                         </Text>
                                                                     </View>
                                                                     <View style={{ width: '25%' }}>
-                                                                        <Text style={{...styles.fontStyles2, fontSize: 18, textAlign: 'right', fontWeight: 'normal'}}>
+                                                                        <Text style={{ ...styles.fontStyles2, fontSize: 18, textAlign: 'right', fontWeight: 'normal' }}>
                                                                             {val?.combination}
                                                                         </Text>
                                                                     </View>
                                                                     <View style={{ width: '20%' }}>
-                                                                        <Text style={{...styles.fontStyles2, fontSize: 18, textAlign: 'right', fontWeight: 'normal'}}>
+                                                                        <Text style={{ ...styles.fontStyles2, fontSize: 18, textAlign: 'right', fontWeight: 'normal' }}>
                                                                             {val?.amount}
                                                                         </Text>
                                                                     </View>
                                                                     <View style={{ width: '30%' }}>
-                                                                        <Text style={{ ...styles.fontStyles2, textAlign: 'center', fontSize: 18, fontWeight: 'normal'}}>
+                                                                        <Text style={{ ...styles.fontStyles2, textAlign: 'center', fontSize: 18, fontWeight: 'normal' }}>
                                                                             {val?.amount * (val?.betType == 'R' ? withWin200?.value : winStraight?.value)}
                                                                         </Text>
                                                                     </View>
@@ -600,15 +595,15 @@ console.log(data.combinations.length, 'THE VIEW HEIGHT')
                             :
 
                             <ViewShot
-  ref={viewShotRef}
-  options={{ format: 'webm', quality: 0.8, width: 600, height: viewHeight + (30 * data.combinations.length) }}
-  style={{
-    position: 'absolute',
-    top: -9999,
-    left: -9999,
-    alignItems: 'center',
-  }}
->
+                                ref={viewShotRef}
+                                options={{ format: 'webm', quality: 0.8, width: 600, height: viewHeight + (30 * data.combinations.length) }}
+                                style={{
+                                    position: 'absolute',
+                                    top: -9999,
+                                    left: -9999,
+                                    alignItems: 'center',
+                                }}
+                            >
                                 {/* <WebView
 								// ref={webViewRef}
 								originWhitelist={['*']}
@@ -618,16 +613,16 @@ console.log(data.combinations.length, 'THE VIEW HEIGHT')
 							/> */}
                                 {/* <Barcode value={'123123'} format="PDF417" width={250} height={100} /> */}
 
- <View
-    onLayout={(e) => {
-      const { height } = e.nativeEvent.layout;
-      setViewHeight(height);
-    //   setReadyToCapture(true); // layout is ready
-    }}
-    style={{ width: '100%', alignItems: 'center', height: data?.combinations.length > 2 ? 750 : 550 }}
-  >
-{/* </View> */}
-                                {/* <View style={{ height: 500, width: '100%', flexDirection: 'column', alignItems: 'center' }}> */}
+                                <View
+                                    onLayout={(e) => {
+                                        const { height } = e.nativeEvent.layout;
+                                        setViewHeight(height);
+                                        //   setReadyToCapture(true); // layout is ready
+                                    }}
+                                    style={{ width: '100%', alignItems: 'center', height: data?.combinations.length > 2 ? 750 : 550 }}
+                                >
+                                    {/* </View> */}
+                                    {/* <View style={{ height: 500, width: '100%', flexDirection: 'column', alignItems: 'center' }}> */}
                                     {/* <View style={{ width: '100%', alignItems: 'center', justifyContent: 'center'}}>
 																			<Image
 																				source={{ uri: 'https://sharewin.pro/apiv2/assets/bwlogo1.png' }}
@@ -645,7 +640,7 @@ console.log(data.combinations.length, 'THE VIEW HEIGHT')
                                         </Text>
 
                                         <Text style={{ ...styles.fontStyles1, fontSize: 27, fontWeight: 'bold' }}>
-                                            {data.ticketNo}
+                                            {data.ticket_no}
                                         </Text>
 
                                     </View>
@@ -665,7 +660,7 @@ console.log(data.combinations.length, 'THE VIEW HEIGHT')
                                         </Text>
 
                                         <Text style={{ ...styles.fontStyles1, fontSize: 22, fontWeight: 'bold' }}>
-                                            Game: 3D - {String(data.gameTime).toUpperCase()}
+                                            Game: 3D - {String(data.game_time).toUpperCase()}
                                         </Text>
 
                                     </View>
@@ -691,7 +686,7 @@ console.log(data.combinations.length, 'THE VIEW HEIGHT')
                                         </View>
 
                                         <View style={{ width: '25%', borderRightWidth: .5, alignItems: 'center', justifyContent: 'center' }}>
-                                            <Text style={{ ...styles.fontStyles1, fontSize: 24, fontWeight: '600' , padding: 2}}>
+                                            <Text style={{ ...styles.fontStyles1, fontSize: 24, fontWeight: '600', padding: 2 }}>
                                                 STAT
                                             </Text>
                                         </View>
@@ -731,11 +726,11 @@ console.log(data.combinations.length, 'THE VIEW HEIGHT')
                                         </View>
                                     ))}
 
-                                    {/* <PDF417BarcodeGenerator data={data.ticketNo}/> */}
+                                    {/* <PDF417BarcodeGenerator data={data.ticket_no}/> */}
                                     <View style={{ width: '100%', alignItems: 'center', justifyContent: 'center' }}>
-                                        <BarcodeCreatorView value={`${data.ticketNo}`} format={BarcodeFormat.PDF417} width={350} height={120} foregroundColor={'#000000'} style={{ marginVertical: 10 }} />
+                                        <BarcodeCreatorView value={`${data.ticket_no}`} format={BarcodeFormat.PDF417} width={350} height={120} foregroundColor={'#000000'} style={{ marginVertical: 10 }} />
                                         <Text style={{ ...styles.fontStyles1, fontSize: 30 }}>
-                                            REF #: {data.ticketNo}
+                                            REF #: {data.ticket_no}
                                         </Text>
                                     </View>
                                 </View>
@@ -761,7 +756,7 @@ console.log(data.combinations.length, 'THE VIEW HEIGHT')
                             style={{ elevation: 10, shadowRadius: SIZES.radius, borderRadius: SIZES.radius, width: '100%' }}>
                             <LinearGradient colors={['#6599c3', '#3573a2', '#165894']} style={styles.linearGradient}>
                                 <Text style={styles.buttonText}>
-                                    {data?.printCopy > 1 ? 'REPRINT' : 'PRINT'}
+                                    {data?.print_copy > 1 ? 'REPRINT' : 'PRINT'}
                                 </Text>
                             </LinearGradient>
                         </TouchableOpacity>
