@@ -11,8 +11,11 @@ import { useSelector } from 'react-redux';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import SQLite from 'react-native-sqlite-storage';
 import { COLORS, icons } from '../../constants';
-import { formatNumberWithComma } from '../../utils/helpers';
+import { formatNumberWithComma, getConfiguration, getDayRange } from '../../utils/helpers';
 import supabase from '../../utils/supabaseClient';
+import { useOffline } from '../../context/OfflineProvider';
+import { Switch } from 'react-native';
+// import { api } from '../../utils/offlineSync';
 
 // Open SQLite database
 const db = SQLite.openDatabase({ name: 'local.db', location: 'default' });
@@ -25,8 +28,8 @@ const drawTimes = [
 ];
 
 const CancelledTickets = ({ navigation }) => {
-  const { collector, selectedUser } = useSelector(({ user }) => user);
-
+  const { collector, selectedUser, user } = useSelector(({ user }) => user);
+  const { api, dataVersion, bumpVersion } = useOffline();
   const [date, setDate] = useState(new Date());
   const [show, setShowDate] = useState(false);
   const [selectedTime, setSelectedTime] = useState(null);
@@ -34,97 +37,126 @@ const CancelledTickets = ({ navigation }) => {
   const [filteredData, setFilteredData] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [filterTime, setFilterTime] = useState(drawTimes[0].name);
+  const [includeAll, setIncludeAll] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const userNow = selectedUser ? selectedUser.id : user.id;
 
-  // --- Fetch Cancelled Tickets from SQLite ---
-  const fetchTickets = useCallback(() => {
-    const startOfDay = moment(date).startOf('day').toISOString();
-    const endOfDay = moment(date).endOf('day').toISOString();
+  // const { start_of_day, end_of_day  } = getDayRange(date);
 
-    db.transaction(tx => {
-      let sql = `
-        SELECT * FROM bettings
-        WHERE is_deleted = 1 
-        AND timestamp >= ? AND timestamp < ?
-      `;
-      let params = [startOfDay, endOfDay];
+// Local timezone start and end of day (if you prefer local)
+function startOfDayLocal(dateInput) {
+  const d = new Date(dateInput);
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
 
-      if (!collector?.isAdmin) {
-        sql += ` AND owner_id = ?`;
-        params.push(collector?.id); // assumes collector has `id`
-      }
+function endOfDayLocal(dateInput) {
+  const d = new Date(dateInput);
+  d.setHours(23, 59, 59, 999);
+  return d.toISOString();
+}
 
-      if (filterTime !== 'All Time') {
-        sql += ` AND game_time = ?`;
-        params.push(filterTime.toLowerCase());
-      }
+  
 
-      if (searchQuery) {
-        sql += ` AND ticketNo LIKE ?`;
-        params.push(`%${searchQuery}%`);
-      }
 
-      sql += ` ORDER BY timestamp DESC`;
+  // useEffect(() => {
+  //   const load = async () => {
+  //     try {
+  //       setLoading(true);
 
-      tx.executeSql(sql, params, (txObj, { rows }) => {
-        let data = [];
-        for (let i = 0; i < rows.length; i++) {
-          data.push(rows.item(i));
+  //       // Get start and end of selected day using moment
+  //       // const start_of_day = moment(date).startOf('day').toISOString();
+  //       // const end_of_day = moment(date).endOf('day').toISOString();
+
+  //       console.log('Date Range:', start_of_day, end_of_day);
+
+  //       // Filters for bettings belonging to the current user
+  //       // and not deleted, within the selected day
+  //       const filters = {
+  //         owner_id: user?.id,
+  //         is_deleted: true,
+  //         timestamp: { op: 'between', from: start_of_day, to: end_of_day },
+  //       };
+
+  //       console.log('Filters:', filters);
+
+  //       // Query local bettings with filtering + sorting
+  //       const localBettings = await api.listBettings({
+  //         filters,
+  //         orderBy: 'created_at DESC',
+  //         limit: 20,
+  //       });
+
+  //       console.log('Loaded Bettings:', localBettings);
+
+  //       setFilteredData(localBettings);
+  //     } catch (error) {
+  //       console.error('Error loading bettings:', error);
+  //     } finally {
+  //       setLoading(false);
+  //     }
+  //   };
+
+  //   load();
+  // }, [date, user, dataVersion]);
+    
+
+      useEffect(() => {
+    const loadDeletedBets = async () => {
+      try {
+        setLoading(true);
+
+        // Determine current user
+        const userNow = selectedUser ? selectedUser : user;
+
+        // Compute day range using moment
+        // const { start_of_day, end_of_day } = getDayRange(date);
+        const from = startOfDayLocal(date);
+        const to = endOfDayLocal(date);
+
+        console.log('Fetching for user:', userNow?.id);
+        // console.log('Date Range:', start_of_day, end_of_day);
+
+        // Supabase query with filters
+        const { data, error } = await supabase
+          .from('bettings')
+          .select('*')
+          .eq('is_deleted', true)
+          .eq('owner_id', userNow?.id)
+          .gte('timestamp', from)
+          .lt('timestamp', to)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Supabase error:', error.message);
+          return;
         }
-        setFilteredData(data);
-      });
-    });
-  }, [date, filterTime, searchQuery, collector]);
 
-  // --- Sync with Supabase (when online) ---
-  const syncWithSupabase = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('bettings')
-        .select('*')
-        .eq('is_deleted', true)
-        .gte('timestamp', moment(date).startOf('day').toISOString())
-        .lt('timestamp', moment(date).endOf('day').toISOString());
+        console.log('Fetched Bettings:', data);
+        setFilteredData(data || []);
+      } catch (err) {
+        console.error('Error loading bettings:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-      if (error) throw error;
+    loadDeletedBets();
+  }, [date, user, filterTime]);
 
-      db.transaction(tx => {
-        data.forEach(ticket => {
-          tx.executeSql(
-            `INSERT OR REPLACE INTO bettings 
-              (id, ticketNo, game_time, gross, is_deleted, timestamp, owner_id, isComplete, isValidated, inputType)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-              ticket.id,
-              ticket.ticketNo,
-              ticket.game_time,
-              ticket.gross,
-              ticket.is_deleted ? 1 : 0,
-              ticket.timestamp,
-              ticket.owner_id,
-              ticket.isComplete ? 1 : 0,
-              ticket.isValidated ? 1 : 0,
-              ticket.inputType
-            ]
-          );
-        });
-      });
-
-      fetchTickets();
-    } catch (err) {
-      console.error('Supabase sync error:', err);
-    }
-  };
-
-  // --- Initial load + sync ---
-  useEffect(() => {
-    fetchTickets();
-    syncWithSupabase();
-  }, [date, filterTime, searchQuery]);
-
-  const onRefresh = () => {
+  const onRefresh = React.useCallback(() => {
     setRefreshing(true);
-    syncWithSupabase().finally(() => setRefreshing(false));
-  };
+    setLoading(true);
+    setTimeout(() => {
+      setRefreshing(false);
+      bumpVersion();
+      setSearchQuery('');
+      // setFilteredData(items)
+      setLoading(false);
+    setRefreshing(false);
+
+    }, 2000);
+  }, [date, userNow, includeAll]);
 
   // --- UI Components ---
   const renderHeader = () => (
@@ -173,38 +205,89 @@ const CancelledTickets = ({ navigation }) => {
     </TouchableOpacity>
   );
 
-  const renderTicketList = () => {
+  const renderTicketList = (listData) => {
     const renderItem = ({ item, index }) => {
       let total = item.gross || 0;
-      const backgroundColor = index % 2 === 0 ? COLORS.gray200 : COLORS.gray300;
+
+
+      
+      const backgroundColor = index % 2 === 0 ? COLORS.gray300 : COLORS.gray200;
 
       return (
         <Animated.View entering={FadeInDown.delay(index * 100).duration(500)} exiting={FadeOutDown.delay(index * 100).duration(500)}>
           <TouchableOpacity
-            onPress={() => navigation.navigate('ViewTicket', item)}
-            style={{ ...styles.ticketRow, backgroundColor }}
+            onPress={() => navigation.navigate('ViewTicket', JSON.stringify(item))}
+            style={{ paddingLeft: 10, backgroundColor: backgroundColor, width: '100%', flexDirection: 'row', paddingVertical: 14, justifyContent: 'space-around', alignItems: 'flex-start' }}
           >
-            <Text style={styles.ticketCol}>{item.ticketNo}</Text>
-            <Text style={[styles.ticketCol, { fontWeight: 'bold', color: item.game_time === '2pm' ? '#3897e7' : item.game_time === '5pm' ? '#ff9d3e' : COLORS.black }]}>
+            {/* <Text style={styles.ticketCol}> */}
+            <Text style={{ textAlign: 'left', fontSize: 18, width: '30%', color: COLORS.black, }}>
+              {item.ticket_no}
+            </Text>
+            {/* <Text style={[styles.ticketCol, { fontWeight: 'bold', color: item.game_time === '2pm' ? '#3897e7' : item.game_time === '5pm' ? '#ff9d3e' : COLORS.black }]}> */}
+            <Text style={{ textAlign: 'left', fontSize: 18, width: '30%', fontWeight: 'bold', color: item.game_time == '2pm' ? '#3897e7' : item.game_time == '5pm' ? '#ff9d3e' : item.game_time == '9pm' ? COLORS.black600 : null }}>
               {String(item.game_time).toUpperCase()}
             </Text>
-            <Text style={styles.ticketCol}>₱{formatNumberWithComma(total)} {item.inputType === 'sold' ? `(SO)` : ''}</Text>
+            {/* <Text style={styles.ticketCol}> */}
+            <Text style={{ textAlign: 'left', width: '30%', fontSize: 18, color: COLORS.black, }}>
+              ₱{formatNumberWithComma(total)} {item.input_type === 'sold' ? `(SO)` : ''}
+            </Text>
+            <View style={{ width: '10%', alignItems: 'center', justifyContent: 'center' }}>
+                          {
+            
+                            (item?.isComplete && !item?.isValidated)
+                            &&
+                            <Image
+                              source={icons.exclamation}
+                              style={{ height: 15, width: 15, resizeMode: 'contain', tintColor: COLORS.warningBorderColor }}
+                            />
+                          }
+                        </View>
           </TouchableOpacity>
         </Animated.View>
       );
     };
 
     return (
+      <>
+      <View style={{ paddingLeft: 10, width: '100%', flexDirection: 'row', borderBottomWidth: 1, borderTopWidth: 1, borderColor: COLORS.gray600, color: COLORS.black, justifyContent: 'flex-start', backgroundColor: COLORS.gray400, alignItems: 'flex-start' }}>
+          <Text style={{ fontWeight: 'bold', color: COLORS.black, fontSize: 16, width: '30%' }}>
+            Ticket#
+          </Text>
+          <Text style={{ textAlign: 'left', width: '30%', fontWeight: 'bold', color: COLORS.black, fontSize: 16, }}>
+            GAME TIME
+          </Text>
+          <Text style={{ textAlign: 'left', width: '30%', fontWeight: 'bold', color: COLORS.black, fontSize: 16 }}>
+            AMOUNT
+          </Text>
+        </View>
       <FlatList
-        data={filteredData}
+        data={listData}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderItem}
+        showsHorizontalScrollIndicator={false}
+        showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListEmptyComponent={<Text style={styles.emptyText}>No records found.</Text>}
+        ListFooterComponent={
+            listData.length > 0 &&
+            <View style={{ padding: 14, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ textAlign: 'center', fontSize: 14, color: COLORS.gray600, fontWeight: '500' }}>
+                End of results.
+              </Text>
+            </View>
+          }
       />
+      </>
     );
   };
 
+  console.log(filteredData, "FILTERED")
+
+    let filteredList = filterTime == 'All Time' ? filteredData : filteredData.filter(a => a.gameTime == filterTime);
+  filteredList = searchQuery ? filteredData.filter(a => String(a.ticket_no).includes(String(searchQuery))) : filteredList
+  let totalGross = filteredList.reduce((n, { gross }) => n + gross, 0);
+  
+  
   return (
     <SafeAreaProvider style={styles.wrapper}>
       {renderHeader()}
@@ -220,7 +303,36 @@ const CancelledTickets = ({ navigation }) => {
           }}
         />
       )}
-      {renderTicketList()}
+        <View style={{ paddingLeft: 10, paddingTop: 10, marginTop: 10, marginBottom: 10, borderBottomWidth: 1, borderTopWidth: 1, borderColor: COLORS.gray600, justifyContent: 'space-between', flexDirection: 'row', alignItems: 'flex-start' }}>
+          <View style={{ flex: 1, flexDirection: 'column', width: '30%', }}>
+            <Text style={{ fontWeight: 'bold', color: COLORS.black, fontSize: 16}}>Total Tickets</Text>
+            <Text style={{ fontWeight: 'bold', color: COLORS.black, fontSize: 16 }}>{formatNumberWithComma(filteredList.length)}</Text>
+
+          </View>
+          <View style={{ flex: 1, flexDirection: 'column', width: '30%', }}>
+            <Text style={{ fontWeight: 'bold', color: COLORS.black, fontSize: 16}}>Total Amount</Text>
+            <Text style={{ fontWeight: 'bold', color: COLORS.black, fontSize: 16 }}>{formatNumberWithComma(totalGross)}</Text>
+          </View>
+          
+          {(selectedUser && selectedUser.role !== 'teller' && getConfiguration(selectedUser, 'showAllData')?.isCheck) &&
+                    <View style={{ width: '30%', alignItems: 'flex-end', flexDirection: 'column' }}>
+                      <View style={{ alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10}}>
+                      <Text style={{ color: COLORS.black900, fontSize: 12, fontWeight: 'bold' }}>Show All</Text>
+                    <Switch
+                        trackColor={{ true: '#00ED64' }}
+                        onValueChange={() => {
+                        console.log(!includeAll)
+                          setIncludeAll(!includeAll);
+                        }}
+                        value={includeAll}
+                      />   
+                    </View>
+                      </View>
+                   
+                    }
+          
+        </View>
+      {renderTicketList(filteredList)}
     </SafeAreaProvider>
   );
 };
@@ -237,7 +349,7 @@ const styles = StyleSheet.create({
   searchInput: { height: 40, paddingLeft: 10, width: '90%', color: COLORS.black },
   searchIcon: { height: 20, width: 20 },
   ticketRow: { flexDirection: 'row', padding: 12, justifyContent: 'space-between' },
-  ticketCol: { fontSize: 18, width: '30%', color: COLORS.black },
+  ticketCol: { fontSize: 18, width: '30%', color: COLORS.black, textAlign: 'left' },
   emptyText: { textAlign: 'center', fontSize: 14, color: COLORS.gray600, marginTop: 20 },
   dropdownMenuStyle: { backgroundColor: '#E9ECEF', borderRadius: 8 },
   dropdownItemStyle: { padding: 10 },

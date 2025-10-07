@@ -10,6 +10,7 @@ import Animated, { BounceOutDown, FadeInDown, FadeOutDown } from 'react-native-r
 import { COLORS, icons } from '../../constants'
 import { formatNumberWithComma, getConfiguration, getDayRange } from '../../utils/helpers';
 import { useOffline } from '../../context/OfflineProvider';
+import { forceFullResync } from '../../utils/batchPull';
 
 const drawTimes = [
   {
@@ -67,6 +68,7 @@ const Transactions = ({ navigation }) => {
   console.log(start_of_day, end_of_day, 'date range')
     
     let filters = {}
+    // filters.is_deleted = false;
     if (includeAll) {
   filters = {
     ...filters,
@@ -82,6 +84,7 @@ const Transactions = ({ navigation }) => {
 }
 
 
+console.log(filters, 'filtering')
 
       let localBettings = await api.listBettings({
         filters: filters,
@@ -239,7 +242,7 @@ const Transactions = ({ navigation }) => {
       })
 
       delete item.uplines;
-      const backgroundColor = index % 2 === 0 ? COLORS.gray200 : COLORS.gray300;
+      const backgroundColor = index % 2 === 0 ? COLORS.gray300 : COLORS.gray200;
 
 
 

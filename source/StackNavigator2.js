@@ -35,6 +35,7 @@ import TipScreen from './screens/TipScreen';
 import ViewSoldOuts from './screens/ViewSoldOuts';
 import TestPrinter2 from './screens/TestPrinter2';
 import TicketForm3 from './screens/TicketForm3';
+import Messenger from './screens/Messenger';
 
 
 
@@ -214,10 +215,10 @@ export const StackNavigator = () => {
               headerTitle: '',
               headerTitleStyle: { color: COLORS.black, fontWeight: 'bold' },
               headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
-              headerShown: true
-              // headerLeft: () => (
-              // 	<CustomDrawerIcon route={null} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'Winning Ticket'} />
-              // ),
+              headerShown: true,
+              headerLeft: () => (
+                <CustomDrawerIcon route={null} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'Winning Ticket'} />
+              ),
             })}
           />
           <Stack.Screen name="ViewSoldOut" component={ViewSoldOuts}
@@ -242,10 +243,16 @@ export const StackNavigator = () => {
             headerShown: true,
             headerTitle: '',
             headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
-            // headerLeft: () => (
-            //   <CustomDrawerIcon route={null} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'Test Printer'} />
-            // ),
+            headerLeft: () => (
+              <CustomDrawerIcon route={null} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'Test Printer'} />
+            ),
           })}
+          />
+          <Stack.Screen name="Messenger" component={Messenger}
+            options={({ navigation }) => ({
+              headerShown: false,
+            })
+            }
           />
           <Stack.Screen name="Permissions" component={PermissionScreen} options={{ headerShown: false }}/>
           {/* <Stack.Screen

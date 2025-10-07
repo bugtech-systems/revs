@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, FlatList, SafeAreaView, TouchableOpacity } from 'react-native';
 import moment from 'moment-timezone';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
-// import { executeSql } from '../../utils/db';
 import { COLORS } from '../../constants';
 import { useOffline } from '../../context/OfflineProvider';
 

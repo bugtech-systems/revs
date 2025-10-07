@@ -1,13 +1,9 @@
 import { SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View, Modal, Alert, Platform } from 'react-native'
 import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { COLORS, icons, SIZES } from '../constants'
-import { realmContext } from '../RealmContext'
 import moment from 'moment-timezone';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useDispatch, useSelector } from 'react-redux';
-import { useObject } from '@realm/react';
-import { Messages, Users } from '../Models';
-import { BSON } from 'realm';
 import { Image } from 'react-native';
 import { FlatList } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -18,30 +14,68 @@ import axios from 'axios';
 import RNFS from 'react-native-fs';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { SET_LOADING, STOP_LOADING } from '../redux/actions/types';
-import { SyncComponent } from '../components/SyncComponent';
-
-const { useQuery, useRealm } = realmContext;
+// import { SyncComponent } from '../components/SyncComponent';
+import { useOffline } from '../context/OfflineProvider';
 
 const Messenger = ({ route, navigation }) => {
+    const { api, dataVersion } = useOffline()
     const { user } = useSelector(({ user }) => user);
     const dispatch = useDispatch();
-    const realm = useRealm()
     const flatListRef = useRef(null);
     const messageId = JSON.parse(route.params);
     const [textInput, setTextInput] = useState("");
     // const [messages, setMessages] = useState(null);
-    // const [senderName, setSenderName] = useState(null);
+    const [senderName, setSenderName] = useState(null);
     const [isTyping, setIsTyping] = useState(false);
     const [imageUrl, setImageUrl] = useState(null);
 
     const [selectedImage, setSelectedImage] = useState(null);
     const [isModalVisible, setIsModalVisible] = useState(false);
+    const [messages, setMessages] = useState();
 
-    const messages = useQuery(Messages, message => {
 
-        return message.filtered(`isDeleted == false && _id == $0`, BSON.ObjectId(messageId))
-    }, [realm, user])[0]
 
+    console.log(messageId, "THE MESSAGE ID")
+    
+
+    // const messages = useQuery(Messages, message => {
+
+    //     return message.filtered(`isDeleted == false && _id == $0`, BSON.ObjectId(messageId))
+    // }, [realm, user])[0]
+
+    useEffect(() => {
+        async function load() {
+            // let filters = {};
+
+            // filters = {
+            //     is_deleted: false,
+            // }
+        const data = await api.getMessage(messageId);
+
+
+
+        console.log(data, "THE MESSAGE DATA")
+        
+
+        if (data) {
+            const sender = await api.getUser(data.created_by)
+            if (sender) {
+                setSenderName(sender)
+            } else {
+                setSenderName(null)
+            }
+            setMessages(data)
+        } else {
+            const sender = await api.getUser(messageId);
+            if (sender) {
+                setSenderName(sender)
+            } else {
+                setSenderName(null)
+            }
+        }
+        };
+        load();
+    }, [])
 
     const requestStoragePermission = async () => {
         if (Platform.OS === 'android') {
@@ -54,38 +88,38 @@ const Messenger = ({ route, navigation }) => {
     };
 
 
-    const saveImage = async () => {
-        try {
-            const hasPermission = await requestStoragePermission();
-            if (!hasPermission) {
-                Alert.alert("Permission Denied", "Please grant storage permission to save images.");
-                return;
-            }
+    // const saveImage = async () => {
+    //     try {
+    //         const hasPermission = await requestStoragePermission();
+    //         if (!hasPermission) {
+    //             Alert.alert("Permission Denied", "Please grant storage permission to save images.");
+    //             return;
+    //         }
 
-            const filename = `image_${Date.now()}.jpg`;
-            const downloadPath = `${RNFS.DownloadDirectoryPath}/${filename}`;
+    //         const filename = `image_${Date.now()}.jpg`;
+    //         const downloadPath = `${RNFS.DownloadDirectoryPath}/${filename}`;
 
-            const response = await RNFS.downloadFile({
-                fromUrl: selectedImage, // The image URL
-                toFile: downloadPath,
-            }).promise;
+    //         const response = await RNFS.downloadFile({
+    //             fromUrl: selectedImage, // The image URL
+    //             toFile: downloadPath,
+    //         }).promise;
 
-            if (response.statusCode === 200) {
-                Alert.alert("Success", "Image saved to gallery!");
-            } else {
-                Alert.alert("Error", "Failed to save the image.");
-            }
-        } catch (error) {
-            console.error("Error saving image:", error);
-            Alert.alert("Error", "Could not save the image.");
-        }
-    };
+    //         if (response.statusCode === 200) {
+    //             Alert.alert("Success", "Image saved to gallery!");
+    //         } else {
+    //             Alert.alert("Error", "Failed to save the image.");
+    //         }
+    //     } catch (error) {
+    //         console.error("Error saving image:", error);
+    //         Alert.alert("Error", "Could not save the image.");
+    //     }
+    // };
 
-    const handleSaveImage = (uri) => {
-        console.log(uri, "HANDLE SAVE IMAGE!")
+    // const handleSaveImage = (uri) => {
+    //     console.log(uri, "HANDLE SAVE IMAGE!")
 
-        return;
-    }
+    //     return;
+    // }
 
     const handleImageUpload = async () => {
         try {
@@ -101,7 +135,7 @@ const Messenger = ({ route, navigation }) => {
             formData.append('file', {
                 uri: image.uri,
                 type: image.type,
-                name: `${messages._id}${dateName}_message.${fileExtension[fileExtension.length - 1]}`,
+                name: `${messages.id}${dateName}_message.${fileExtension[fileExtension.length - 1]}`,
             });
 
             console.log('IMAGE DETAILS', image)
@@ -167,10 +201,13 @@ const Messenger = ({ route, navigation }) => {
     const [rnd, setRnd] = useState(0);
     const today = moment().tz('Asia/Manila').toDate();
 
-    const senderName = realm.objectForPrimaryKey(Users, BSON.ObjectId(messages ? messages.createdBy : messageId))
+    // const senderName = realm.objectForPrimaryKey(Users, BSON.ObjectId(messages ? messages.createdBy : messageId))
 
 
     let displayName = String(senderName?.email).split('@')[0];
+
+
+    console.log(senderName, "THE DISPLAYED NAME")
 
     const renderHeader = () => {
         return (
@@ -192,15 +229,15 @@ const Messenger = ({ route, navigation }) => {
                 </TouchableOpacity>
                 <View style={{ width: '50%', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'flex-end' }}>
                     <Text style={{ color: COLORS.black900, fontWeight: '500', fontSize: 20 }}>
-                        {String(messages?.createdBy == String(user?._id) ? messages?.recepientName : displayName).toUpperCase()}
+                        {String(messages?.created_by == String(user?.id) ? messages?.recepient_name : displayName).toUpperCase()}
                     </Text>
-                    {/* <Text style={{ color: COLORS.darkGray2, fontSize: 14}}>
+                    <Text style={{ color: COLORS.darkGray2, fontSize: 14}}>
                         {String(senderName.address)}
-                    </Text> */}
-                    <Text style={{ color: COLORS.black, fontSize: 10, }}>{isTyping ? "Typing ..." : null}</Text>
+                    </Text>
+                    {/* <Text style={{ color: COLORS.black, fontSize: 10, }}>{isTyping ? "Typing ..." : null}</Text> */}
                 </View>
                 <View style={{ alignItems: 'flex-end', width: '40%', justifyContent: 'flex-end' }}>
-                    <SyncComponent />
+                    {/* <SyncComponent /> */}
                 </View>
             </View>
         )
@@ -215,19 +252,19 @@ const Messenger = ({ route, navigation }) => {
             {
                 item?.message ?
                     <View
-                        style={[styles.messageBubble, String(item.owner_id) == String(user?._id) ? styles.sent : styles.received]}
+                        style={[styles.messageBubble, String(item.owner_id) == String(user?.id) ? styles.sent : styles.received]}
                     >
 
                         {/* <Text style={{...styles.messageText, color: item?.sent ? COLORS.white : COLORS.black }}>{item.text}</Text> */}
                         {/* <Text style={{...styles.timeText, color: item?.sent ? COLORS.white : COLORS.black}}>{item.time}</Text> */}
                         <View style={{ maxWidth: '80%', paddingVertical: 10, flexDirection: 'column' }}>
-                            <Text style={{ ...styles.messageText, fontWeight: '400', color: item.owner_id == String(user?._id) ? COLORS.white : COLORS.black }}>
+                            <Text style={{ ...styles.messageText, fontWeight: '400', color: item.owner_id == String(user?.id) ? COLORS.white : COLORS.black }}>
                                 {item.message}
                             </Text>
                         </View>
                         <View style={{ maxWidth: '20%', padding: 6, alignItems: 'flex-end', justifyContent: 'flex-end' }}>
-                            <Text style={{ ...styles.timeText, color: item.owner_id == String(user?._id) ? COLORS.white2 : COLORS.darkGray2 }}>
-                                {moment(item.createdAt).format('H:ss')}
+                            <Text style={{ ...styles.timeText, color: item.owner_id == String(user?.id) ? COLORS.white2 : COLORS.darkGray2 }}>
+                                {moment(item.created_at).format('H:ss')}
                             </Text>
                         </View>
                     </View>
@@ -237,13 +274,13 @@ const Messenger = ({ route, navigation }) => {
 
             {
                 item?.imageUrl ?
-                    <View style={{ alignSelf: String(item.owner_id) == String(user?._id) ? 'flex-end' : 'flex-start', flexDirection: 'row', alignItems: 'center', marginVertical: 6 }}>
+                    <View style={{ alignSelf: String(item.owner_id) == String(user?.id) ? 'flex-end' : 'flex-start', flexDirection: 'row', alignItems: 'center', marginVertical: 6 }}>
                         <TouchableOpacity
                             onPress={() => {
                                 setSelectedImage(`${item?.imageUrl}`)
                                 setIsModalVisible(true)
                             }}
-                            style={[String(item.owner_id) == String(user?._id) ? styles.sent : styles.received, { width: 150, height: 200, borderWidth: 1, borderColor: COLORS.transparentBlack1, borderRadius: 6, backgroundColor: COLORS.transparentBlack8 }]}
+                            style={[String(item.owner_id) == String(user?.id) ? styles.sent : styles.received, { width: 150, height: 200, borderWidth: 1, borderColor: COLORS.transparentBlack1, borderRadius: 6, backgroundColor: COLORS.transparentBlack8 }]}
                         >
 
                             <Image
@@ -281,31 +318,31 @@ const Messenger = ({ route, navigation }) => {
     const sendMessage = async () => {
         let messageArray = messages?.conversations;
         let newMessageObj = {
-            owner_id: String(user?._id),
+            owner_id: String(user?.id),
             message: textInput,
             imageUrl: imageUrl,
             isViewed: false,
-            createdAt: moment(today).toDate()
+            created_at: moment(today).toDate()
         }
         if (!messages) {
-            realm.write(async () => {
-                let newConversation = new Messages(realm, {
-                    createdBy: String(user?._id),
-                    recepient: String(messageId),
-                    recepientName: String(displayName),
-                    conversations: [newMessageObj],
-                    isDeleted: false,
-                    createdAt: moment(today).toDate(),
-                    updatedAt: moment(today).toDate(),
-                })
-                navigation.replace('Messenger', JSON.stringify(newConversation._id))
-            })
+            // realm.write(async () => {
+            //     let newConversation = new Messages(realm, {
+            //         createdBy: String(user?._id),
+            //         recepient: String(messageId),
+            //         recepientName: String(displayName),
+            //         conversations: [newMessageObj],
+            //         isDeleted: false,
+            //         created_at: moment(today).toDate(),
+            //         updatedAt: moment(today).toDate(),
+            //     })
+            //     navigation.replace('Messenger', JSON.stringify(newConversation._id))
+            // })
 
         } else {
-            realm.write(() => {
-                messageArray.push(newMessageObj)
-                messages.updatedAt = moment(today).toDate();
-            })
+            // realm.write(() => {
+            //     messageArray.push(newMessageObj)
+            //     messages.updatedAt = moment(today).toDate();
+            // })
         }
         setImageUrl(null);
         setTextInput("");
@@ -317,14 +354,14 @@ const Messenger = ({ route, navigation }) => {
             let conversationArray = messages?.conversations;
 
             let viewReceivedMessages = conversationArray.filter(a => {
-                return (a.owner_id !== String(user?._id) && a.isViewed === false);
+                return (a.owner_id !== String(user?.id) && a.isViewed === false);
             })
 
             if (viewReceivedMessages.length > 0) {
                 viewReceivedMessages.map(message => {
-                    realm.write(() => {
-                        message.isViewed = true
-                    })
+                    // realm.write(() => {
+                    //     message.isViewed = true
+                    // })
                     return
                 })
 
@@ -344,7 +381,7 @@ const Messenger = ({ route, navigation }) => {
         return () => {
             handleMessages(); // Runs when the component unmounts
         };
-    }, [messages, realm])
+    }, [messages])
 
 
     return (

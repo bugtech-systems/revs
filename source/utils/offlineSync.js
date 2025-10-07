@@ -86,6 +86,31 @@ function ensureDB() {
   return db;
 }
 
+
+// ✅ Execute SQL queries safely
+export const executeSql = async (query, params = []) => {
+  try {
+    const [results] = await db.executeSql(query, params);
+    return results;
+  } catch (error) {
+    console.error('SQLite query error:', error);
+    throw error;
+  }
+};
+
+// ✅ Helper to read rows easily
+export const getRows = (results) => {
+  if (!results || results.length === 0) return [];
+
+  const rows = results[0].rows;
+  const data = [];
+  for (let i = 0; i < rows.length; i++) {
+    data.push(rows.item(i));
+  }
+  return data;
+};
+
+
 /**
  * runSql: wrapper to execute SQL and return a Promise with the result
  * ensures db is opened and handles errors consistently.
@@ -320,35 +345,35 @@ async function createTablesIfNotExists() {
   );
 
 //   // messages
-//   await runSql(
-//     `CREATE TABLE IF NOT EXISTS messages (
-//       id TEXT PRIMARY KEY,
-//       created_by TEXT,
-//       recepient TEXT,
-//       recepient_name TEXT,
-//       conversations TEXT,
-//       is_deleted INTEGER DEFAULT 0,
-//       created_at TEXT NOT NULL,
-//       updated_at TEXT NOT NULL
-//     );`
-//   );
+  await runSql(
+    `CREATE TABLE IF NOT EXISTS messages (
+      id TEXT PRIMARY KEY,
+      created_by TEXT,
+      recepient TEXT,
+      recepient_name TEXT,
+      conversations TEXT,
+      is_deleted INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );`
+  );
 
 //   // cashflow
-//   await runSql(
-//     `CREATE TABLE IF NOT EXISTS cashflow (
-//       id TEXT PRIMARY KEY,
-//       amount TEXT DEFAULT '0',
-//       description TEXT NOT NULL,
-//       input_type TEXT NOT NULL,
-//       is_deleted INTEGER DEFAULT 0,
-//       owner TEXT NOT NULL,
-//       owner_name TEXT,
-//       user TEXT NOT NULL,
-//       updated_by TEXT,
-//       created_at TEXT NOT NULL,
-//       updated_at TEXT NOT NULL
-//     );`
-//   );
+  await runSql(
+    `CREATE TABLE IF NOT EXISTS cashflow (
+      id TEXT PRIMARY KEY,
+      amount TEXT DEFAULT '0',
+      description TEXT NOT NULL,
+      input_type TEXT NOT NULL,
+      is_deleted INTEGER DEFAULT 0,
+      owner TEXT NOT NULL,
+      owner_name TEXT,
+      user TEXT NOT NULL,
+      updated_by TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );`
+  );
 
   // sync_queue: holds operations to push to Supabase
   await runSql(
@@ -516,11 +541,6 @@ async function localUpdate(tableName, id, patch) {
   const existing = res.rows.item(0);
   const updated = { ...existing, ...patch, updated_at: nowISO() };
 
-
-
-  console.log(patch, "UPDATING")
-  
-  
   // JSON fields stringify
   if (tableName === 'users') {
     updated.configuration = toJsonText(parseJsonText(updated.configuration) ?? updated.configuration ?? []);

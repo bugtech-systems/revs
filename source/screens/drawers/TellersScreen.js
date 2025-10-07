@@ -3,24 +3,42 @@ import { View, Text, Image, TouchableOpacity, TextInput, FlatList } from 'react-
 import { useDispatch, useSelector } from 'react-redux';
 import { SET_SUMMARIZED_USER } from '../../redux/actions/types';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { COLORS, icons } from '../../constants';
+import { COLORS, icons, SIZES } from '../../constants';
+import { useOffline } from '../../context/OfflineProvider';
 import { getUserByEmail, getTellersByReferral, getFirstMessage } from '../../utils/db';
+import supabase from '../../utils/supabaseClient';
 
 const TellersScreen = ({ navigation }) => {
+    const { api } = useOffline();
   const dispatch = useDispatch();
   const { collector, user, selectedUser } = useSelector(({ user }) => user);
   const [searchQuery, setSearchQuery] = useState('');
   const [usersCoord, setUsersCoord] = useState([]);
+  const [userTeller, setUserTeller] = useState([]);
 
   const userNow = selectedUser || collector;
 
   // 🔹 Load tellers
   const loadTellers = async () => {
     try {
-      const currentUser = await getUserByEmail(userNow);
-      const referralId = currentUser?._id || user._id;
-      const tellers = await getTellersByReferral(referralId);
-      setUsersCoord(tellers);
+      // const currentUser = await getUserByEmail(userNow);
+      // const referralId = currentUser?._id || user._id;
+      // const tellers = await getTellersByReferral(referralId);
+
+      let filters = {};
+
+  filters.is_deleted = false;
+  filters.role = 'teller';
+  filters.referral = userNow.id;
+
+  const localTellers = await api.listUsers({
+    filters: filters
+  });
+  console.log(userNow, "LOCAL COORDINATORS")
+
+  if (localTellers) {
+    setUserTeller(localTellers);
+  }
     } catch (err) {
       console.error('Error loading tellers:', err);
     }
@@ -28,11 +46,29 @@ const TellersScreen = ({ navigation }) => {
 
   // 🔹 Handle messaging
   const handleMessageNavigation = async (recepientId) => {
+    // try {
+    //   const message = await getFirstMessage(recepientId, user?._id);
+    //   navigation.navigate('Messenger', JSON.stringify(message?._id || recepientId));
+    // } catch (err) {
+    //   console.error('Error navigating to messages:', err);
+    // }
     try {
-      const message = await getFirstMessage(recepientId, user?._id);
-      navigation.navigate('Messenger', JSON.stringify(message?._id || recepientId));
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('is_deleted', false)
+        .eq('recepient', recepientId)
+        .eq('created_by', user?.id);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        navigation.navigate('Messenger', JSON.stringify(data[0].id));
+      } else {
+        navigation.navigate('Messenger', JSON.stringify(recepientId));
+      }
     } catch (err) {
-      console.error('Error navigating to messages:', err);
+      console.error("Error navigating to Messenger:", err);
     }
   };
 
@@ -79,23 +115,23 @@ const TellersScreen = ({ navigation }) => {
 
   const renderItem = ({ item, index }) => {
     const displayName = String(item.email).split('@')[0];
-    const backgroundColor = index % 2 === 0 ? COLORS.gray200 : COLORS.gray300;
+    const backgroundColor = index % 2 === 0 ? COLORS.gray200 : COLORS.gray200;
 
     return (
       <Animated.View key={index} entering={FadeInDown.delay(index * 100).duration(500)}>
         <TouchableOpacity
-          onLongPress={() => (user?.isAdmin ? handleDoublePress(item) : console.log('Not Admin'))}
+          onLongPress={() => (user?.is_admin ? handleDoublePress(item) : console.log('Not Admin'))}
           onPress={() => handleSelectCollector(item)}
           style={{ flexDirection: 'row', paddingVertical: 1, backgroundColor, width: '100%' }}
         >
-          <View style={{ backgroundColor, padding: 10, flexDirection: 'column', alignItems: 'flex-start', width: '50%' }}>
+          <View style={{ backgroundColor, borderRadius: SIZES.radius, padding: 10, flexDirection: 'column', alignItems: 'flex-start', width: '50%' }}>
             <Text style={{ fontSize: 18, color: COLORS.black900, fontWeight: 'bold' }}>
               {displayName.toUpperCase()}
             </Text>
             <Text style={{ fontWeight: '500', fontSize: 14, color: COLORS.darkGray2 }}>{item.address}</Text>
           </View>
           <View style={{ width: '50%', alignItems: 'center', justifyContent: 'flex-end', flexDirection: 'row', padding: 10 }}>
-            <TouchableOpacity onPress={() => handleMessageNavigation(item._id)} style={{ paddingHorizontal: 10 }}>
+            <TouchableOpacity onPress={() => handleMessageNavigation(item.id)} style={{ paddingHorizontal: 10 }}>
               <Image source={icons.send_message} style={{ height: 35, width: 35, resizeMode: 'contain' }} />
             </TouchableOpacity>
           </View>
@@ -109,8 +145,8 @@ const TellersScreen = ({ navigation }) => {
   }, [collector, selectedUser]);
 
   const filteredList = searchQuery
-    ? usersCoord.filter(a => String(a.email).toLowerCase().includes(searchQuery.toLowerCase()))
-    : usersCoord;
+    ? userTeller.filter(a => String(a.email).toLowerCase().includes(searchQuery.toLowerCase()))
+    : userTeller;
 
   return (
     <View style={{ flex: 1, padding: 10, backgroundColor: COLORS.gray300 }}>
