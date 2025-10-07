@@ -5,11 +5,12 @@ import { StackNavigator } from './StackNavigator2';
 import NotifService from './utils/NotificationService';
 import { COLORS } from './constants';
 import  supabase  from './utils/supabaseClient';
-import { useDispatch } from 'react-redux';
+import {  useDispatch } from 'react-redux';
 import { SET_ACTIVE_USER, SET_COLLECTOR, SET_USER } from './redux/actions/types';
 import { SessionContext } from './context/SessionContext';
 // import { useOfflineSync } from './context/OfflineSyncProvider';
 import { useOffline } from './context/OfflineProvider';
+
 
 const LoadingIndicator = () => (
   <View style={{ ...styles.activityContainer, backgroundColor: COLORS.transparentBlack7 }}>
@@ -38,7 +39,6 @@ export const App = () => {
   
       // Try fetching from local SQLite
       let localUser = await fetchUser(email);
-      console.log(localUser, 'LOCAL USER');
   
       if (!localUser) {
         // Fetch from Supabase by email if not found locally
@@ -82,10 +82,7 @@ console.log(loading, session, 'loaad')
 
   return (
     <>
-      {/* <AppInitializer />  */}
-      {/* <SyncProvider> */}
       <StackNavigator />
-      {/* </SyncProvider> */}
     </>
   );
 };

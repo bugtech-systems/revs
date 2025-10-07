@@ -22,13 +22,14 @@ import NetInfo from '@react-native-community/netinfo';
 import supabase from './supabaseClient';
 import { schema } from './schema';
 import { generateObjectId } from './helpers';
-import { forceFullResync } from './batchPull';
+import DatabaseService from '../services/DatabaseService';
 
 import moment from 'moment-timezone';
+import SyncManager from '../services/SyncManager';
 
 // Enable debug (optional for development)
-SQLite.DEBUG(false);
-SQLite.enablePromise(false); // optional, to use promises
+// SQLite.DEBUG(false);
+// SQLite.enablePromise(false); // optional, to use promises
 
 export const BATCH_SIZE = 1000; // Supabase limit
 
@@ -45,23 +46,23 @@ export const TABLES = [
 // 'messages', 'cashflow'
 ];
 
-// ---------- UTIL ----------
-let db = SQLite.openDatabase(
-      { name: DB_NAME, location: "default" },
-      async () => {  console.log("SQLite opened", DB_NAME);},
-      (err) => console.error("SQLite open error", err)
-    );
+// // ---------- UTIL ----------
+// let db = SQLite.openDatabase(
+//       { name: DB_NAME, location: "default" },
+//       async () => {  console.log("SQLite opened", DB_NAME);},
+//       (err) => console.error("SQLite open error", err)
+//     );
 
 // ---------- INIT ----------
 export async function init(userId) {
   // Ensure single DB open
-  if (!db) {
-    db = SQLite.openDatabase(
-      { name: DB_NAME, location: "default" },
-      async () => {  console.log("SQLite opened", DB_NAME);},
-      (err) => console.error("SQLite open error", err)
-    );
-  }
+  // if (!db) {
+  //   db = SQLite.openDatabase(
+  //     { name: DB_NAME, location: "default" },
+  //     async () => {  console.log("SQLite opened", DB_NAME);},
+  //     (err) => console.error("SQLite open error", err)
+  //   );
+  // }
 
   // create tables if not exists
   await createTablesIfNotExists();
@@ -365,18 +366,9 @@ async function createTablesIfNotExists() {
   // local metadata: we use AsyncStorage for lastPulledAt per table
 }
 
-// ---------- QUEUE HELPERS ----------
-async function enqueueSync(op, tableName, rowId, payload = null) {
-  const createdAt = nowISO();
-  const payloadText = payload ? JSON.stringify(payload) : null;
-  await runSql(
-    `INSERT INTO sync_queue (op, table_name, row_id, payload, created_at) VALUES (?, ?, ?, ?, ?);`,
-    [op, tableName, rowId, payloadText, createdAt]
-  );
-}
 
 async function fetchSyncQueue() {
-  const res = await runSql(`SELECT * FROM sync_queue ORDER BY id ASC;`);
+  const res = await DatabaseService.executeQuery(`SELECT * FROM sync_queue ORDER BY id ASC;`);
   const rows = [];
   
   for (let i = 0; i < res.rows.length; i++) rows.push(res.rows.item(i));
@@ -384,7 +376,7 @@ async function fetchSyncQueue() {
 }
 
 async function removeQueueItem(id) {
-  await runSql(`DELETE FROM sync_queue WHERE id = ?;`, [id]);
+  await DatabaseService.executeQuery(`DELETE FROM sync_queue WHERE id = ?;`, [id]);
 }
 
 // ✅ Converts JSON fields before storing into SQLite (TEXT)
@@ -497,21 +489,19 @@ async function localInsert(tableName, record) {
 
   const sql = `INSERT OR REPLACE INTO ${tableName} (${cols.join(', ')}) VALUES (${placeholders});`;
 
-  await runSql(sql, values);
+  await DatabaseService.executeQuery(sql, values);
 
   // enqueue for sync (use normalized row so Supabase gets valid JSON)
-  await enqueueSync('insert', tableName, id, normalized);
+  await SyncManager.queueChange(tableName, 'insert', id, normalized);
 
   // Return freshly inserted row
-  // const updated = await localGet(tableName, id);
-  await pushQueueToSupabase();
 
   return record;
 }
 
 async function localUpdate(tableName, id, patch) {
   // fetch existing
-  const res = await runSql(`SELECT * FROM ${tableName} WHERE id = ? LIMIT 1;`, [id]);
+  const res = await DatabaseService.executeQuery(`SELECT * FROM ${tableName} WHERE id = ? LIMIT 1;`, [id]);
   if (res.rows.length === 0) throw new Error('Not found');
   const existing = res.rows.item(0);
   const updated = { ...existing, ...patch, updated_at: nowISO() };
@@ -535,9 +525,9 @@ async function localUpdate(tableName, id, patch) {
   const values = cols.map((c) => updated[c]);
   values.push(id);
   const sql = `UPDATE ${tableName} SET ${setClause} WHERE id = ?;`;
-  await runSql(sql, values);
+  await DatabaseService.executeQuery(sql, values);
 
-  await enqueueSync('update', tableName, id, updated);
+  await SyncManager.queueChange(tableName, 'update',  id, updated);
   
   
   await pushQueueToSupabase();
@@ -547,15 +537,15 @@ async function localUpdate(tableName, id, patch) {
 
 async function localDelete(tableName, id) {
   // For soft delete preference depends on table; we queue a delete operation and also remove local row
-  await runSql(`DELETE FROM ${tableName} WHERE id = ?;`, [id]);
-  await enqueueSync('delete', tableName, id, null);
+  await DatabaseService.executeQuery(`DELETE FROM ${tableName} WHERE id = ?;`, [id]);
+  await SyncManager.queueChange(tableName, 'delete',  id, null);
   await pushQueueToSupabase();
   
   return true;
 }
 
 export async function localGet(tableName, id) {
-  const res = await runSql(`SELECT * FROM ${tableName} WHERE id = ? LIMIT 1;`, [id]);
+  const res = await DatabaseService.executeQuery(`SELECT * FROM ${tableName} WHERE id = ? LIMIT 1;`, [id]);
   
   
   if (res.rows.length === 0) return null;
@@ -580,7 +570,7 @@ export async function localGet(tableName, id) {
 async function localList(tableName, whereClause = "", params = []) {
   // Always order by created_at DESC
   const sql = `SELECT * FROM ${tableName} ${whereClause} ORDER BY created_at DESC;`;
-  const res = await runSql(sql, params);
+  const res = await DatabaseService.executeQuery(sql, params);
   const rows = [];
 
   for (let i = 0; i < res.rows.length; i++) {
@@ -619,11 +609,12 @@ async function localQuery(tableName, query = {}) {
   const offsetSql = offset ? `OFFSET ${offset}` : "";
 
   const sql = `SELECT * FROM ${tableName} ${whereSql} ${orderSql} ${limitSql} ${offsetSql};`;
-  const res = await runSql(sql, values);
+  const res = await DatabaseService.executeQuery(sql, values);
 
   const rows = [];
+  console.log(res, 'RESSSP', sql, values)
   for (let i = 0; i < res.rows.length; i++) {
-    let row = res.rows.item(i);
+    let row = res.rows[i];
 console.log(row?.hits, 'HITSSS')
     // parse JSON fields
     if (tableName === "users") {
@@ -732,7 +723,7 @@ async function pullFromSupabase(userId) {
 
     // Handle deleted records
     if (remoteRow.is_deleted) {
-      await runSql(`DELETE FROM ${tableName} WHERE id = ?`, [remoteRow.id]);
+      await DatabaseService.executeQuery(`DELETE FROM ${tableName} WHERE id = ?`, [remoteRow.id]);
       continue;
     }
 
@@ -798,7 +789,7 @@ export async function fetchWithFallback(table, query = {}) {
       // replace local with remote snapshot
       for (const row of data) {
         if (row.is_deleted) {
-          await runSql(`DELETE FROM ${table} WHERE id = ?`, [row.id]);
+          await DatabaseService.executeQuery(`DELETE FROM ${table} WHERE id = ?`, [row.id]);
         } else {
           const normalized = normalizeForSQLite(table, row);
           await insertOrReplace(table, normalized);
@@ -997,7 +988,7 @@ function buildWhereClause(filters = {}) {
 };
 
 export async function getAllLocalIds(table) {
-  const res = await runSql(`SELECT id FROM ${table} ORDER BY updated_at ASC;`);
+  const res = await DatabaseService.executeQuery(`SELECT id FROM ${table} ORDER BY updated_at ASC;`);
   const ids = [];
   if (res && res.rows) {
     for (let i = 0; i < res.rows.length; i++) {
@@ -1012,7 +1003,7 @@ export async function insertOrReplace(table, row) {
   const placeholders = cols.map(() => '?').join(', ');
   const sql = `INSERT OR REPLACE INTO ${table} (${cols.join(', ')}) VALUES (${placeholders});`;
   const values = cols.map((c) => row[c]);
-  await runSql(sql, values);
+  await DatabaseService.executeQuery(sql, values);
 };
 
 export async function clearAllStorage() {
@@ -1148,7 +1139,7 @@ export async function fetchWinningBettings({ date, user, includeAll = false }) {
 
   const query = `SELECT * FROM ${table} ${whereClause} ORDER BY timestamp DESC;`;
 
-  const localRes = await runSql(query, params);
+  const localRes = await DatabaseService.executeQuery(query, params);
   const rows = [];
   for (let i = 0; i < localRes.rows.length; i++) {
     rows.push(localRes.rows.item(i));

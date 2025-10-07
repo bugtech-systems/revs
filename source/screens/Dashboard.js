@@ -7,11 +7,14 @@ import { COLORS, SIZES } from '../constants/theme';
 import icons from '../constants/icons';
 import { formatNumber, getConfiguration } from '../utils/helpers';
 import { useOffline } from '../context/OfflineProvider';
-// import { useOfflineSync } from '../context/OfflineSyncProvider';
+import { useOfflineSync } from '../context/OfflineSyncProvider';
 
+import {
+  fetchUser,
+} from "../utils/offlineSync";
 
 const Dashboard = ({ navigation }) => {
-  const { dataVersion, api, fetchUser } = useOffline()
+  const { dataVersion, api } = useOfflineSync()
   const { user, collector, selectedUser } = useSelector(({user}) => user);
 
   const [date, setDate] = useState(new Date());
@@ -137,7 +140,7 @@ const Dashboard = ({ navigation }) => {
 			let genCommsTotal = 0;
 
 			for (let bet of bettings) {
-				commsTotal += bet.commissions.filter(coms => String(coms.referral) == String(user?.id)).reduce((n, { amount }) => n + amount, 0);
+				commsTotal += bet.commissions?.filter(coms => String(coms.referral) == String(user?.id)).reduce((n, { amount }) => n + amount, 0);
 			}
 			genCommsTotal += gross * (user?.com_rate / 100);
 			let comms = commsTotal ? commsTotal : 0;
@@ -283,10 +286,15 @@ const Dashboard = ({ navigation }) => {
   }, [selectedUser]);
   
   useEffect(() => {
+  
+  console.log('SOMETHING CHANGED', collector);
+  setBettings([]);
+  setDraws([]);
+  
     (async () => {
       if (!collector) return;
 		let selectedCollector = await fetchUser(collector);
-
+		
 
 //   const today = new Date().toISOString(); 
 
@@ -316,6 +324,7 @@ if (includeAll) {
       let localBettings = await api.listBettings({
         filters: filters,
         orderBy: 'timestamp DESC',
+        bulk: true
         // limit: 20,
       });
 
@@ -342,6 +351,8 @@ if (includeAll) {
 	}
   }, [date, includeAll, collector, dataVersion]);
 
+
+console.log(bettings.length, 'BETS', draws.length, date)
 
 
   return (

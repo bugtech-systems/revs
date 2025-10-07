@@ -7,10 +7,10 @@ import moment from 'moment-timezone';
 import { COLORS, icons } from './constants';
 import supabase  from './utils/supabaseClient'; // Your initialized Supabase client
 // import { useOfflineSync } from './context/OfflineSyncProvider';
-import { useOffline } from './context/OfflineProvider';
+// import { useOffline } from './context/OfflineProvider';
+import {  fetchUser, saveLocalUser } from './utils/offlineSync';
 
 export function WelcomeView(): React.ReactElement {
-  const { fetchUser,  saveLocalUser} = useOffline();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);

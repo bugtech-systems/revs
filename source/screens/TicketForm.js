@@ -13,8 +13,9 @@ import Geolocation from 'react-native-geolocation-service';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, icons } from '../constants';
 import ConfirmationModal from '../components/ConfirmationModal';
-import { useOffline } from '../context/OfflineProvider';
-// import { api, fetchUser } from '../utils/offlineSync';
+// import { useOffline } from '../context/OfflineProvider';
+import {  fetchUser } from '../utils/offlineSync';
+import { useOfflineSync } from '../context/OfflineSyncProvider';
 
 
 let keyPad = [
@@ -69,7 +70,7 @@ let keyPad = [
 ]
 
 export default function TicketForm({ navigation }) {
-    const { fetchUser, api, dataVersion } = useOffline();
+    const {  api, dataVersion } = useOfflineSync();
     const { collector, user, selectedUser } = useSelector(({ user }) => user);
     const [amountVal, setAmountVal] = useState('')
     const [time, setSelectedTime] = useState('2pm')
@@ -624,7 +625,7 @@ export default function TicketForm({ navigation }) {
                         is_win_to: false,
                         is_print: false,
                         is_deleted: false,
-                        timestamp: date,
+                        timestamp: moment().tz("Asia/Manila").toISOString(),
                         game_time: time,
                         print_copy: 0,
                         input_type: 'normal',
@@ -633,8 +634,8 @@ export default function TicketForm({ navigation }) {
                         combinations: combinations,
                         commissions: newComms,
                         uplines: newUplines,
-                        created_at: moment().tz("Asia/Manila"),
-                        updated_at: moment().tz("Asia/Manila")
+                        created_at: moment().tz("Asia/Manila").toISOString(),
+                        updated_at: moment().tz("Asia/Manila").toISOString()
                     }
 
                     

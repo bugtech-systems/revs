@@ -37,7 +37,7 @@ export const OfflineProvider = ({ session, children }) => {
   useEffect(() => {
     const bootstrap = async () => {
       // clearAllStorage()
-      await init();
+      // await init();
       bumpVersion()
     };
     bootstrap();
@@ -101,22 +101,22 @@ export const OfflineProvider = ({ session, children }) => {
   
 
      // Initial load
-  useEffect(() => {
-      if(session?.user?.email){
+  // useEffect(() => {
+  //     if(session?.user?.email){
 
-      startAutoSyncOnReconnect(session?.user?.email);
-      bumpVersion();
+  //     startAutoSyncOnReconnect(session?.user?.email);
+  //     bumpVersion();
      
-    const interval = setInterval(syncNow, 60000); // background sync every 10s
-    const fullSyncInterval = setInterval(fullResync, 300000); // background sync every 5m
-    return () => {
-    clearInterval(interval);
-    clearInterval(fullSyncInterval);
-     stopAutoSyncOnReconnect(session?.user?.email);
-    }    
-      }
+  //   const interval = setInterval(syncNow, 60000); // background sync every 10s
+  //   const fullSyncInterval = setInterval(fullResync, 300000); // background sync every 5m
+  //   return () => {
+  //   clearInterval(interval);
+  //   clearInterval(fullSyncInterval);
+  //    stopAutoSyncOnReconnect(session?.user?.email);
+  //   }    
+  //     }
 
-  }, [session?.user?.email]);
+  // }, [session?.user?.email]);
 
 
   // Wrapped API that bumps version after any CRUD

@@ -10,13 +10,13 @@ import Animated, { ZoomIn } from 'react-native-reanimated';
 import { formatNumber, getConfiguration, getDayRange } from '../../utils/helpers';
 import SQLite from 'react-native-sqlite-storage';
 import supabase from '../../utils/supabaseClient';
-import { useOffline } from '../../context/OfflineProvider';
+// import { useOffline } from '../../context/OfflineProvider';
+import { useOfflineSync } from '../../context/OfflineSyncProvider';
 
-const db = SQLite.openDatabase('localDB.db');
 
 const SummaryReport = ({ navigation }) => {
   const { collector, user, selectedUser } = useSelector(({ user }) => user);
-  const { api, dataVersion, bumpVersion } = useOffline();
+  const { api, dataVersion, bumpVersion } = useOfflineSync();
 
   const [includeAll, setIncludeAll] = useState(false);
   const [startDate, setStartDate] = useState(new Date());
