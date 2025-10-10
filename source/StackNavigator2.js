@@ -84,7 +84,13 @@ const DrawerNavigation = () => {
         </>
       )}
 
-
+      {(getConfiguration(curUser, 'cancelled_tickets')?.isCheck || curUser?.is_admin) ?
+        (
+          <Drawer.Screen name="CancelledTickets" component={CancelledTickets} options={({ navigation }) => generateDrawerScreenOptions('Cancelled Tickets', icons.cancelled_ticket, 'Cancelled Tickets', navigation)} />
+        )
+        : 
+        <></>
+      }
 
       {(getConfiguration(curUser, 'inbox')?.isCheck) && (
               <>
