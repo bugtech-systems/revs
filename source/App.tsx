@@ -9,8 +9,8 @@ import {  useDispatch } from 'react-redux';
 import { SET_ACTIVE_USER, SET_COLLECTOR, SET_USER } from './redux/actions/types';
 import { SessionContext } from './context/SessionContext';
 // import { useOfflineSync } from './context/OfflineSyncProvider';
-import { useOffline } from './context/OfflineProvider';
-
+// import { useOffline } from './context/OfflineProvider';
+import { fetchUser, saveLocalUser } from "./utils/offlineSync"
 
 const LoadingIndicator = () => (
   <View style={{ ...styles.activityContainer, backgroundColor: COLORS.transparentBlack7 }}>
@@ -20,7 +20,7 @@ const LoadingIndicator = () => (
 
 export const App = () => {
   const dispatch = useDispatch();
-  const { fetchUser,  saveLocalUser} = useOffline();
+  // const { fetchUser,  saveLocalUser} = useOfflineSync();
   const [loading, setLoading] = useState(true);
     const { session } = useContext(SessionContext);
 

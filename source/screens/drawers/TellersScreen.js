@@ -4,19 +4,19 @@ import { useDispatch, useSelector } from 'react-redux';
 import { SET_SUMMARIZED_USER } from '../../redux/actions/types';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { COLORS, icons, SIZES } from '../../constants';
-import { useOffline } from '../../context/OfflineProvider';
-import { getUserByEmail, getTellersByReferral, getFirstMessage } from '../../utils/db';
-import supabase from '../../utils/supabaseClient';
+// import { useOffline } from '../../context/OfflineProvider';
+// import supabase from '../../utils/supabaseClient';
+
+import { api } from '../../utils/offlineSync';
 
 const TellersScreen = ({ navigation }) => {
-    const { api } = useOffline();
+    // const { api } = useOffline();
   const dispatch = useDispatch();
   const { collector, user, selectedUser } = useSelector(({ user }) => user);
   const [searchQuery, setSearchQuery] = useState('');
-  const [usersCoord, setUsersCoord] = useState([]);
   const [userTeller, setUserTeller] = useState([]);
 
-  const userNow = selectedUser || collector;
+  const userNow = selectedUser || user;
 
   // 🔹 Load tellers
   const loadTellers = async () => {
@@ -53,14 +53,12 @@ const TellersScreen = ({ navigation }) => {
     //   console.error('Error navigating to messages:', err);
     // }
     try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('is_deleted', false)
-        .eq('recepient', recepientId)
-        .eq('created_by', user?.id);
+    
+         let data = await api.listMessages({
+          filters: {is_deleted: false, recepient: recepientId, created_by: userNow.id}
+       })
 
-      if (error) throw error;
+
 
       if (data && data.length > 0) {
         navigation.navigate('Messenger', JSON.stringify(data[0].id));

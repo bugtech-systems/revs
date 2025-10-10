@@ -1,31 +1,14 @@
-/**
- * offlineSync.js
- *
- * Offline-first CRUD + auto-sync between SQLite (react-native-sqlite-storage)
- * and Supabase (Postgres). JavaScript (React Native).
- *
- * - Creates local SQLite tables matching the provided schemas (approximate mapping).
- * - Adds a `sync_queue` table to record pending operations.
- * - CRUD functions write to SQLite and enqueue operations.
- * - `syncWithSupabase()` processes the queue and pulls remote changes.
- *
- * NOTES:
- * - JSONB columns are stored locally as TEXT (JSON.stringify).
- * - UUIDs are generated locally with uuid v4.
- * - Conflict resolution: last-write-wins using `updated_at` timestamps.
- *
- * Usage: import functions below in your app. Call `init()` at app startup.
- */
-import SQLite from 'react-native-sqlite-storage';
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import supabase from './supabaseClient';
-import { schema } from './schema';
+// import { schema } from './schema';
+import { schema } from "../services/schema";
 import { generateObjectId } from './helpers';
 import DatabaseService from '../services/DatabaseService';
-
 import moment from 'moment-timezone';
 import SyncManager from '../services/SyncManager';
+import SupabaseService from '../services/SupabaseService';
 
 // Enable debug (optional for development)
 // SQLite.DEBUG(false);
@@ -75,312 +58,147 @@ export async function init(userId) {
   });
 }
 
-// ---------- UTIL ----------
-function ensureDB() {
-  if (!db) {
-    db = SQLite.openDatabase(
-      { name: DB_NAME, location: "default" },
-      async () => {  console.log("SQLite opened", DB_NAME);},
-      (err) => console.error("SQLite open error", err)
-    );
-  }
-  return db;
-}
-
-
-
-
-/**
- * runSql: wrapper to execute SQL and return a Promise with the result
- * ensures db is opened and handles errors consistently.
- */
-export function runSql (sql, params = [])  {
-    let database = ensureDB();
-  return new Promise((resolve, reject) => {
-    database.transaction(
-      (tx) => {
-        tx.executeSql(
-          sql,
-          params,
-          (_, res) => resolve(res),
-          (_, err) => {
-            console.error("SQL ERROR", sql, params, err);
-            // returning false here would rollback the transaction; we reject to bubble up
-            reject(err);
-            return false;
-          }
-        );
-      },
-      (txErr) => {
-        // transaction error
-        console.error("Transaction error", txErr);
-        reject(txErr);
-      }
-    );
-  });
-};
-
-
-
-// // convert JS object to JSON string for JSONB columns
-// const toJsonText = (v) => (v === undefined || v === null ? null : JSON.stringify(v));
-// const parseJsonText = (v) => {
-//   try {
-//     return v === null || v === undefined ? null : JSON.parse(v);
-//   } catch {
-//     return null;
-//   }
-// };
 
 export const fetchUser = async (email) => {
-  // let db = await getDB();
-
-
   try {
-    // Fetch main user from Supabase
+    // Try Supabase first when online
     const { data, error } = await supabase
       .from('users')
       .select('*')
       .eq('email', email)
-      .single();
+      // .single();
+
+
+
 
     if (error) throw error;
 
     let populatedUplines = [];
 
-    if (data.uplines?.length) {
+    if (data[0]?.uplines?.length) {
       // Fetch all uplines as user objects
       const { data: uplineData, error: uplineError } = await supabase
         .from('users')
         .select('*')
-        .in('id', data.uplines);
+        .in('id', data[0]?.uplines);
 
       if (uplineError) throw uplineError;
-
       populatedUplines = uplineData || [];
     }
 
-    const userWithUplines = { ...data, uplines: populatedUplines };
+    const userWithUplines = { ...data[0], uplines: populatedUplines };
+
+  console.log(userWithUplines, 'HELLO WORLD', populatedUplines, data[0]?.uplines)
 
 
+
+    // Save to local SQLite for offline access
+    // await saveUserToLocal(userWithUplines);
 
     return userWithUplines;
   } catch (err) {
     console.log('Supabase fetchUser error, falling back to local', err);
+    
+    // Fallback to SQLite using DatabaseService
+    return await fetchUserFromLocal(email);
+  }
+};
 
-    // Fallback to SQLite
-    return new Promise(resolve => {
-      db.transaction(tx => {
-        tx.executeSql(
-          `SELECT * FROM users WHERE email = ?`,
-          [email],
-          async (_, { rows }) => {
-            if (!rows.length) return resolve(null);
 
-            const user = rows._array[0];
+export const saveUserToLocal = async (user) => {
+  try {
+    // Normalize user data for SQLite storage
+    const normalizedUser = normalizeForSQLite('users', user);
+    
+    // Prepare data for insertion/update
+    const columns = Object.keys(normalizedUser);
+    const placeholders = columns.map(() => '?').join(', ');
+    const values = columns.map(col => normalizedUser[col]);
 
-            // Parse uplines from JSON and fetch each locally
-            if (user.uplines) {
-              const uplineIds = JSON.parse(user.uplines);
-              if (uplineIds.length) {
-                const placeholders = uplineIds.map(() => '?').join(',');
-                tx.executeSql(
-                  `SELECT * FROM users WHERE id IN (${placeholders})`,
-                  uplineIds,
-                  (_, { rows: uplineRows }) => {
-                    user.uplines = uplineRows._array;
-                    resolve(user);
-                  }
-                );
-              } else {
-                user.uplines = [];
-                resolve(user);
-              }
-            } else {
-              user.uplines = [];
-              resolve(user);
-            }
-          }
-        );
-      });
-    });
+    // Use INSERT OR REPLACE to handle both new and existing users
+    await DatabaseService.executeQuery(
+      `INSERT OR REPLACE INTO users (${columns.join(', ')}) VALUES (${placeholders})`,
+      values
+    );
+
+    console.log('✅ User saved to local database:', user.id);
+    
+    // Also save upline users if they exist
+    if (user.uplines?.length) {
+      await saveUsersToLocal(user.uplines);
+    }
+    
+    return user;
+  } catch (error) {
+    console.error('Error saving user to local database:', error);
+    throw error;
   }
 };
 
 export const saveLocalUser = async (user) => {
-            await api.createUser(user)
+            await saveUserToLocal(user)
 }
 
-// // get timestamp string in ISO format
-// const nowISO = () => moment().tz("Asia/Manila").toISOString();
+export const fetchUserFromLocal = async (email) => {
+  try {
+    // Fetch main user using DatabaseService
+    const result = await DatabaseService.executeQuery(
+      `SELECT * FROM users WHERE email = ? LIMIT 1`,
+      [email]
+    );
 
-// ---------- SCHEMA CREATION (SQLite) ----------
-// Note: SQLite types simplified. JSONB stored as TEXT.
-// created_at and updated_at stored as TEXT (ISO timestamp).
-async function createTablesIfNotExists() {
-  // users
-  await runSql(
-    `CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      first_name TEXT NOT NULL,
-      last_name TEXT NOT NULL,
-      role TEXT NOT NULL DEFAULT 'teller',
-      email TEXT NOT NULL,
-      password TEXT NOT NULL,
-      is_deleted INTEGER DEFAULT 0,
-      is_admin INTEGER DEFAULT 0,
-      address TEXT,
-      receipt_template TEXT,
-      commission TEXT,
-      mobile TEXT,
-      referral TEXT,
-      user_level INTEGER DEFAULT 0,
-      com_rate TEXT DEFAULT '0',
-      com_portion TEXT DEFAULT '0',
-      device_id TEXT,
-      user_id TEXT,
-      coordinates TEXT,
-      gross_today TEXT,
-      app_version TEXT,
-      last_summary TEXT,
-      configuration TEXT,
-      uplines TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );`
-  );
+    if (!result.rows || result.rows.length === 0) {
+      return null;
+    }
 
-  // draws
-  await runSql(
-    `CREATE TABLE IF NOT EXISTS draws (
-      id TEXT PRIMARY KEY,
-      game_type TEXT NOT NULL DEFAULT 'swertres',
-      game_time TEXT NOT NULL DEFAULT '2pm',
-      combination TEXT,
-      gross_total TEXT NOT NULL,
-      win_total TEXT,
-      net_total TEXT,
-      sold_out_total TEXT,
-      draw_date TEXT,
-      is_win_to INTEGER DEFAULT 0,
-      tip_url TEXT,
-      created_at TEXT,
-      updated_at TEXT
-    );`
-  );
+    const user = result.rows[0];
+    
+    // Parse JSON fields
+    user.configuration = parseJsonText(user.configuration);
+    user.uplines = parseJsonText(user.uplines);
 
-  // bettings
-  await runSql(
-    `CREATE TABLE IF NOT EXISTS bettings (
-      id TEXT PRIMARY KEY,
-      is_complete INTEGER DEFAULT 0,
-      is_deleted INTEGER DEFAULT 0,
-      is_validated TEXT,
-      timestamp TEXT,
-      input_type TEXT DEFAULT 'normal',
-      straight TEXT NOT NULL,
-      ramble TEXT NOT NULL,
-      gross TEXT NOT NULL,
-      net TEXT NOT NULL,
-      is_print INTEGER DEFAULT 0,
-      is_win_to INTEGER DEFAULT 0,
-      collector TEXT NOT NULL,
-      owner_id TEXT NOT NULL,
-      print_copy INTEGER,
-      draw_id TEXT,
-      user_id TEXT,
-      file_url TEXT,
-      note TEXT,
-      contact TEXT,
-      ticket_no TEXT,
-      winning TEXT,
-      game_time TEXT DEFAULT '2pm',
-      hits TEXT,
-      commissions TEXT,
-      combinations TEXT,
-      uplines TEXT,
-      created_at TEXT,
-      updated_at TEXT
-    );`
-  );
+    // Populate uplines if they exist
+    if (user.uplines?.length) {
+      const uplineUsers = await fetchUsersByIds(user.uplines);
+      user.uplines = uplineUsers;
+    } else {
+      user.uplines = [];
+    }
 
-  // master_combinations
-  await runSql(
-    `CREATE TABLE IF NOT EXISTS master_combinations (
-      id TEXT PRIMARY KEY,
-      digit TEXT NOT NULL,
-      straight_limit TEXT DEFAULT '0',
-      ramble_limit TEXT DEFAULT '0',
-      ramble_total TEXT DEFAULT '0',
-      straight_total TEXT DEFAULT '0',
-      is_win_to INTEGER DEFAULT 0,
-      risk_level TEXT DEFAULT 'neutral',
-      win_frequency INTEGER DEFAULT 0,
-      straight_max_limit TEXT DEFAULT '0',
-      ramble_max_limit TEXT DEFAULT '0',
-      created_at TEXT,
-      updated_at TEXT
-    );`
-  );
+    return user;
+  } catch (error) {
+    console.error('Error fetching user from local database:', error);
+    throw error;
+  }
+};
 
-//   // messages
-  await runSql(
-    `CREATE TABLE IF NOT EXISTS messages (
-      id TEXT PRIMARY KEY,
-      created_by TEXT,
-      recepient TEXT,
-      recepient_name TEXT,
-      conversations TEXT,
-      is_deleted INTEGER DEFAULT 0,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );`
-  );
+export const fetchUsersByIds = async (userIds) => {
+  if (!userIds || userIds.length === 0) {
+    return [];
+  }
 
-//   // cashflow
-  await runSql(
-    `CREATE TABLE IF NOT EXISTS cashflow (
-      id TEXT PRIMARY KEY,
-      amount TEXT DEFAULT '0',
-      description TEXT NOT NULL,
-      input_type TEXT NOT NULL,
-      is_deleted INTEGER DEFAULT 0,
-      owner TEXT NOT NULL,
-      owner_name TEXT,
-      user TEXT NOT NULL,
-      updated_by TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );`
-  );
+  try {
+    const placeholders = userIds.map(() => '?').join(',');
+    const result = await DatabaseService.executeQuery(
+      `SELECT * FROM users WHERE id IN (${placeholders})`,
+      userIds
+    );
 
-  // sync_queue: holds operations to push to Supabase
-  await runSql(
-    `CREATE TABLE IF NOT EXISTS sync_queue (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      op TEXT NOT NULL, -- 'insert'|'update'|'delete'
-      table_name TEXT NOT NULL,
-      row_id TEXT NOT NULL,
-      payload TEXT, -- JSON text of changed row (for insert/update)
-      created_at TEXT NOT NULL
-    );`
-  );
+    if (!result.rows) {
+      return [];
+    }
 
-  // local metadata: we use AsyncStorage for lastPulledAt per table
-}
-
-
-async function fetchSyncQueue() {
-  const res = await DatabaseService.executeQuery(`SELECT * FROM sync_queue ORDER BY id ASC;`);
-  const rows = [];
-  
-  for (let i = 0; i < res.rows.length; i++) rows.push(res.rows.item(i));
-  return rows;
-}
-
-async function removeQueueItem(id) {
-  await DatabaseService.executeQuery(`DELETE FROM sync_queue WHERE id = ?;`, [id]);
-}
+    // Parse JSON fields for each user
+    return result.rows.map(user => ({
+      ...user,
+      configuration: parseJsonText(user.configuration),
+      uplines: parseJsonText(user.uplines)
+    }));
+  } catch (error) {
+    console.error('Error fetching users by IDs:', error);
+    return [];
+  }
+};
 
 // ✅ Converts JSON fields before storing into SQLite (TEXT)
 export function toJsonText(obj) {
@@ -408,35 +226,34 @@ export function nowISO() {
 
 // ✅ Normalize row from SQLite -> JS object for Supabase
 
-// ✅ normalize single value
-export function normalizeValue(type, value, target = "supabase") {
-  if (value === null || value === undefined) return null;
+// // ✅ normalize single value
+// export function normalizeValue(type, value, target = "supabase") {
+//   if (value === null || value === undefined) return null;
 
-  switch (type) {
-    case "boolean":
-      return target === "sqlite" ? (value ? 1 : 0) : Boolean(value);
+//   switch (type) {
+//     case "boolean":
+//       return target === "sqlite" ? (value ? 1 : 0) : Boolean(value);
 
-    case "json":
-      return target === "sqlite"
-        ? JSON.stringify(value ?? [])
-        : typeof value === "string"
-          ? JSON.parse(value)
-          : value;
+//     case "json":
+//       return target === "sqlite"
+//         ? JSON.stringify(value ?? [])
+//         : typeof value === "string"
+//           ? JSON.parse(value)
+//           : value;
 
-    case "integer":
-      return Number(value);
+//     case "integer":
+//       return Number(value);
 
-    case "timestamp":
-      return new Date(value).toISOString();
+//     case "timestamp":
+//       return new Date(value).toISOString();
 
-    case "uuid":
-    case "text":
-    default:
-      return String(value);
-  }
-}
+//     case "uuid":
+//     case "text":
+//     default:
+//       return String(value);
+//   }
+// }
 
-// ✅ Normalize row for Supabase (from SQLite)
 export function normalizeForSupabase(table, row) {
   const tableSchema = schema[table];
   if (!tableSchema) throw new Error(`Unknown table: ${table}`);
@@ -453,52 +270,171 @@ export function normalizeForSupabase(table, row) {
   return normalized;
 }
 
-// ✅ Normalize row for SQLite (from Supabase)
+// // ✅ Normalize row for SQLite (from Supabase)
+// export function normalizeForSQLite(table, remoteRow) {
+//   const tableSchema = schema[table];
+//   if (!tableSchema) throw new Error(`Unknown table: ${table}`);
+
+//   const normalized = {};
+//   for (const col in tableSchema) {
+//     normalized[col] = normalizeValue(tableSchema[col], remoteRow[col], "sqlite");
+//   }
+
+//   // timestamps fallback
+//   normalized.created_at = normalized.created_at || moment().tz("Asia/Manila").toISOString();
+//   normalized.updated_at = normalized.updated_at || moment().tz("Asia/Manila").toISOString();
+//   return normalized;
+// }
+
+
+// Enhanced normalization with validation
 export function normalizeForSQLite(table, remoteRow) {
+  if (!remoteRow) {
+    console.error(`❌ Cannot normalize null/undefined row for ${table}`);
+    return {};
+  }
+
   const tableSchema = schema[table];
-  if (!tableSchema) throw new Error(`Unknown table: ${table}`);
+  if (!tableSchema) {
+    console.error(`❌ Unknown table schema: ${table}`);
+    return remoteRow; // Return as-is if no schema
+  }
 
   const normalized = {};
   for (const col in tableSchema) {
-    normalized[col] = normalizeValue(tableSchema[col], remoteRow[col], "sqlite");
+    try {
+      normalized[col] = normalizeValue(tableSchema[col], remoteRow[col], "sqlite");
+    } catch (error) {
+      console.warn(`⚠️ Normalization error for ${table}.${col}:`, error);
+      normalized[col] = remoteRow[col]; // Fallback to original value
+    }
   }
 
-  // timestamps fallback
-  normalized.created_at = normalized.created_at || moment().tz("Asia/Manila").toISOString();
-  normalized.updated_at = normalized.updated_at || moment().tz("Asia/Manila").toISOString();
+  // Ensure required fields
+  const manilaTime = moment().tz("Asia/Manila").toISOString();
+  normalized.created_at = normalized.created_at || remoteRow.created_at || manilaTime;
+  normalized.updated_at = normalized.updated_at || remoteRow.updated_at || manilaTime;
+  
+  if (!normalized.id && remoteRow.id) {
+    normalized.id = remoteRow.id;
+  }
 
   return normalized;
 }
 
+// Enhanced value normalization with debugging
+export function normalizeValue(type, value, target = "supabase") {
+  // Log normalization for debugging
+  const shouldLog = false; // Set to true for debugging
+  
+  if (value === null || value === undefined) {
+    if (shouldLog) console.log(`🔄 Normalize ${type}: null/undefined -> null`);
+    return null;
+  }
+
+  let result;
+
+  switch (type) {
+    case "boolean":
+      result = target === "sqlite" ? (value ? 1 : 0) : Boolean(value);
+      if (shouldLog) console.log(`🔄 Normalize boolean: ${value} -> ${result}`);
+      break;
+
+    case "json":
+      if (target === "sqlite") {
+        result = JSON.stringify(value ?? []);
+        if (shouldLog) console.log(`🔄 Normalize json to sqlite:`, value, '->', result);
+      } else {
+        result = typeof value === "string" ? JSON.parse(value) : value;
+        if (shouldLog) console.log(`🔄 Normalize json from sqlite:`, value, '->', result);
+      }
+      break;
+
+    case "integer":
+      result = Number(value);
+      if (shouldLog) console.log(`🔄 Normalize integer: ${value} -> ${result}`);
+      break;
+
+    case "timestamp":
+      result = new Date(value).toISOString();
+      if (shouldLog) console.log(`🔄 Normalize timestamp: ${value} -> ${result}`);
+      break;
+
+    case "uuid":
+    case "text":
+    default:
+      result = String(value);
+      if (shouldLog) console.log(`🔄 Normalize text: ${value} -> ${result}`);
+      break;
+  }
+
+  return result;
+}
 
 
 // ---------- CRUD Helpers (local-first) ----------
 // Generic insert: expects record object with fields matching local column names
-async function localInsert(tableName, record) {
+async function localInsert(tableName, recordData) {
+
+      const id = `${tableName}_${Date.now()}`;
+      const manilaTime = SyncManager.getCurrentManilaTime(); // Use Manila time
+
+      // Remove any sync columns from the data being sent to Supabase
+      const { _status, _version, ...cleanRecordData } = recordData;
+      
+      const record = {
+        ...cleanRecordData,
+        // id,
+        created_at: manilaTime,
+        updated_at: manilaTime,
+      };
+
+      const columns = Object.keys(record);
+      const placeholders = columns.map(() => '?').join(', ');
+      const values = columns.map(col => DatabaseService.sanitizeValue(record[col]));
+
+      await DatabaseService.executeQuery(
+        `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`,
+        values
+      );
+
+
   // Generate id + timestamps if missing
-  const id = record.id || generateObjectId();
-  const createdAt = record.created_at || nowISO();
-  const updatedAt = nowISO();
+  // const id = record.id || generateObjectId();
+  // const createdAt = recordData.created_at || nowISO();
+  // const updatedAt = new Date().toISOString();
+  // const id =  recordData.id || generateObjectId();
 
-  record = { ...record, id, created_at: createdAt, updated_at: updatedAt };
+  // // record = { ...record, id, created_at: createdAt, updated_at: updatedAt };
 
-  // Normalize for SQLite based on schema
-  const normalized = normalizeForSQLite(tableName, record);
+  //     const { _status, _version, ...cleanRecordData } = recordData;
+      
+  //     const record = {
+  //       ...cleanRecordData,
+  //       created_at: createdAt,
+  //       updated_at: updatedAt,
+  //     };
 
-  // Build dynamic insert
-  const cols = Object.keys(normalized);
-  const placeholders = cols.map(() => '?').join(', ');
-  const values = cols.map((c) => normalized[c]);
 
-  const sql = `INSERT OR REPLACE INTO ${tableName} (${cols.join(', ')}) VALUES (${placeholders});`;
+  // // Normalize for SQLite based on schema
+  // const normalized = normalizeForSQLite(tableName, record);
 
-  await DatabaseService.executeQuery(sql, values);
+  // // Build dynamic insert
+  // const cols = Object.keys(normalized);
+  // const placeholders = cols.map(() => '?').join(', ');
+  // const values = cols.map((c) => normalized[c]);
+
+
+
+  // const sql = `INSERT OR REPLACE INTO ${tableName} (${cols.join(', ')}) VALUES (${placeholders});`;
+
+  // await DatabaseService.executeQuery(sql, values);
 
   // enqueue for sync (use normalized row so Supabase gets valid JSON)
-  await SyncManager.queueChange(tableName, 'insert', id, normalized);
+  await SyncManager.queueChange(tableName, 'INSERT', id, record);
 
   // Return freshly inserted row
-
+  // await SyncManager.pushLocalChanges();
   return record;
 }
 
@@ -506,8 +442,13 @@ async function localUpdate(tableName, id, patch) {
   // fetch existing
   const res = await DatabaseService.executeQuery(`SELECT * FROM ${tableName} WHERE id = ? LIMIT 1;`, [id]);
   if (res.rows.length === 0) throw new Error('Not found');
-  const existing = res.rows.item(0);
-  const updated = { ...existing, ...patch, updated_at: nowISO() };
+  
+  const existing = res.rows[0];
+  console.log(existing, 'EXISTIIINGG')
+  const cleanRecord = { ...existing, ...patch, updated_at: nowISO() };
+
+ const { _status, _version, ...updated } = cleanRecord;
+
 
   // JSON fields stringify
   if (tableName === 'users') {
@@ -530,10 +471,10 @@ async function localUpdate(tableName, id, patch) {
   const sql = `UPDATE ${tableName} SET ${setClause} WHERE id = ?;`;
   await DatabaseService.executeQuery(sql, values);
 
-  await SyncManager.queueChange(tableName, 'update',  id, updated);
+  await SyncManager.queueChange(tableName, 'UPDATE',  id, updated);
   
   
-  await pushQueueToSupabase();
+  // await pushQueueToSupabase();
   
   return updated;
 }
@@ -541,8 +482,8 @@ async function localUpdate(tableName, id, patch) {
 async function localDelete(tableName, id) {
   // For soft delete preference depends on table; we queue a delete operation and also remove local row
   await DatabaseService.executeQuery(`DELETE FROM ${tableName} WHERE id = ?;`, [id]);
-  await SyncManager.queueChange(tableName, 'delete',  id, null);
-  await pushQueueToSupabase();
+  await SyncManager.queueChange(tableName, 'DELETE',  id, null);
+  // await pushQueueToSupabase();
   
   return true;
 }
@@ -551,8 +492,9 @@ export async function localGet(tableName, id) {
   const res = await DatabaseService.executeQuery(`SELECT * FROM ${tableName} WHERE id = ? LIMIT 1;`, [id]);
   
   
+  console.log(res, 'GET RES LOCALLS', tableName)
   if (res.rows.length === 0) return null;
-  const row = res.rows.item(0);
+  const row = res.rows[0];
 
   // parse JSON fields
   if (tableName === 'users') {
@@ -618,7 +560,6 @@ async function localQuery(tableName, query = {}) {
   console.log(res, 'RESSSP', sql, values)
   for (let i = 0; i < res.rows.length; i++) {
     let row = res.rows[i];
-console.log(row?.hits, 'HITSSS')
     // parse JSON fields
     if (tableName === "users") {
       row.configuration = parseJsonText(row.configuration);
@@ -634,59 +575,20 @@ console.log(row?.hits, 'HITSSS')
 
     rows.push(row);
   }
+  
+  
+    if (SupabaseService.isConnected()) {
+      syncRemoteDataInBackground(tableName, 'query', query);
+    }
+  
   return rows;
 }
-
-
-
-// ---------- SYNC LOGIC ----------
 
 // push: process queue and apply to Supabase
 async function pushQueueToSupabase() {
 
-  const queue = await fetchSyncQueue();
-  for (const q of queue) {
-    try {
-      const { id: queueId, op, table_name: tableName, row_id: rowId, payload } = q;
-      // parse payload if exists
-      let payloadObj = payload ? JSON.parse(payload) : null;
+  await SyncManager.pushLocalChanges();
 
-      if (op === 'insert') {
-        // Insert to Supabase. If record exists remotely, we can use upsert (insert with on_conflict)
-        // supabase-js supports upsert via .upsert()
-        const insertPayload = normalizeForSupabase(tableName, payloadObj);
-        
-        
-          console.log(insertPayload, 'INSERTING PAYLOAD TO SUPABASE')
-        // Remove local-only fields if necessary
-        const { data, error } = await supabase.from(tableName).upsert(insertPayload, { onConflict: 'id' }).select().limit(1);
-        if (error) throw error;
-        // Remove queue entry
-        await removeQueueItem(queueId);
-      } else if (op === 'update') {
-                const updatePayload = normalizeForSupabase(tableName, payloadObj);
-          console.log(updatePayload, 'UPDATING PAYLOAD TO SUPABASE')
-
-        // Use update where id = rowId
-        const { data, error } = await supabase.from(tableName).update(updatePayload).eq('id', rowId);
-        
-        
-        if (error) throw error;
-        await removeQueueItem(queueId);
-      } else if (op === 'delete') {
-        
-        const { error } = await supabase.from(tableName).delete().eq('id', rowId);
-        if (error) {
-          // If not found or other errors, decide to remove or keep queue. We remove to avoid infinite loop.
-          console.warn('Delete error (ignored):', error);
-        }
-        await removeQueueItem(queueId);
-      }
-    } catch (err) {
-      console.warn('Failed to push queue item, will retry later', err);
-      // don't remove queue item - will retry next sync
-    }
-  }
 }
 
 // pull: fetch remote changes since lastPulledAt for each table and write to local
@@ -721,12 +623,13 @@ async function pullFromSupabase(userId) {
       const remoteIds = new Set(remoteData.map(r => r.id));
 
       // ✅ Step 4: sync Supabase rows into local
-      for (const remoteRow of remoteData) {
+      for (const remoteRowData of remoteData) {
+      let { _status, _version, ...remoteRow } = remoteRowData;
            remoteIds.add(remoteRow.id);
 
     // Handle deleted records
     if (remoteRow.is_deleted) {
-      await DatabaseService.executeQuery(`DELETE FROM ${tableName} WHERE id = ?`, [remoteRow.id]);
+      await DatabaseService.executeQuery(`DELETE FROM ${table} WHERE id = ?`, [remoteRow.id]);
       continue;
     }
 
@@ -734,6 +637,7 @@ async function pullFromSupabase(userId) {
     const local = await localGet(table, remoteRow.id);
     const remoteUpdatedAt = remoteRow.updated_at || nowISO();
     const localUpdatedAt = local ? local.updated_at || null : null;
+      console.log(table, remoteRow, 'INSERT OR REPLACE')
 
     if (!local) {
       // New record - insert
@@ -741,6 +645,7 @@ async function pullFromSupabase(userId) {
       await insertOrReplace(table, toInsert);
     } else if (!localUpdatedAt || remoteUpdatedAt > localUpdatedAt) {
       // Updated record - replace
+      console.log(table, toInsert, 'INSERT OR REPLACE')
       const toInsert = normalizeForSQLite(table, remoteRow);
       await insertOrReplace(table, toInsert);
     }
@@ -833,14 +738,6 @@ async function syncWithSupabase(id) {
   }
 };
 
-
-export const getDB = async () => {
-  let db = await SQLite.openDatabase({ name: "app.db", location: "default" });
-
-  if (!db) throw new Error("DB not initialized. Call initDB() first.");
-  return db;
-};
-
 // CRUD wrappers for each table (you can call these from your components)
 export const api = {
   // users
@@ -876,14 +773,14 @@ export const api = {
   updateMessage: async (id, patch) => localUpdate('messages', id, patch),
   deleteMessage: async (id) => localDelete('messages', id),
   getMessage: async (id) => localGet('messages', id),
-  listMessages: async () => localList('messages'),
+  listMessages: async (params) => localQuery('messages', params),
 
   // cashflow
   createCashflow: async (c) => localInsert('cashflow', { ...c }),
   updateCashflow: async (id, patch) => localUpdate('cashflow', id, patch),
   deleteCashflow: async (id) => localDelete('cashflow', id),
   getCashflow: async (id) => localGet('cashflow', id),
-  listCashflow: async () => localList('cashflow'),
+  listCashflow: async (params) => localQuery('cashflow', params),
 };
 
 export async function deleteDB(){
@@ -897,25 +794,6 @@ export async function deleteDB(){
 // Force sync manually
 export async function forceSync() {
   return await syncWithSupabase();
-};
-
-// Optionally: watch connectivity and auto-sync when network returns
-let unsubscribeNetInfo = null;
-export function startAutoSyncOnReconnect(id) {
-  if (unsubscribeNetInfo) return;
- /*  unsubscribeNetInfo = NetInfo.addEventListener((state) => {
-    if (state.isConnected) {
-      console.log('Device reconnected — running sync');
-      syncWithSupabase(id).catch((e) => console.warn('Auto sync failed', e));
-    }
-  }); */
-};
-
-export function stopAutoSyncOnReconnect(id) {
-  if (unsubscribeNetInfo) {
-    unsubscribeNetInfo();
-    unsubscribeNetInfo = null;
-  }
 };
 
 function buildWhereClause(filters = {}) {
@@ -995,7 +873,7 @@ export async function getAllLocalIds(table) {
   const ids = [];
   if (res && res.rows) {
     for (let i = 0; i < res.rows.length; i++) {
-      ids.push(res.rows.item(i).id);
+      ids.push(res.rows[i].id);
     }
   }
   return ids;
@@ -1021,6 +899,297 @@ export async function clearAllStorage() {
     console.error("❌ Failed to clear AsyncStorage", e);
   }
 };
+
+
+// // Bulk data processing
+const processBulkInsert = async (tableName, records) => {
+  if (records.length === 0) return 0;
+
+  const batchSize = 100;
+  let totalInserted = 0;
+
+  for (let i = 0; i < records.length; i += batchSize) {
+    const batch = records.slice(i, i + batchSize);
+    
+    const columns = Object.keys(normalizeForSQLite(tableName, batch[0]));
+    const placeholders = batch.map(() => `(${columns.map(() => '?').join(', ')})`).join(', ');
+    const values = batch.flatMap(record => {
+      const normalized = normalizeForSQLite(tableName, record);
+      return columns.map(col => normalized[col]);
+    });
+
+
+    await DatabaseService.executeQuery(
+      `INSERT OR REPLACE INTO ${tableName} (${columns.join(', ')}) VALUES ${placeholders}`,
+      values
+    );
+
+    totalInserted += batch.length;
+  }
+
+  console.log(`💾 Bulk inserted ${totalInserted} ${tableName} records`);
+  return totalInserted;
+};
+
+
+
+// Enhanced remote query with better error handling and progress tracking
+const fetchAllRemoteDataWithPagination = async (tableName, baseQuery, maxRecords = 50000) => {
+  const allData = [];
+  let page = 0;
+  const pageSize = 1000;
+  let hasMore = true;
+  let totalFetched = 0;
+
+  console.log(`🌐 Starting remote fetch for ${tableName}...`, baseQuery);
+
+  while (hasMore && allData.length < maxRecords) {
+    try {
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
+
+      console.log(`📄 Fetching ${tableName} page ${page + 1} (records ${from}-${to})...`);
+
+      const { data, error, count } = await baseQuery.range(from, to);
+      if (error) {
+        console.error(`ss❌ Error fetching ${tableName} page ${page + 1}:`, error, baseQuery, maxRecords);
+        
+        // If it's a rate limit error, wait and retry
+        if (error.code === 'PGRST204' || error.status === 429) {
+          console.log('⏳ Rate limit hit, waiting 2 seconds...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          continue;
+        }
+        break;
+      }
+
+      if (data && data.length > 0) {
+        allData.push(...data);
+        totalFetched += data.length;
+        
+        console.log(`✅ Page ${page + 1}: ${data.length} records (total: ${totalFetched})`);
+
+        if (data.length < pageSize) {
+          hasMore = false;
+          console.log(`🏁 Reached end of data for ${tableName}`);
+        } else {
+          page++;
+        }
+      } else {
+        hasMore = false;
+        console.log(`🏁 No more data for ${tableName}`);
+      }
+
+      // Rate limiting protection
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+    } catch (error) {
+      console.error(`❌ Unexpected error in ${tableName} bulk fetch:`, error);
+      break;
+    }
+  }
+
+  console.log(`✅ Fetched ${allData.length} ${tableName} records from remote`);
+  return allData;
+};
+
+// Enhanced background sync with transaction support
+const syncRemoteDataInBackground = async (tableName, operation, params = {}) => {
+  // Use requestAnimationFrame for better background execution
+  requestAnimationFrame(async () => {
+    try {
+      console.log(`🔄 Starting background sync for ${tableName} (${operation})...`);
+      
+
+      let query = supabase.from(tableName).select('*');
+      
+      // Apply filters for query operations
+    console.log(params.filters, 'PARAMS FILTERS');
+      if (operation === 'query' && params.filters) {
+        console.log(`🔍 Applying filters:`, params.filters);
+        Object.entries(params.filters).forEach(([key, filter]) => {
+          if (typeof filter !== "object" || !filter.op) {
+            // Simple equality filter
+            query = query.eq(key, filter);
+          } else {
+            switch (filter.op.toLowerCase()) {
+              case "=": 
+                query = query.eq(key, filter.value); 
+                break;
+              case "!=": 
+              case "<>": 
+                query = query.neq(key, filter.value); 
+                break;
+              case ">": 
+                query = query.gt(key, filter.value); 
+                break;
+              case ">=": 
+                query = query.gte(key, filter.value); 
+                break;
+              case "<": 
+                query = query.lt(key, filter.value); 
+                break;
+              case "<=": 
+                query = query.lte(key, filter.value); 
+                break;
+              case "like": 
+                query = query.like(key, `%${filter.value}%`); 
+                break;
+              case "ilike": 
+                query = query.ilike(key, `%${filter.value}%`); 
+                break;
+              case "in": 
+                if (Array.isArray(filter.value) && filter.value.length > 0) {
+                  query = query.in(key, filter.value);
+                } else {
+                  console.warn(`⚠️ Empty array provided for IN filter on ${key}`);
+                }
+                break;
+              case "not.in": 
+                if (Array.isArray(filter.value) && filter.value.length > 0) {
+                  query = query.not.in(key, filter.value);
+                }
+                break;
+              case "contains": 
+                  // Handle array contains - value should be one of the array elements
+               if (Array.isArray(filter.value)) {
+                query = query.filter(key, 'cs', JSON.stringify(filter.value));
+              } else {
+                query = query.filter(key, 'cs', JSON.stringify([filter.value]));
+              }
+              break;
+              case "contained": 
+                // Array is contained by column (opposite of contains)
+                query = query.containedBy(key, filter.value);
+                break;
+              case "overlap": 
+                // Arrays have overlapping elements
+                query = query.overlap(key, filter.value);
+                break;
+              case "between": 
+                if (filter.from !== undefined && filter.to !== undefined) {
+                  query = query.gte(key, filter.from).lte(key, filter.to);
+                } else {
+                  console.warn(`⚠️ Between filter requires 'from' and 'to' properties`);
+                }
+                break;
+              case "is": 
+                if (filter.value === null) {
+                  query = query.is(key, null);
+                } else if (filter.value === true || filter.value === false) {
+                  query = query.is(key, filter.value);
+                }
+                break;
+              case "is.not": 
+                if (filter.value === null) {
+                  query = query.not.is(key, null);
+                }
+                break;
+              case "textsearch": 
+                // Full text search
+                query = query.textSearch(key, filter.value);
+                break;
+              case "match": 
+                // Match against multiple fields
+                if (typeof filter.value === 'object') {
+                  Object.entries(filter.value).forEach(([field, value]) => {
+                    query = query.eq(field, value);
+                  });
+                }
+                break;
+              default:
+                console.warn(`⚠️ Unsupported filter operator: ${filter.op}`);
+            }
+          }
+        });
+      }
+      
+      // Apply ordering
+      if (params.orderBy) {
+        const [column, order] = params.orderBy.split(' ');
+        query = query.order(column, { ascending: order?.toLowerCase() === 'asc' });
+        console.log(`🔽 Applying order: ${column} ${order}`);
+      } else {
+        query = query.order('created_at', { ascending: false });
+      }
+
+      // Start a transaction for better performance
+      // await DatabaseService.executeQuery('BEGIN TRANSACTION');
+      
+      try {
+        if (operation === 'get' && params.id) {
+          console.log(`🎯 Fetching single record: ${params.id}`);
+          const { data, error } = await query.eq('id', params.id).single();
+          
+          if (error) {
+            console.error(`❌ Error fetching ${tableName} record ${params.id}:`, error);
+          } else if (data) {
+            const normalized = normalizeForSQLite(tableName, data);
+            const columns = Object.keys(normalized);
+            const placeholders = columns.map(() => '?').join(', ');
+            const values = columns.map(col => normalized[col]);
+            
+            await DatabaseService.executeQuery(
+              `INSERT OR REPLACE INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`,
+              values
+            );
+            console.log(`💾 Background updated ${tableName} record: ${params.id}`);
+          }
+        } else {
+          // For query/list operations
+          console.log(`📋 Fetching multiple records for ${tableName}...`);
+          const allData = await fetchAllRemoteDataWithPagination(
+            tableName, 
+            query, 
+            params.maxRecords || 10000
+          );
+          
+          console.log(`📥 Retrieved ${allData.length} records from Supabase for ${tableName}`);
+          
+          if (allData.length > 0) {
+            const insertedCount = await processBulkInsert(tableName, allData);
+            console.log(`💾 Background sync: ${insertedCount}/${allData.length} ${tableName} records saved locally`);
+          } else {
+            console.log(`ℹ️ No data found for ${tableName} with current filters`);
+          }
+        }
+        
+        // await DatabaseService.executeQuery('COMMIT');
+        console.log(`✅ Background sync completed for ${tableName}`);
+        
+      } catch (error) {
+        // await DatabaseService.executeQuery('ROLLBACK');
+        console.error(`❌ Transaction failed for ${tableName}:`, error);
+        throw error;
+      }
+      
+    } catch (error) {
+      console.error(`❌ Background sync failed for ${tableName}:`, error);
+    }
+  });
+};
+
+
+// Utility function to verify data was saved
+export const verifyLocalData = async (tableName, expectedCount) => {
+  try {
+    const result = await DatabaseService.executeQuery(`SELECT COUNT(*) as count FROM ${tableName}`);
+    const actualCount = result.rows[0]?.count || 0;
+    
+    console.log(`🔍 Verification: ${tableName} has ${actualCount} records (expected: ${expectedCount})`);
+    
+    if (expectedCount !== null && actualCount < expectedCount) {
+      console.warn(`⚠️ Data mismatch: Expected ${expectedCount}, found ${actualCount}`);
+    }
+    
+    return actualCount;
+  } catch (error) {
+    console.error(`❌ Error verifying ${tableName}:`, error);
+    return 0;
+  }
+};
+
+
 
 export async function fetchBettings({ includeAll, date, userNow, user }) {
   // Convert to Philippine timezone (always consistent with app)
@@ -1151,11 +1320,6 @@ export async function fetchWinningBettings({ date, user, includeAll = false }) {
   return rows;
 }
 
-
-/**
- * 1️⃣ Get current user
- * Realm: users.filtered('email == $0')
- */
 export async function getCurrentUser({ user, collector }) {
   const userNow = user?.email ? user.email : collector ? collector : "";
 
@@ -1192,6 +1356,9 @@ export async function getCoordinators({ authenticatedUser }) {
     },
   });
 }
+
+
+
 
 /**
  * 4️⃣ Get tellers (excluding authenticated user)

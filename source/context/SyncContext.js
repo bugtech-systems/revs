@@ -111,7 +111,8 @@ export const SyncProvider = ({ children, config = {} }) => {
   };
   
   const forceFullSync = async () => {
-  if (!isReady) throw new Error('Sync not ready');
+  if (!isReady) return console.log('Sync not ready');
+  
   await SyncManager.forceFullSync();
 };
 

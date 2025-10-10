@@ -3,13 +3,10 @@ import { View, Text, FlatList, StyleSheet } from 'react-native';
 import moment from 'moment-timezone';
 import { useSelector } from 'react-redux';
 import { COLORS } from '../constants';
-import { getBettingByTicketNo } from '../utils/offlineSync';
 import { formatNumberWithComma, getConfiguration } from '../utils/helpers';
-import { useOffline } from '../context/OfflineProvider';
-
+import { api } from '../utils/offlineSync';
 
 const ViewTicket = ({ route }) => {
-  const { api, dataVersion } = useOffline()
   const { user } = useSelector(({ user }) => user);
   const ticketDetails = JSON.parse(route.params); // data passed from WinningScreen
   const [betting, setBetting] = useState(null);

@@ -8,20 +8,16 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import Animated, { ZoomIn } from 'react-native-reanimated';
 import { formatNumber, getConfiguration, getDayRange } from '../../utils/helpers';
-import SQLite from 'react-native-sqlite-storage';
-import supabase from '../../utils/supabaseClient';
-// import { useOffline } from '../../context/OfflineProvider';
-import { useOfflineSync } from '../../context/OfflineSyncProvider';
-
+import { api } from '../../utils/offlineSync';
 
 const SummaryReport = ({ navigation }) => {
   const { collector, user, selectedUser } = useSelector(({ user }) => user);
-  const { api, dataVersion, bumpVersion } = useOfflineSync();
 
   const [includeAll, setIncludeAll] = useState(false);
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState(new Date());
   const [show, setShowDate] = useState(null);
+  const [rnd, setRnd] = useState(null);
 
   // const [user, setUser] = useState(null);
   const [items, setItems] = useState([]);
@@ -66,8 +62,8 @@ const SummaryReport = ({ navigation }) => {
     
       setItems(localBettings);
       // setLoading(false);
-
-  }, [startDate, endDate, includeAll, ownUser, dataVersion]);
+      setShowDate(null);
+  }, [startDate, endDate, includeAll, ownUser]);
 
   useEffect(() => {
     fetchItems();
@@ -95,7 +91,10 @@ const SummaryReport = ({ navigation }) => {
     }
   };
 
-  const showDatePicker = val => setShowDate(val);
+  const showDatePicker = val => {
+    setRnd(Math.random())
+    setShowDate(val);
+  }
 
   // Totals calculation
   const renderTotals = useCallback(() => {
@@ -154,7 +153,7 @@ const SummaryReport = ({ navigation }) => {
   }, [items]);
 
 
-console.log(com_rate, 'COMM RATE')
+console.log(com_rate, 'COMM RATE', show)
 
 
   return (
@@ -165,7 +164,7 @@ console.log(com_rate, 'COMM RATE')
           value={show === 'start' ? startDate : endDate}
           mode="date"
           display="calendar"
-          onChange={onChangeDate}
+          onChange={(event, selectedDate) => onChangeDate(event, selectedDate)}
           minimumDate={new Date(user?.last_summary)}
           maximumDate={new Date(moment().toDate())}
           negativeButton={{ label: "Cancel" }}

@@ -1,55 +1,75 @@
 import { Image, StyleSheet, Text, TouchableOpacity, View, ScrollView, Modal } from 'react-native';
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import icons from '../constants/icons';
 import moment from 'moment-timezone';
-import { realmContext } from '../RealmContext';
-import { useApp } from '@realm/react';
-import { Betting, Users } from '../Models';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
-import { formatNumber, getConfiguration } from '../utils/helpers';
+import { formatNumber, getConfiguration, getDayRange } from '../utils/helpers';
 import { COLORS, SIZES } from '../constants';
 import { SET_SUMMARIZED_USER } from '../redux/actions/types';
+import { api, fetchUser } from '../utils/offlineSync';
 
-const { useRealm, useQuery } = realmContext;
 
 const SummaryReportUser = ({ route, navigation }) => {
   const dispatch = useDispatch();
-  const { summarizedUser } = useSelector(({ user }) => user);
+  const { summarizedUser, selectedUser, user, collector } = useSelector(({ user }) => user);
   const [includeAll, setIncludeAll] = useState(true);
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState(new Date());
   const [show, setShowDate] = useState(null);
-
-  // Query user
-  const users = useQuery(Users, user =>
-    user.filtered('email == $0', summarizedUser), [summarizedUser]
-  );
-  const userObj = users[0];
+  const [items, setItems] = useState([]);
+  const [userObj, setUserObj] = useState(null);
+  
+  
+  // 
+  
 
   // Memoize config values
   const isWin200 = useMemo(() => getConfiguration(userObj, 'withWin200')?.isCheck, [userObj]);
   const win200Value = useMemo(() => getConfiguration(userObj, 'withWin200')?.value, [userObj]);
   const winStraightValue = useMemo(() => getConfiguration(userObj, 'winStraight')?.value, [userObj]);
-  const comRate = userObj?.comRate || 0;
+  const comRate = userObj?.com_rate || 0;
 
-  // Query bettings
-  const items = useQuery(Betting, data => {
-    let startOfDay = moment(startDate).startOf('day').toDate();
-    let endOfDay = moment(endDate).endOf('day').toDate();
-    let userNow = userObj ? userObj._id : "";
 
-    if (new Date(startOfDay) <= new Date(userObj?.lastSummary)) {
-      startOfDay = moment(userObj?.lastSummary).endOf('day').toDate();
-    }
 
+ const fetchItems = useCallback(async (item) => {
+    if (!item) return;
+    
+    const { start_of_day, end_of_day  } = getDayRange(startDate, endDate)
+    // Start and end of the day
+    
+  console.log(start_of_day, end_of_day, 'date range')
+    
+    let filters = {}
     if (includeAll) {
-      return data.filtered('ANY uplines == $0 && isDeleted == false && inputType == "normal" && timestamp >= $1 && timestamp < $2', String(userNow), startOfDay, endOfDay).sorted('timestamp', true);
-    } else {
-      return data.filtered('isDeleted == false && inputType == "normal" && timestamp >= $0 && timestamp < $1 && owner_id == $2', startOfDay, endOfDay, String(userNow)).sorted('timestamp', true);
-    }
+  filters = {
+    ...filters,
+    uplines: { op: "contains", value: item?.id },
+    timestamp: { op: "between", from: start_of_day, to: end_of_day },
+  };
+} else {
+  filters = {
+    ...filters,
+    owner_id: item?.id,
+    timestamp: { op: "between", from: start_of_day, to: end_of_day },
+  };
+}
+
+
+
+      let localBettings = await api.listBettings({
+        filters: filters,
+        orderBy: 'created_at DESC',
+        // limit: 20,
+      });
+
+    
+      setItems(localBettings);
+      // setLoading(false);
+
   }, [startDate, endDate, includeAll, userObj]);
+
 
   // Date picker logic
   const onChangeDate = (event, selectedDate) => {
@@ -91,22 +111,32 @@ const SummaryReportUser = ({ route, navigation }) => {
   // Totals calculation
   const totalGross = useMemo(() => items.reduce((n, { gross }) => n + gross, 0), [items]);
   const totalHits = useMemo(() => items.reduce((sum, item) => {
-    const winPrize = (isWin200 && item.isWinTo) ? win200Value : winStraightValue;
+    const winPrize = (isWin200 && item.is_win_to) ? win200Value : winStraightValue;
     return sum + (item.winning * winPrize);
   }, 0), [items, isWin200, win200Value, winStraightValue]);
   const totalComms = useMemo(() => items.reduce((total, bet) =>
     total + bet.commissions
-      .filter(coms => String(coms.referral) === String(userObj?._id))
+      .filter(coms => String(coms.referral) === String(userObj?.id))
       .reduce((n, { amount }) => n + amount, 0), 0), [items, userObj]);
   const genCommsTotal = useMemo(() => totalGross * (comRate / 100), [totalGross, comRate]);
   const totalNet = useMemo(() => totalGross - genCommsTotal, [totalGross, genCommsTotal]);
   const genTotal = useMemo(() => totalNet - totalHits, [totalNet, totalHits]);
 
   useEffect(() => {
+    if(summarizedUser){
+      (async () => {
+         let ownUser = await fetchUser(summarizedUser);
+         setUserObj(ownUser)
+         fetchItems(ownUser)
+      })()
+    }
     return () => {
       dispatch({ type: SET_SUMMARIZED_USER, payload: null });
     };
-  }, []);
+  }, [summarizedUser]);
+  
+  
+  
 
   return (
     <SafeAreaProvider style={styles.wrapper}>
@@ -141,7 +171,7 @@ const SummaryReportUser = ({ route, navigation }) => {
           mode="date"
           display="calendar"
           onChange={onChangeDate}
-          minimumDate={new Date(userObj?.lastSummary)}
+          minimumDate={new Date(userObj?.last_summary)}
           maximumDate={new Date(moment().toDate())}
           negativeButton={{ label: "Cancel" }}
           neutralButton={{ label: "Clear" }}
@@ -185,7 +215,7 @@ const SummaryReportUser = ({ route, navigation }) => {
                 .filter(coms => String(coms.referral) === String(userObj?._id))
                 .reduce((n, { amount }) => n + amount, 0), 0);
             const grandHits = bets.reduce((sum, item) => {
-              const winPrize = (isWin200 && item.isWinTo) ? win200Value : winStraightValue;
+              const winPrize = (isWin200 && item.is_win_to) ? win200Value : winStraightValue;
               return sum + (item.winning * winPrize);
             }, 0);
             const net = grandGross - grandHits - grandCommsTotal;
@@ -201,7 +231,7 @@ const SummaryReportUser = ({ route, navigation }) => {
                   .filter(coms => String(coms.referral) === String(userObj?._id))
                   .reduce((n, { amount }) => n + amount, 0), 0);
               const hits = combos.reduce((sum, data) => {
-                const winPrize = (isWin200 && data.isWinTo) ? win200Value : winStraightValue;
+                const winPrize = (isWin200 && data.is_win_to) ? win200Value : winStraightValue;
                 return sum + (data.winning * winPrize);
               }, 0);
               const netVal = gross - hits - commsTotal;

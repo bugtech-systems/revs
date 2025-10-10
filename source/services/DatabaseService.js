@@ -1,6 +1,7 @@
 // src/database/DatabaseService.js
 import SQLite from 'react-native-sqlite-storage';
 import { INITIAL_SCHEMA } from './schema.js';
+import supabase from '../utils/supabaseClient';
 
 class DatabaseService {
   constructor() {
@@ -8,7 +9,10 @@ class DatabaseService {
     this.isInitialized = false;
     this.transactionInProgress = false;
     this.initPromise = null;
-
+    
+    
+    
+    this.init();
   }
 
  init() {
@@ -20,7 +24,7 @@ class DatabaseService {
     this.initPromise = new Promise((resolve, reject) => {
       this.db = SQLite.openDatabase(
         {
-          name: 'leodev2.db',
+          name: 'leodev3.db',
           location: 'default',
         },
         () => {
@@ -118,6 +122,98 @@ class DatabaseService {
       );
     });
   }
+  
+  async fetchUser (email) {
+    // let db = await getDB();
+  
+  
+    try {
+      // Fetch main user from Supabase
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', email)
+        .single();
+  
+      if (error) throw error;
+  
+      let populatedUplines = [];
+  
+      if (data.uplines?.length) {
+        // Fetch all uplines as user objects
+        const { data: uplineData, error: uplineError } = await supabase
+          .from('users')
+          .select('*')
+          .in('id', data.uplines);
+  
+        if (uplineError) throw uplineError;
+  
+        populatedUplines = uplineData || [];
+      }
+  
+      const userWithUplines = { ...data, uplines: populatedUplines };
+  
+  
+  
+      return userWithUplines;
+    } catch (err) {
+      console.log('Supabase fetchUser error, falling back to local', err);
+  
+      // Fallback to SQLite
+      return new Promise(resolve => {
+        this.db.transaction(tx => {
+          tx.executeSql(
+            `SELECT * FROM users WHERE email = ?`,
+            [email],
+            async (_, { rows }) => {
+              if (!rows.length) return resolve(null);
+              
+              const rowsArr = [];
+            for (let i = 0; i < rows.length; i++) {
+              rowsArr.push(rows.item(i));
+            }
+              
+              
+              console.log(rowsArr, 'ROWSSS')
+              
+              const user = rowsArr[0];
+                // rows.push(results.rows.item());
+                console.log(user.configuration, 'USSSSSE')
+              // Parse uplines from JSON and fetch each locally
+              if (user.uplines) {
+                const uplineIds = JSON.parse(user.uplines);
+                if (uplineIds.length) {
+                  const placeholders = uplineIds.map(() => '?').join(',');
+                  tx.executeSql(
+                    `SELECT * FROM users WHERE id IN (${placeholders})`,
+                    uplineIds,
+                    (_, { rows: uplineRows }) => {
+                    const uplinesArr = [];
+                      for (let i = 0; i < uplineRows.length; i++) {
+                        uplinesArr.push(uplineRows.item(i));
+                      }
+                      
+                      user.uplines = uplinesArr;
+                      console.log(user.uplines, 'UPLINES')
+                      resolve(user);
+                    }
+                  );
+                } else {
+                  user.uplines = [];
+                  resolve(user);
+                }
+              } else {
+                user.uplines = [];
+                resolve(user);
+              }
+            }
+          );
+        });
+      });
+    }
+  };
+  
+  
 
   close() {
     if (this.db) {

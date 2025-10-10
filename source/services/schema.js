@@ -79,6 +79,7 @@ export const schema = {
     draw_date: "timestamp",
     is_win_to: "boolean",
     tip_url: "text",
+    is_deleted: "boolean",
     created_at: "timestamp",
     updated_at: "timestamp",
     // Sync columns
@@ -98,6 +99,7 @@ export const schema = {
     win_frequency: "integer",
     straight_max_limit: "numeric",
     ramble_max_limit: "numeric",
+    is_deleted: "boolean",
     created_at: "timestamp",
     updated_at: "timestamp",
     // Sync columns
@@ -240,6 +242,7 @@ CREATE TABLE IF NOT EXISTS draws (
   draw_date TIMESTAMP,
   is_win_to BOOLEAN DEFAULT 0,
   tip_url TEXT,
+  is_deleted BOOLEAN DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   _status TEXT DEFAULT 'synced',
@@ -259,6 +262,7 @@ CREATE TABLE IF NOT EXISTS master_combinations (
   win_frequency INTEGER DEFAULT 0,
   straight_max_limit NUMERIC DEFAULT 0,
   ramble_max_limit NUMERIC DEFAULT 0,
+  is_deleted BOOLEAN DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   _status TEXT DEFAULT 'synced',

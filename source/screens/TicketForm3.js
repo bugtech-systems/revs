@@ -51,9 +51,7 @@ export default function TicketForm3({ navigation, route }) {
   const [draws, setDraws] = useState([]);
   const [comb, setComb] = useState([]);
   const [combs, setCombs] = useState([]);
-  const [item, setItem] = useState();
 
-  let isWinTo = false;
   const current = new Date();
   const hoursNow = current.getHours();
   const minNow = current.getMinutes();

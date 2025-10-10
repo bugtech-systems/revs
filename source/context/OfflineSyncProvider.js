@@ -250,8 +250,8 @@ const localInsert = async (tableName, recordData) => {
   
 //   return fullRecord;
 
-
-     const id = `${tableName}_${Date.now()}`;
+        // id: 
+     const id = `${tableName}_${generateObjectId()}_${Date.now()}`;
 
       const manilaTime = SyncManager.getCurrentManilaTime(); // Use Manila time
 
@@ -259,27 +259,34 @@ const localInsert = async (tableName, recordData) => {
       const { _status, _version, ...cleanRecordData } = recordData;
       
       const record = {
-        ...cleanRecordData,
-        id: generateObjectId()
+        ...cleanRecordData,    
+        id,
+        created_at: manilaTime,
+        updated_at: manilaTime,
+        // id: generateObjectId()
       };
 
       const columns = Object.keys(record);
       const placeholders = columns.map(() => '?').join(', ');
       const values = columns.map(col => DatabaseService.sanitizeValue(record[col]));
 
-      await DatabaseService.executeQuery(
-        `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`,
-        values
-      );
+      // await DatabaseService.executeQuery(
+      //   `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`,
+      //   values
+      // );
 
       // Queue for sync - send clean data without sync columns
       if (syncReady) {
-        await queueChange(tableName, 'INSERT', id, cleanRecordData);
+        await queueChange(tableName, 'INSERT', id, record);
+      } else {
+        
       }
 
-           const result = await localGet(tableName, record.id)
+          // const result = await localGet(tableName, record.id)
+          
+          // console.log(result)
       // await SyncManager.pushLocalChanges();
-  console.log(result, "CREATED ??")
+  // console.log(result, "CREATED ??")
       // await loadData(); // Refresh data
       return record;
       
@@ -439,9 +446,9 @@ const fastResponseList = async (tableName, params = {}) => {
   const localData = await localList(tableName);
   
   // 2. If online, sync remote data in background
-  if (online && SupabaseService.isConnected()) {
-    syncRemoteDataInBackground(tableName, 'list', params);
-  }
+  // if (online && SupabaseService.isConnected()) {
+  //   syncRemoteDataInBackground(tableName, 'list', params);
+  // }
   
   return localData;
 };
@@ -458,25 +465,9 @@ const syncRemoteDataInBackground = async (tableName, operation, params = {}) => 
       
       // Apply filters for query operations
       if (operation === 'query' && params.filters) {
-        Object.entries(params.filters).forEach(([key, filter]) => {
-          if (typeof filter !== "object" || !filter.op) {
-            query = query.eq(key, filter);
-          } else {
-            switch (filter.op.toLowerCase()) {
-              case "=": query = query.eq(key, filter.value); break;
-              case "!=": query = query.neq(key, filter.value); break;
-              case ">": query = query.gt(key, filter.value); break;
-              case ">=": query = query.gte(key, filter.value); break;
-              case "<": query = query.lt(key, filter.value); break;
-              case "<=": query = query.lte(key, filter.value); break;
-              case "like": query = query.like(key, `%${filter.value}%`); break;
-              case "in": query = query.in(key, filter.value); break;
-              case "is": 
-                if (filter.value === null) query = query.is(key, null);
-                break;
-            }
-          }
-        });
+              //  buildWhereClause(params.filters);
+            const { whereSql, values } = buildWhereClause(params.filters);
+            
       }
       
       // Apply ordering

@@ -9,8 +9,7 @@ import moment from 'moment-timezone';
 import { COLORS, icons, SIZES } from '../constants';
 import Config from 'react-native-config';
 import { getConfiguration, getDayRange } from '../utils/helpers';
-import { useOffline } from '../context/OfflineProvider';
-
+import { api } from '../utils/offlineSync';
 
 
 
@@ -20,7 +19,6 @@ const { width, height } = Dimensions.get('window');
 
 
 const TipScreen = ({ navigation, route }) => {
-    const { api } = useOffline()
   const { resultDate } = route.params;
   const { collector, user, selectedUser } = useSelector(({ user }) => user);
   const [selectedImage, setSelectedImage] = useState(null)

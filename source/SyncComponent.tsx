@@ -1,17 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet, Button, TouchableOpacity } from 'react-native';
-import NetInfo from '@react-native-community/netinfo';
-import { PermissionsAndroid } from 'react-native';
-// import { useOfflineSync } from "./context/OfflineSyncProvider";
-import { useOffline } from "./context/OfflineProvider";
 import { useSync } from './context/SyncContext';
-// import {  forceFullResync } from './utils/batchPull';
 
 
 
 
 const SyncComponent = () => {
-  const {   online } = useOffline();
   const { forceFullSync, isReady, status, lastSync
   } = useSync();
   

@@ -5,7 +5,7 @@ import SupabaseService from './SupabaseService';
 import { SYNC_TABLES } from './schema';
 import { AppState } from 'react-native';
 import { syncConfig } from '../configs/syncConfig';
-
+import supabase from '../utils/supabaseClient';
 
 
 
@@ -39,6 +39,7 @@ class SyncManager {
       
       this.isInitialized = true;
       console.log('✅ SyncManager initialized');
+      this.sync();
     } catch (error) {
       console.error('❌ SyncManager initialization failed:', error);
       throw error;
@@ -262,7 +263,7 @@ async checkColumnExists(tableName, columnName) {
 async processSyncItem(item) {
   const { table_name, operation, record_id, data } = item;
   const recordData = data ? JSON.parse(data) : null;
-  const supabase = SupabaseService.getClient();
+  // const supabase = SupabaseService.getClient();
 
 
 console.log(recordData, 'RECORD DATA')
@@ -600,6 +601,8 @@ console.log(result, "RESULLT", item.id)
         if (typeof value === 'object') return JSON.stringify(value);
         return value;
       });
+
+console.log(placeholders, values, 'INSERT RECORDD')
 
       await DatabaseService.executeQuery(
         `INSERT INTO ${tableName} (${columns.join(', ')}) 

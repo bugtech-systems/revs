@@ -6,15 +6,17 @@ import { useSelector, useDispatch } from 'react-redux';
 import { COLORS, SIZES } from '../constants/theme';
 import icons from '../constants/icons';
 import { formatNumber, getConfiguration } from '../utils/helpers';
-import { useOffline } from '../context/OfflineProvider';
-import { useOfflineSync } from '../context/OfflineSyncProvider';
+// import { useOffline } from '../context/OfflineProvider';
+// import { useOfflineSync } from '../context/OfflineSyncProvider';
 
 import {
-  fetchUser,
+  fetchUser, api
 } from "../utils/offlineSync";
+import { useSync } from '../context/SyncContext';
 
 const Dashboard = ({ navigation }) => {
-  const { dataVersion, api } = useOfflineSync()
+//   const { dataVersion, api } = useOfflineSync()
+    const {  lastSync } = useSync();
   const { user, collector, selectedUser } = useSelector(({user}) => user);
 
   const [date, setDate] = useState(new Date());
@@ -313,7 +315,7 @@ let filters = {
 if (includeAll) {
   filters = {
     ...filters,
-    uplines: { op: "contains", value: selectedCollector.id },
+    uplines: { op: "contains", value: [selectedCollector.id] },
     timestamp: { op: "between", from: start_of_day, to: end_of_day },
   };
 } else {
@@ -354,7 +356,7 @@ if (includeAll) {
 
 
 	}
-  }, [date, includeAll, collector, dataVersion]);
+  }, [date, includeAll, collector, lastSync]);
 
 
 console.log(bettings.length, 'BETS', draws.length, date)
