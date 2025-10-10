@@ -2,19 +2,14 @@ import { SafeAreaView, StyleSheet, Text, TouchableOpacity, ScrollView, View } fr
 
 import React, { useCallback, useEffect, useState } from 'react'
 import { COLORS, SIZES } from '../constants/theme'
-import { realmContext } from '../RealmContext'
-import { useApp } from '@realm/react';
-import { Users } from '../Models'
 import { getConfiguration } from '../utils/helpers'
 import SelectDropdown from 'react-native-select-dropdown'
 import { useDispatch, useSelector } from 'react-redux'
 import LargeInput from '../components/LargeInput'
 import LinearGradient from 'react-native-linear-gradient'
-import { BSON } from 'realm'
 import { SET_LOADING, SET_USER_CONFIG, STOP_LOADING } from '../redux/actions/types'
 
 
-const { useRealm, useQuery } = realmContext;
 
 function getRandomNumber() {
   return Math.floor(Math.random() * 99) + 1;
@@ -22,25 +17,23 @@ function getRandomNumber() {
 
 const ViewUserForm = ({ route, navigation }) => {
   const userDetails = JSON.parse(route.params);
-  const { collector, userConfig } = useSelector(({ user }) => user);
+  const { collector, userConfig, user } = useSelector(({ user }) => user);
   const dispatch = useDispatch();
 
-  const realm = useRealm();
-  const app = useApp();
   const [values, setValues] = useState({
     type: 'Coordinator',
     deviceId: '',
     commission: '',
-    firstName: '',
-    lastName: '',
+    first_name: '',
+    last_name: '',
     mobile: '',
     address: '',
-    receiptTemplate: '',
+    receipt_template: '',
     // username: '',
     // password: userDetails.password,
     role: '',
     commission: '',
-    winStraight: '',
+    win_straight: '',
     win200: ''
   });
 
@@ -49,30 +42,14 @@ const ViewUserForm = ({ route, navigation }) => {
   // console.log(userConfig, "THE USER CAN BE CONFIG")
 
 
-  const users = useQuery(Users, users => {
-    return users.filtered(
-      'email == $0',
-      userDetails.email,
-    );
-  }, [userDetails]);
-
-  const currentUsers = useQuery(Users, users => {
-    return users.filtered(
-      'email == $0',
-      collector,
-    );
-  }, [collector]);
-
-
-
 
 
 
   const handleChanges = (prop) => (value) => {
-    // if (prop == 'firstName') {
+    // if (prop == 'first_name') {
 
     //   let val = String(value).split(' ')[0];
-    //   let coordName = String(users[0].firstName).split(' ')[0].toLowerCase().substring(0, 6);
+    //   let coordName = String(user.first_name).split(' ')[0].toLowerCase().substring(0, 6);
     //   let ownName = String(val).toLowerCase().substring(0, 6)
     //   let email = `${coordName}-${ownName}`
     //   setValues({ ...values, username: email, password: String(email).split('-').join('') + getRandomNumber(), email: email + '@collector.com', [prop]: value })
@@ -86,8 +63,8 @@ const ViewUserForm = ({ route, navigation }) => {
   }
 
   const handleConfiguration = (type) => {
-    let config = getConfiguration(users[0], type)
-    let oldConfigs = users[0].configuration;
+    let config = getConfiguration(user, type)
+    let oldConfigs = user.configuration;
     console.log(config);
     if (config.title) {
       oldConfigs
@@ -116,16 +93,16 @@ const ViewUserForm = ({ route, navigation }) => {
     console.log(values, "user to updateuser to updateuser to updateuser to updateuser to updateuser to update!")
     
     try {
-      if (userToUpdate) {
-        await realm.write(async () => {
-          userToUpdate.firstName = values?.firstName;
-          userToUpdate.lastName = values?.lastName;
-          userToUpdate.mobile = values?.mobile;
-          userToUpdate.address = values?.address;
-          userToUpdate.role = String(values?.type).toLowerCase();
-          userToUpdate.receiptTemplate = values.receiptTemplate;
-        })
-      }
+      // if (userToUpdate) {
+      //   await realm.write(async () => {
+      //     userToUpdate.first_name = values?.first_name;
+      //     userToUpdate.last_name = values?.last_name;
+      //     userToUpdate.mobile = values?.mobile;
+      //     userToUpdate.address = values?.address;
+      //     userToUpdate.role = String(values?.type).toLowerCase();
+      //     userToUpdate.receipt_template = values.receipt_template;
+      //   })
+      // }
     } catch (error) {
       console.log(error, 'Something went wrong.')
       return;
@@ -140,17 +117,17 @@ const ViewUserForm = ({ route, navigation }) => {
 
     setValues({
       ...values,
-      firstName: userDetails.firstName,
-      lastName: userDetails.lastName,
-      deviceId: userDetails?.deviceId,
+      first_name: userDetails.first_name,
+      last_name: userDetails.last_name,
+      device_id: userDetails?.device_id,
       mobile: userDetails.mobile,
       address: userDetails.address,
       username: String(userDetails.email).split('@')[0],
       password: userDetails.password,
       role: userDetails.role,
       commission: userDetails.commission,
-      receiptTemplate: userDetails?.receiptTemplate,
-      winStraight: getConfiguration(userDetails, 'winStraight')?.value,
+      receipt_template: userDetails?.receipt_template,
+      win_straight: getConfiguration(userDetails, 'winStraight')?.value,
       win200: getConfiguration(userDetails, 'withWin200')?.value
     })
 
@@ -159,9 +136,9 @@ const ViewUserForm = ({ route, navigation }) => {
 
   }, [userConfig])
 
-  let maxCom = users[0] ? users[0]?.comRate - 5 : 0;
-  let isWin200 = getConfiguration(users[0], 'withWin200');
-  let printHeader = getConfiguration(users[0], 'printHeader')
+  let maxCom = user ? user?.comRate - 5 : 0;
+  let isWin200 = getConfiguration(user, 'withWin200');
+  let printHeader = getConfiguration(user, 'printHeader')
 
   return (
     <SafeAreaView style={{ ...styles.wrapper }}>
@@ -180,8 +157,8 @@ const ViewUserForm = ({ route, navigation }) => {
           <LargeInput
             editable={true}
             label={'First name'}
-            onChangeText={handleChanges('firstName')}
-            value={values.firstName}
+            onChangeText={handleChanges('first_name')}
+            value={values.first_name}
             inputLength={'100%'}
           />
         </View>
@@ -190,8 +167,8 @@ const ViewUserForm = ({ route, navigation }) => {
           <LargeInput
             editable={true}
             label={'Last name'}
-            onChangeText={handleChanges('lastName')}
-            value={values.lastName}
+            onChangeText={handleChanges('last_name')}
+            value={values.last_name}
             inputLength={'100%'}
           />
         </View>
@@ -303,7 +280,7 @@ const ViewUserForm = ({ route, navigation }) => {
             editable={false}
             label={'Win Straight'}
             onChangeText={handleChanges('winStraight')}
-            value={values.winStraight ? values.winStraight : '0'}
+            value={values.win_straight ? values.win_straight : '0'}
             inputLength={'48%'}
           />
           <LargeInput
@@ -320,14 +297,14 @@ const ViewUserForm = ({ route, navigation }) => {
           <SelectDropdown
             data={[{ title: 'Samar' }, { title: 'Tacloban' }]}
             defaultValue={
-              values.receiptTemplate
-                ? { title: values.receiptTemplate } // If exists, set object with matching title
+              values.receipt_template
+                ? { title: values.receipt_template } // If exists, set object with matching title
                 : null // If no value, leave it null
             }
-            // data={values?.receiptTemplate}
+            // data={values?.receipt_template}
             // disabled={true}
             onSelect={(selectedItem, index) => {
-              setValues({ ...values, receiptTemplate: selectedItem.title })
+              setValues({ ...values, receipt_template: selectedItem.title })
               // Alert.alert(selectedItem, index)
             }}
             defaultValueByIndex={userDetails.role == 'coordinator' ? 0 : 1}
@@ -392,16 +369,16 @@ const ViewUserForm = ({ route, navigation }) => {
                 <TextInput
                   placeholder='Enter First Name'
                   placeholderTextColor={COLORS.gray800}
-                  value={userDetails.firstName}
-                  // onChangeText={handleChanges('firstName')}
+                  value={userDetails.first_name}
+                  // onChangeText={handleChanges('first_name')}
                   style={{ height: 40, paddingLeft: 10, width: '100%', borderWidth: 1, borderRadius: 6, borderColor: COLORS.white, marginTop: 4, backgroundColor: COLORS.white, elevation: 4, shadowRadius: SIZES.radius / 2 }}
                 />
               </View>
               <View style={styles.formControl}>
                 <Text style={{ color: COLORS.black }}>Last Name</Text>
                 <TextInput
-                  value={userDetails.lastName}
-                  // onChangeText={handleChanges('lastName')}
+                  value={userDetails.last_name}
+                  // onChangeText={handleChanges('last_name')}
                   placeholder='Enter Last Name'
                   placeholderTextColor={COLORS.gray800}
                   style={{ height: 40, paddingLeft: 10, width: '100%', borderWidth: 1, borderRadius: 6, borderColor: COLORS.white, marginTop: 4, backgroundColor: COLORS.white, elevation: 4, shadowRadius: SIZES.radius / 2 }}
@@ -491,19 +468,19 @@ const ViewUserForm = ({ route, navigation }) => {
                   <Text style={{ color: COLORS.black }}>Commission</Text>
                   <TextInput
                     value={String(userDetails.comRate)}
-                    placeholder={`Max. ${users[0]?.commission}%`}
+                    placeholder={`Max. ${user?.commission}%`}
                     placeholderTextColor={COLORS.gray800}
                     style={{ height: 40, paddingLeft: 10, width: '100%', borderWidth: 1, borderRadius: 6, borderColor: COLORS.gray600, marginTop: 4 }}
                   />
                 </View>
               </View>
-              {(currentUsers[0] && currentUsers[0].isAdmin) && (
+              {(currentuser && currentuser.isAdmin) && (
                 <>
                   <View style={{ marginTop: 10, display: 'flex', flexDirection: 'row', width: '100%', justifyContent: 'space-between' }}>
                     <View style={{ ...styles.formControl, width: '47%' }}>
                       <Text style={{ color: COLORS.black }}>Win Straight</Text>
                       <TextInput
-                        value={values.winStraight}
+                        value={values.win_straight}
                         disabled
                         placeholderTextColor={COLORS.gray800}
                         style={{ height: 40, paddingLeft: 10, width: '100%', borderWidth: 1, borderRadius: 6, borderColor: COLORS.gray600, marginTop: 4 }}

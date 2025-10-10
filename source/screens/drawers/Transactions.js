@@ -65,7 +65,7 @@ const Transactions = ({ navigation }) => {
   console.log(start_of_day, end_of_day, 'date range')
     
     let filters = {}
-    // filters.is_deleted = false;
+    filters.is_deleted = false;
     if (includeAll) {
   filters = {
     ...filters,

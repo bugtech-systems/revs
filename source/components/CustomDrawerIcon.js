@@ -10,6 +10,9 @@ const CustomDrawerIcon = ({ route, navigation, navType, headerTitle }) => {
   const [ownUser, setOwnUser] = useState(null);
   const [displayName, setDisplayName] = useState('');
 
+
+  console.log(collector, "SELECTED")
+
   // // Load local user first (offline-first)
   useEffect(() => {
     (async () => {

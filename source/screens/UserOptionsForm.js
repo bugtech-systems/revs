@@ -1,152 +1,205 @@
-import { SafeAreaView, StyleSheet, Switch, Text, View, Alert, ScrollView } from 'react-native'
 import React, { useEffect, useState } from 'react'
-import { realmContext } from '../RealmContext'
-import { useApp } from '@realm/react'
-import { getConfiguration } from '../utils/helpers'
-import { useDispatch, useSelector } from 'react-redux'
-import { SET_LOADING, STOP_LOADING } from '../redux/actions/types'
+import { SafeAreaView, StyleSheet, Switch, Text, View, ScrollView, Alert } from 'react-native'
+import { useSelector, useDispatch } from 'react-redux'
+import SQLite from 'react-native-sqlite-storage'
+import { SET_LOADING, SET_USER_CONFIG, STOP_LOADING } from '../redux/actions/types'
+import supabase from '../utils/supabaseClient'
 import { COLORS, SIZES } from '../constants'
 
-const { useRealm } = realmContext
+// 🔹 Default configuration template
+const DEFAULT_CONFIG = [
+  { title: 'ticketForm', label: 'Ticket Form', description: 'This will allow the user to Create Bettings', isCheck: false },
+  { title: 'printHeader', label: 'Print Header', description: 'This enables users to display a header logo on receipts', isCheck: false },
+  { title: 'soldouts', label: 'Sold Outs', description: 'This will allow the user to Generate Sold-out Tickets', isCheck: false },
+  { title: 'updateTickets', label: 'Update Tickets', description: 'This allows for modifications to user-created tickets.', isCheck: false },
+  { title: 'hasMaxLimit', label: 'Max Limit', description: 'Set maximum betting thresholds for straight and ramble.', isCheck: false },
+  { title: 'uploadTip', label: 'Tip Uploader', description: 'This allows the user to provide a tip by uploading an image.', isCheck: false },
+  { title: 'analytics', label: 'Analytics', description: 'Show Combinations Analytics.', isCheck: false },
+  { title: 'dataAnalytics', label: 'Permutation Sets', description: 'Enables the user to access the Combinations Screen.', isCheck: false },
+  { title: 'showAllData', label: 'Show All Switch', description: 'Toggle to reveal downline records in Transactions and Winnings.', isCheck: false },
+  { title: 'mapUsers', label: 'Map Users', description: 'Provide access to Location Tracking for users.', isCheck: false },
+  { title: 'coordinators', label: 'Coordinators', description: 'Provide access to the Coordinators Summary Report.', isCheck: false },
+  { title: 'tellers', label: 'Tellers', description: 'Provide access to the Tellers Summary Report.', isCheck: false },
+  { title: 'withWin200', label: 'With Win200', description: 'Enable WINTO tickets.', isCheck: false },
+  { title: 'appUsers', label: 'Show Application Users', description: 'Grant access for all Users.', isCheck: false },
+  { title: 'lastSummaryReport', label: 'Last Summary Report', description: 'Allows configuration of a user’s latest summary report.', isCheck: false },
+  { title: 'cashFlow', label: 'Cash Flow', description: 'Enable viewing of Cash Flow reports.', isCheck: false },
+]
 
-function getRandomNumber() {
-  return Math.floor(Math.random() * 99) + 1
-}
+const db = SQLite.openDatabase({ name: 'app.db', location: 'default' })
 
-const UserOptionsForm = ({ route, navigation }) => {
-  const { selectedUser, user, configuration, userConfig } = useSelector(({ user }) => user)
+const UserOptionsForm = () => {
   const dispatch = useDispatch()
-  const realm = useRealm()
-  const app = useApp()
+  const { userConfig } = useSelector(({ user }) => user)
+  const [mergedConfig, setMergedConfig] = useState([])
 
-  // Local state for switches
-  const [switchStates, setSwitchStates] = useState({})
-
-  // Sync state with realm config when userConfig changes
+  // 🔹 Merge Supabase or SQLite configuration with defaults
   useEffect(() => {
     if (userConfig?.configuration) {
-      const updatedStates: Record<string, boolean> = {}
-      userConfig.configuration.forEach(cfg => {
-        updatedStates[cfg.title] = cfg.isCheck
-      })
-      setSwitchStates(updatedStates)
+      const userConfigMap = Object.fromEntries(
+        userConfig.configuration.map(cfg => [cfg.title, cfg])
+      )
+      const merged = DEFAULT_CONFIG.map(def => ({
+        ...def,
+        ...(userConfigMap[def.title] || {}),
+      }))
+      setMergedConfig(merged)
+    } else {
+      setMergedConfig(DEFAULT_CONFIG)
     }
   }, [userConfig])
 
-  // const handleConfiguration = (type: string) => {
-  //   dispatch({ type: SET_LOADING })
+  // 🔹 Toggle Configuration Handler
+  const handleConfiguration = async (type) => {
+    dispatch({ type: SET_LOADING })
 
-  //   let config = getConfiguration(userConfig, type)
-  //   let oldConfigs = userConfig?.configuration
+    try {
+      const configIndex = mergedConfig.findIndex(c => c.title === type)
+      const oldConfigs = [...mergedConfig]
+      const updatedConfig = { ...oldConfigs[configIndex], isCheck: !oldConfigs[configIndex].isCheck }
+      oldConfigs[configIndex] = updatedConfig
 
-  //   if (config?.title) {
-  //     realm.write(() => {
-  //       oldConfigs[config.index].isCheck = !config.isCheck
-  //     })
-  //     setSwitchStates(prev => ({ ...prev, [type]: !config.isCheck }))
-  //   } else {
-  //     realm.write(() => {
-  //       oldConfigs.push({
-  //         title: type,
-  //         isCheck: true,
-  //       })
-  //     })
-  //     setSwitchStates(prev => ({ ...prev, [type]: true }))
-  //   }
+      // 🔹 Update local SQLite
+      await updateLocalConfig(userConfig._id, type, updatedConfig.isCheck)
 
-  //   dispatch({ type: STOP_LOADING })
-  // }
+      // 🔹 Update remote Supabase
+      await updateSupabaseConfig(userConfig._id, oldConfigs)
 
-  const handleConfiguration = (type) => {
-  dispatch({ type: SET_LOADING });
+      // 🔹 Update Redux state
+      dispatch({
+        type: SET_USER_CONFIG,
+        payload: {
+          ...userConfig,
+          configuration: oldConfigs,
+        },
+      })
 
-  let configIndex = userConfig?.configuration?.findIndex(cfg => cfg.title === type);
-  let oldConfigs = userConfig?.configuration;
-
-  realm.write(() => {
-    if (configIndex !== -1) {
-      // Toggle the value
-      oldConfigs[configIndex].isCheck = !oldConfigs[configIndex].isCheck;
-    } else {
-      // Add new config if not exists
-      oldConfigs.push({
-        title: type,
-        isCheck: true,
-      });
+      setMergedConfig(oldConfigs)
+    } catch (error) {
+      console.error('Error updating configuration:', error)
+      Alert.alert('Error', 'Failed to update configuration.')
+    } finally {
+      dispatch({ type: STOP_LOADING })
     }
-  });
+  }
 
-  // Sync local state with Realm after write
-  const updatedStates = {};
-  oldConfigs.forEach(cfg => {
-    updatedStates[cfg.title] = cfg.isCheck;
-  });
-  setSwitchStates(updatedStates);
+  // 🔹 Update SQLite (Offline)
+  const updateLocalConfig = (userId, type, isCheck) => {
+    return new Promise((resolve, reject) => {
+      db.transaction(tx => {
+        tx.executeSql(
+          'CREATE TABLE IF NOT EXISTS user_config (user_id TEXT PRIMARY KEY, configuration TEXT)',
+          [],
+        )
+        tx.executeSql(
+          'SELECT configuration FROM user_config WHERE user_id = ?',
+          [userId],
+          (_, results) => {
+            if (results.rows.length > 0) {
+              const existing = JSON.parse(results.rows.item(0).configuration)
+              const updated = existing.map(cfg =>
+                cfg.title === type ? { ...cfg, isCheck } : cfg
+              )
+              tx.executeSql(
+                'UPDATE user_config SET configuration = ? WHERE user_id = ?',
+                [JSON.stringify(updated), userId],
+                () => resolve(),
+                (_, err) => reject(err)
+              )
+            } else {
+              const newConfig = DEFAULT_CONFIG.map(cfg =>
+                cfg.title === type ? { ...cfg, isCheck } : cfg
+              )
+              tx.executeSql(
+                'INSERT INTO user_config (user_id, configuration) VALUES (?, ?)',
+                [userId, JSON.stringify(newConfig)],
+                () => resolve(),
+                (_, err) => reject(err)
+              )
+            }
+          },
+        )
+      })
+    })
+  }
 
-  dispatch({ type: STOP_LOADING });
-};
+  // 🔹 Update Supabase (Online)
+  const updateSupabaseConfig = async (userId, configuration) => {
+    const { error } = await supabase
+      .from('user_configs')
+      .update({ configuration })
+      .eq('user_id', userId)
 
+    if (error) {
+      console.warn('Supabase update failed (will retry later):', error.message)
+    }
+  }
 
-  
-  
-  const renderToggle = (label: string, description: string, type: string) => (
-    <View style={{ ...styles.toggleRow, marginVertical: SIZES.padding }}>
-      <View style={{ flexGrow: 1, flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center' }}>
-        <Text style={styles.toggleText}>{label}</Text>
-        <Text style={{ color: COLORS.darkGray2, fontSize: 12, textAlign: 'left' }}>{description}</Text>
-      </View>
-      <Switch
-        trackColor={{ true: '#00ED64' }}
-        value={!!switchStates[type]}
-        onValueChange={() => {
-          if (realm.syncSession?.state !== 'active') {
-            Alert.alert(
-              'Switching subscriptions does not affect Realm data when the sync is offline.'
-            )
-          }
-          handleConfiguration(type)
-        }}
-      />
+  const renderToggle = (label, description, type, isEnabled) => (
+    <View key={type} style={{ ...styles.toggleRow, marginVertical: SIZES.padding }}>
+      <View style={{ flexGrow: 1, flexDirection: 'row', borderWidth: 1, width: '100%' }}>
+				<View
+					style={{
+						flexDirection: 'column',
+						alignItems: 'flex-start',
+						justifyContent: 'flex-start',
+						width: '80%',
+						borderWidth: 1,
+					}}
+				>
+					<Text style={styles.toggleText}>{label}</Text>
+					<Text style={{ ...styles.toggleText, color: COLORS.darkGray2, fontSize: 12 }}>{description}</Text>
+				</View>
+				<View
+					style={{
+						width: '20%',
+						alignItems: 'center',
+						justifyContent: 'center'
+					}}
+				>
+					<Switch
+						trackColor={{ true: '#00ED64', false: COLORS.gray400 }}
+						thumbColor={!isEnabled ? '#f4f3f4' : '#00ED64'}
+						value={!!isEnabled}
+						onValueChange={() => handleConfiguration(type)}
+						style={{ alignSelf: 'flex-end',  }}
+						/>
+				</View>
+				</View>
     </View>
   )
 
+  if (!userConfig) return null
+
   return (
-    <SafeAreaView style={{ ...styles.wrapper, backgroundColor: COLORS.white }}>
+    <SafeAreaView style={[styles.wrapper, { backgroundColor: COLORS.white }]}>
       <ScrollView style={{ width: '100%' }}>
-        <View style={{ ...styles.paginationContainer, paddingHorizontal: 10 }}>
+        <View style={[styles.paginationContainer, { paddingHorizontal: 10 }]}>
           <View style={{ width: '100%', paddingVertical: 4, marginTop: 10 }}>
-            <Text style={{ textAlign: 'left', fontSize: 12, color: COLORS.primary, fontWeight: '500' }}>
-              Configurations
-            </Text>
+            <Text style={{ fontSize: 12, color: COLORS.primary, fontWeight: '500' }}>Configurations</Text>
           </View>
 
-          {renderToggle('Ticket Form', 'This will allow the user to Create Bettings', 'ticketForm')}
-          {renderToggle('Print Header', 'This enables users to display a header logo on receipts', 'printHeader')}
-          {renderToggle('Sold Outs', 'This will allow the user to Generate Sold-out Tickets', 'soldouts')}
-          {renderToggle('Update Tickets', 'This allows for modifications to user-created tickets.', 'updateTickets')}
-          {renderToggle('Max Limit', 'Set maximum betting thresholds for straight and ramble.', 'hasMaxLimit')}
-          {renderToggle('Tip Uploader', 'This allows the user to provide a tip by uploading an image.', 'uploadTip')}
+          {mergedConfig
+            .filter(cfg =>
+              ['ticketForm', 'printHeader', 'soldouts', 'updateTickets', 'hasMaxLimit', 'uploadTip'].includes(cfg.title)
+            )
+            .map(cfg => renderToggle(cfg.label, cfg.description, cfg.title, cfg.isCheck))}
 
           <View style={{ width: '100%', paddingVertical: 4, marginTop: 10 }}>
-            <Text style={{ textAlign: 'left', fontSize: 12, color: COLORS.primary, fontWeight: '500' }}>
-              View Access
-            </Text>
+            <Text style={{ fontSize: 12, color: COLORS.primary, fontWeight: '500' }}>View Access</Text>
           </View>
 
-          {renderToggle('Analytics', 'Show Combinations Analytics.', 'analytics')}
-          {renderToggle('Permutation Sets', 'Enables the user to access the Combinations Screen.', 'dataAnalytics')}
-          {renderToggle('Show All Switch', 'Toggle to reveal downline records in Transactions and Winnings.', 'showAllData')}
-          {renderToggle('Map Users', 'Provide access to Location Tracking for users.', 'mapUsers')}
-          {renderToggle('Coordinators', 'Provide access to the Coordinators Summary Report.', 'coordinators')}
-          {renderToggle('Tellers', 'Provide access to the Tellers Summary Report.', 'tellers')}
-          {renderToggle('With Win200', 'Enable WINTO tickets.', 'withWin200')}
-          {renderToggle('Show Application Users', 'Grant access for all Users.', 'appUsers')}
-          {renderToggle('Last Summary Report', 'Allows configuration of a user’s latest summary report.', 'lastSummaryReport')}
-
-          {userConfig?.role === 'coordinator' && userConfig?.is_admin &&
-            renderToggle('Cash Flow', 'Enable viewing of Cash Flow reports.', 'cashFlow')
-          }
+       
+          {mergedConfig
+            .filter(cfg =>
+              !['ticketForm', 'printHeader', 'soldouts', 'updateTickets', 'hasMaxLimit', 'uploadTip'].includes(cfg.title)
+            )
+            .map(cfg => {
+              if (cfg.title === 'cashFlow' && !(userConfig?.role === 'coordinator' && userConfig?.is_admin)) return null
+              return renderToggle(cfg.label, cfg.description, cfg.title, cfg.isCheck)
+            })}
         </View>
+ 
       </ScrollView>
     </SafeAreaView>
   )
@@ -157,19 +210,23 @@ export default UserOptionsForm
 const styles = StyleSheet.create({
   toggleRow: {
     flexDirection: 'row',
+    // justifyContent: 'space-between',
     alignItems: 'center',
+    paddingVertical: 10,
+    borderWidth: 1,
+		width: '100%',
     padding: 4,
   },
   toggleText: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.black,
+    fontWeight: '800',
+    color: COLORS.black900,
+    width: '80%',
   },
   wrapper: {
     flex: 1,
     alignItems: 'flex-start',
     justifyContent: 'flex-start',
-    width: '100%',
     backgroundColor: COLORS.gray300,
   },
   paginationContainer: {

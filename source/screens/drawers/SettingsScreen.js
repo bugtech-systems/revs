@@ -104,6 +104,7 @@ const SettingsScreen = ({ navigation }) => {
 
   const handleDoublePress = val => {
     dispatch({ type: SET_USER_CONFIG, payload: val });
+    dispatch({ type: SET_ACTIVE_USER, payload: val });
     navigation.navigate('View User', JSON.stringify(val));
   };
 
