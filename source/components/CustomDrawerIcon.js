@@ -21,8 +21,8 @@ const CustomDrawerIcon = ({ route, navigation, navType, headerTitle }) => {
           .from('users')
           .select('*')
           .eq('email', user?.email)
-          .single();
-        if (!error && data) localUser = data;
+          // .single();
+        if (!error && data) localUser = data[0];
       }
 
       if (localUser) {

@@ -876,7 +876,7 @@ export default function TicketForm({ navigation }) {
         let validDate = await updateDateTimeIfGreater();
         console.log(validDate, 'VALID DATE?')
         if (!validDate) {
-            Alert.alert('Set Timezone Properly!');
+            // Alert.alert('Set Timezone Properly!');
             return;
         }
     };

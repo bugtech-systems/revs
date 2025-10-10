@@ -309,7 +309,7 @@ const end_of_day = moment(new Date(date)).tz("Asia/Manila").endOf('day').toISOSt
 
 // Build filters
 let filters = {
-	
+	is_deleted: false
 };
 
 if (includeAll) {

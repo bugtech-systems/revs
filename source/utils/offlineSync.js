@@ -443,33 +443,37 @@ async function localUpdate(tableName, id, patch) {
   const res = await DatabaseService.executeQuery(`SELECT * FROM ${tableName} WHERE id = ? LIMIT 1;`, [id]);
   if (res.rows.length === 0) throw new Error('Not found');
   
-  const existing = res.rows[0];
-  console.log(existing, 'EXISTIIINGG')
-  const cleanRecord = { ...existing, ...patch, updated_at: nowISO() };
+  // const existing = res.rows[0];
+  const cleanRecord = { ...patch, updated_at: nowISO() };
 
  const { _status, _version, ...updated } = cleanRecord;
 
 
-  // JSON fields stringify
-  if (tableName === 'users') {
-    updated.configuration = toJsonText(parseJsonText(updated.configuration) ?? updated.configuration ?? []);
-    updated.uplines = toJsonText(parseJsonText(updated.uplines) ?? updated.uplines ?? []);
-  } else if (tableName === 'bettings') {
-    updated.hits = toJsonText(updated.hits ? parseJsonText(updated.hits) : null) || updated.hits;
-    updated.commissions = toJsonText(updated.commissions ? parseJsonText(updated.commissions) : null) || updated.commissions;
-    updated.combinations = toJsonText(updated.combinations ? parseJsonText(updated.combinations) : null) || updated.combinations;
-    updated.uplines = toJsonText(updated.uplines ? parseJsonText(updated.uplines) : null) || updated.uplines;
-  } else if (tableName === 'messages') {
-    updated.conversations = toJsonText(updated.conversations ? parseJsonText(updated.conversations) : []);
-  }
+  // // JSON fields stringify
+  // if (tableName === 'users') {
+  //   updated.configuration = toJsonText(parseJsonText(updated.configuration) ?? updated.configuration ?? []);
+  //   updated.uplines = toJsonText(parseJsonText(updated.uplines) ?? updated.uplines ?? []);
+  // } else if (tableName === 'bettings') {
+  //   updated.hits = toJsonText(updated.hits ? parseJsonText(updated.hits) : null) || updated.hits;
+  //   updated.commissions = toJsonText(updated.commissions ? parseJsonText(updated.commissions) : null) || updated.commissions;
+  //   updated.combinations = toJsonText(updated.combinations ? parseJsonText(updated.combinations) : null) || updated.combinations;
+  //   updated.uplines = toJsonText(updated.uplines ? parseJsonText(updated.uplines) : null) || updated.uplines;
+  // } else if (tableName === 'messages') {
+  //   updated.conversations = toJsonText(updated.conversations ? parseJsonText(updated.conversations) : []);
+  // }
+
 
   // build update SQL
-  const cols = Object.keys(updated).filter((c) => c !== 'id');
-  const setClause = cols.map((c) => `${c} = ?`).join(', ');
-  const values = cols.map((c) => updated[c]);
-  values.push(id);
-  const sql = `UPDATE ${tableName} SET ${setClause} WHERE id = ?;`;
-  await DatabaseService.executeQuery(sql, values);
+      const columns = Object.keys(updated);
+      const setClause = columns.map(col => `${col} = ?`).join(', ');
+      const values = columns.map(col => DatabaseService.sanitizeValue(updated[col]));
+
+
+    await DatabaseService.executeQuery(
+        `UPDATE ${tableName} SET ${setClause}, updated_at = ? WHERE id = ?`,
+        [...values, nowISO(), id]
+      );
+  // await DatabaseService.executeQuery(sql, values);
 
   await SyncManager.queueChange(tableName, 'UPDATE',  id, updated);
   

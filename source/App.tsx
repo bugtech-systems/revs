@@ -20,7 +20,6 @@ const LoadingIndicator = () => (
 
 export const App = () => {
   const dispatch = useDispatch();
-  // const { fetchUser,  saveLocalUser} = useOfflineSync();
   const [loading, setLoading] = useState(true);
     const { session } = useContext(SessionContext);
 
@@ -47,16 +46,11 @@ export const App = () => {
           .select('*')
           .eq('email', email) // filter by email
           .limit(1)
-          .single();
     console.log(data, 'DATAA USER')
         if (error) {
           console.error('Supabase fetch error:', error);
-        }
-  
-        if (data) {
-          // Save fetched user to local SQLite
-          await saveLocalUser(data);
-          localUser = data;
+        } else {
+           localUser = data[0]
         }
       }
   
@@ -67,7 +61,6 @@ export const App = () => {
       }
   
 
-  console.log('SET LOADING')
       setLoading(false);
       };
     
