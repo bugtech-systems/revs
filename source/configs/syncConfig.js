@@ -1,6 +1,6 @@
 // src/config/syncConfig.js
 export const syncConfig = {
-  syncInterval: 3 * 60 * 1000, // 2 minutes
+  syncInterval: 2 * 60 * 1000, // 2 minutes
   
   tables: {
     users: {
