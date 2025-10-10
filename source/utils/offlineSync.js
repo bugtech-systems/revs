@@ -376,7 +376,7 @@ export function normalizeValue(type, value, target = "supabase") {
 // Generic insert: expects record object with fields matching local column names
 async function localInsert(tableName, recordData) {
 
-      const id = `${tableName}_${Date.now()}`;
+      const id = recordData.id || generateObjectId();
       const manilaTime = SyncManager.getCurrentManilaTime(); // Use Manila time
 
       // Remove any sync columns from the data being sent to Supabase
@@ -384,7 +384,7 @@ async function localInsert(tableName, recordData) {
       
       const record = {
         ...cleanRecordData,
-        // id,
+        id,
         created_at: manilaTime,
         updated_at: manilaTime,
       };
@@ -434,7 +434,7 @@ async function localInsert(tableName, recordData) {
   await SyncManager.queueChange(tableName, 'INSERT', id, record);
 
   // Return freshly inserted row
-  await SyncManager.pushLocalChanges();
+  // await SyncManager.pushLocalChanges();
   return record;
 }
 

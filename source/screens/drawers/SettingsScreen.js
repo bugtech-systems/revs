@@ -30,7 +30,7 @@ import { api, clearAllStorage, deleteDB, forceSync } from '../../utils/offlineSy
 
 
 const SettingsScreen = ({ navigation }) => {
-  const { width, height } = Dimensions.get('window');
+  const { height } = Dimensions.get('window');
   const dispatch = useDispatch();
 
 
@@ -84,6 +84,7 @@ const SettingsScreen = ({ navigation }) => {
   const handleSelectCollector = val => {
     dispatch({ type: SET_COLLECTOR, payload: val.email });
     dispatch({ type: SET_ACTIVE_USER, payload: val });
+    console.log(val, 'COORDINATORSS')
     navigation.navigate('Dashboard', JSON.stringify({ user: val.email }));
   };
 
@@ -158,7 +159,7 @@ const SettingsScreen = ({ navigation }) => {
   const handleSetDefault = () => {
     const authenticatedEmail = user?.email;
     dispatch({ type: SET_COLLECTOR, payload: authenticatedEmail });
-    dispatch({ type: SET_ACTIVE_USER, payload: null });
+    dispatch({ type: SET_ACTIVE_USER, payload: user });
   };
 
   const selUser = user;
