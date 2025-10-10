@@ -4,7 +4,7 @@ export const syncConfig = {
   
   tables: {
     users: {
-      query: "is_deleted = false",
+      query: "",
       maxAge: 100, // hours (30 days)
       maxRecords: 1000,
       immediateSync: true,
@@ -13,7 +13,7 @@ export const syncConfig = {
       incrementalSync: true // Use incremental sync for better performance
     },
     bettings: {
-      query: "is_deleted = false",
+      query: "",
       maxAge: 100, // 7 days
       maxRecords: 25000,
       immediateSync: true,
