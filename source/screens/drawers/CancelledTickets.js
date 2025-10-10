@@ -13,9 +13,9 @@ import SQLite from 'react-native-sqlite-storage';
 import { COLORS, icons } from '../../constants';
 import { formatNumberWithComma, getConfiguration, getDayRange } from '../../utils/helpers';
 import supabase from '../../utils/supabaseClient';
-import { useOffline } from '../../context/OfflineProvider';
+// import { useOffline } from '../../context/OfflineProvider';
 import { Switch } from 'react-native';
-// import { api } from '../../utils/offlineSync';
+import { api } from '../../utils/offlineSync';
 
 // Open SQLite database
 const db = SQLite.openDatabase({ name: 'local.db', location: 'default' });
@@ -28,36 +28,62 @@ const drawTimes = [
 ];
 
 const CancelledTickets = ({ navigation }) => {
-  const { collector, selectedUser, user } = useSelector(({ user }) => user);
-  const { api, dataVersion, bumpVersion } = useOffline();
+  const { selectedUser, user } = useSelector(({ user }) => user);
+  // const { api, dataVersion, bumpVersion } = useOffline();
   const [date, setDate] = useState(new Date());
   const [show, setShowDate] = useState(false);
-  const [selectedTime, setSelectedTime] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredData, setFilteredData] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [filterTime, setFilterTime] = useState(drawTimes[0].name);
-  const [includeAll, setIncludeAll] = useState(false);
+  const [includeAll, setIncludeAll] = useState(true);
   const [loading, setLoading] = useState(false);
   const userNow = selectedUser ? selectedUser.id : user.id;
 
   // const { start_of_day, end_of_day  } = getDayRange(date);
 
 // Local timezone start and end of day (if you prefer local)
-function startOfDayLocal(dateInput) {
-  const d = new Date(dateInput);
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString();
-}
 
-function endOfDayLocal(dateInput) {
-  const d = new Date(dateInput);
-  d.setHours(23, 59, 59, 999);
-  return d.toISOString();
-}
 
   
+  const load = async () => {
+    console.log(date, 'LOOOADED')
+    const { start_of_day, end_of_day  } = getDayRange(date)
+    // Start and end of the day
+    
+  console.log(start_of_day, end_of_day, 'date range')
+    
+    let filters = {
+      is_deleted: true,
+      input_type: "normal"
+    }
+    // filters.is_deleted = false;
+    if (includeAll) {
+  filters = {
+    ...filters,
+    uplines: { op: "contains", value: [userNow] },
+    timestamp: { op: "between", from: start_of_day, to: end_of_day },
+  };
+} else {
+  filters = {
+    ...filters,
+    owner_id: userNow,
+    timestamp: { op: "between", from: start_of_day, to: end_of_day },
+  };
+}
 
+
+
+      let localBettings = await api.listBettings({
+        filters: {...filters, input_type: 'normal'},
+        orderBy: 'created_at DESC',
+        // limit: 20,
+      });
+
+    
+      setFilteredData(localBettings);
+      setLoading(false);
+    };
 
   // useEffect(() => {
   //   const load = async () => {
@@ -101,60 +127,22 @@ function endOfDayLocal(dateInput) {
   // }, [date, user, dataVersion]);
     
 
-      useEffect(() => {
-    const loadDeletedBets = async () => {
-      try {
-        setLoading(true);
-
-        // Determine current user
-        const userNow = selectedUser ? selectedUser : user;
-
-        // Compute day range using moment
-        // const { start_of_day, end_of_day } = getDayRange(date);
-        const from = startOfDayLocal(date);
-        const to = endOfDayLocal(date);
-
-        console.log('Fetching for user:', userNow?.id);
-        // console.log('Date Range:', start_of_day, end_of_day);
-
-        // Supabase query with filters
-        const { data, error } = await supabase
-          .from('bettings')
-          .select('*')
-          .eq('is_deleted', true)
-          .eq('owner_id', userNow?.id)
-          .gte('timestamp', from)
-          .lt('timestamp', to)
-          .order('created_at', { ascending: false });
-
-        if (error) {
-          console.error('Supabase error:', error.message);
-          return;
-        }
-
-        console.log('Fetched Bettings:', data);
-        setFilteredData(data || []);
-      } catch (err) {
-        console.error('Error loading bettings:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadDeletedBets();
-  }, [date, user, filterTime]);
+  useEffect(() => {
+  (async () => {
+     await load()
+  })()
+  }, [date, userNow, filterTime, includeAll]);
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
     setLoading(true);
     setTimeout(() => {
-      setRefreshing(false);
-      bumpVersion();
+      load()
+      // bumpVersion();
       setSearchQuery('');
       // setFilteredData(items)
       setLoading(false);
     setRefreshing(false);
-
     }, 2000);
   }, [date, userNow, includeAll]);
 
@@ -283,7 +271,7 @@ function endOfDayLocal(dateInput) {
 
   console.log(filteredData, "FILTERED")
 
-    let filteredList = filterTime == 'All Time' ? filteredData : filteredData.filter(a => a.gameTime == filterTime);
+    let filteredList = filterTime == 'All Time' ? filteredData : filteredData.filter(a => a.game_time == filterTime);
   filteredList = searchQuery ? filteredData.filter(a => String(a.ticket_no).includes(String(searchQuery))) : filteredList
   let totalGross = filteredList.reduce((n, { gross }) => n + gross, 0);
   

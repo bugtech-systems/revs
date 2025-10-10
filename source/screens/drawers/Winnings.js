@@ -231,7 +231,10 @@ const Winnings = ({ navigation }) => {
     const end_of_day = moment(new Date(date)).tz("Asia/Manila").endOf('day').toISOString();
     
     // Build filters
-    let filters = {};
+    let filters = {
+    	is_deleted: false,
+	    input_type: "normal"
+    };
     
     if (includeAll) {
       filters = {
@@ -355,7 +358,7 @@ const Winnings = ({ navigation }) => {
                         <Text style={{ fontWeight: 'bold', color: COLORS.black, fontSize: 16 }}>{formatNumberWithComma(totalWins)}</Text>
                     </View>
                 </View>
-                {(user && user.role !== 'teller' && getConfiguration(user, 'showAllData')?.isCheck) &&
+                {(user && (user.role !== 'teller' || getConfiguration(user, 'showAllData')?.isCheck)) &&
                     <View style={styles.toggleRow}>
                         <Switch
                             trackColor={{ true: '#00ED64' }}

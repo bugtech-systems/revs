@@ -15,13 +15,13 @@ import { api } from '../utils/offlineSync';
 
 
 const ReviewScreen = ({ route, navigation, onPress }) => {
+  const dispatch = useDispatch();
   const ticketDetails = JSON.parse(route.params);
   const [total, setTotal] = useState(0);
   const [game_time, setgame_time] = useState('')
   const [isPrint, setIsPrint] = useState(false);
   const [warningType, setWarningType] = useState('');
   const [disableDeleteButton, setDisableDeleteButton] = useState(false);
-  const dispatch = useDispatch();
   const { collector, user } = useSelector(({ user }) => user);
   const { warningModal, confirmationModal } = useSelector(({ ui }) => ui);
   const [confirmTicket, setConfirmTecket] = useState(null);
@@ -43,7 +43,7 @@ const ReviewScreen = ({ route, navigation, onPress }) => {
     }
   }
 
-  const handleCancelTicket = (ticket) => {
+  const handleCancelTicket = async (ticket) => {
 
     if (!user?.is_admin && !updateTickets) {
       setWarningType('unauthorize')
@@ -66,6 +66,9 @@ console.log(currentTime.isAfter(ticketExpiry), 'TICKET EXPIRE')
         dispatch({ type: OPEN_CONFIRMATION_MODAL, payload: 'ticket' });
       }
     }
+
+
+
   }
 
   const handleConfirmButton = useCallback(async (item) => {
@@ -73,14 +76,13 @@ console.log(currentTime.isAfter(ticketExpiry), 'TICKET EXPIRE')
     // const item = realm.objectForPrimaryKey(Betting, BSON.ObjectId(_id)); // search for a realm object with a primary key that is an objectId
 
     try {
-    console.log(item, 'ITEMM')
     
       if (item) {
         /* realm.write(() => {
           item.is_deleted = true;
         }); */
         setConfirmTecket(null);
-        await api.updateBetting(ticketDetails?.id, {is_deleted: true, updated_at: nowISO});
+        await api.updateBetting(ticketDetails?.id, {is_deleted: true });
         navigation.goBack();
       }
     } catch (error) {
@@ -89,11 +91,40 @@ console.log(currentTime.isAfter(ticketExpiry), 'TICKET EXPIRE')
     }
     dispatch({ type: CLOSE_CONFIRMATION_MODAL });
   }, [ticketDetails?.id])
+  
+   const handleRestore = useCallback(async (item) => {
+
+    // const item = realm.objectForPrimaryKey(Betting, BSON.ObjectId(_id)); // search for a realm object with a primary key that is an objectId
+      let localBetting = await api.getBetting(item);
+
+    try {
+    console.log(item, localBetting, 'ITEMM')
+    
+    
+    
+      if (item) {
+        /* realm.write(() => {
+          item.is_deleted = true;
+        }); */
+        setConfirmTecket(null);
+        await api.updateBetting(item, {is_deleted: false, updated_at: nowISO});
+        navigation.goBack();
+      }
+    } catch (error) {
+      console.log(error, `Something went wrong.`)
+      return
+    }
+    dispatch({ type: CLOSE_CONFIRMATION_MODAL });
+  }, [ticketDetails?.id])
+  
 
   const handleConfirmWarning = () => {
   
     dispatch({ type: CLOSE_WARNING_MODAL })
   }
+  
+  
+  
 
   const renderBet = ({ item }) => (
     <View style={styles.betRow}>
@@ -113,6 +144,8 @@ console.log(currentTime.isAfter(ticketExpiry), 'TICKET EXPIRE')
   }, [])
 
   let totalGross = ticketDetails.combinations.reduce((n, { amount }) => n + amount, 0);
+
+console.log(ticketDetails, 'TICKET INFO')
 
   return (
     <View style={styles.container}>
@@ -230,7 +263,7 @@ console.log(currentTime.isAfter(ticketExpiry), 'TICKET EXPIRE')
           </TouchableOpacity>
         }
         {ticketDetails.is_deleted ?
-          <TouchableOpacity activeOpacity={.6} disabled={true} onPress={() => handleCancelTicket(ticketDetails._id)} style={{ width: '30%', opacity: .5 }}>
+          <TouchableOpacity activeOpacity={.6} disabled={!user?.is_admin} onPress={() => handleRestore(ticketDetails.id)} style={{ width: '30%' }}>
             <LinearGradient colors={['#6ddc59', '#39ad4a', '#217735']} style={styles.linearGradientOk}>
               <Text style={styles.buttonTextOk}>
                 Restore

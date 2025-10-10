@@ -36,11 +36,14 @@ const SummaryReport = ({ navigation }) => {
     
   console.log(start_of_day, end_of_day, 'date range')
     
-    let filters = {}
+    let filters = {
+        	is_deleted: false,
+	        input_type: "normal"
+    }
     if (includeAll) {
   filters = {
     ...filters,
-    uplines: { op: "contains", value: ownUser },
+    uplines: { op: "contains", value: [ownUser] },
     timestamp: { op: "between", from: start_of_day, to: end_of_day },
   };
 } else {
@@ -63,7 +66,7 @@ const SummaryReport = ({ navigation }) => {
       setItems(localBettings);
       // setLoading(false);
       setShowDate(null);
-  }, [startDate, endDate, includeAll, ownUser]);
+  }, [startDate, endDate, includeAll, ownUser, rnd]);
 
   useEffect(() => {
     fetchItems();

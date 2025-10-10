@@ -434,7 +434,7 @@ async function localInsert(tableName, recordData) {
   await SyncManager.queueChange(tableName, 'INSERT', id, record);
 
   // Return freshly inserted row
-  // await SyncManager.pushLocalChanges();
+  await SyncManager.pushLocalChanges();
   return record;
 }
 
@@ -478,7 +478,7 @@ async function localUpdate(tableName, id, patch) {
   await SyncManager.queueChange(tableName, 'UPDATE',  id, updated);
   
   
-  // await pushQueueToSupabase();
+  await SyncManager.pushLocalChanges();
   
   return updated;
 }
@@ -493,6 +493,14 @@ async function localDelete(tableName, id) {
 }
 
 export async function localGet(tableName, id) {
+
+
+
+    if (SupabaseService.isConnected()) {
+      await syncRemoteDataInBackground(tableName, 'query', {filters: {id: id}});
+    }
+
+
   const res = await DatabaseService.executeQuery(`SELECT * FROM ${tableName} WHERE id = ? LIMIT 1;`, [id]);
   
   
@@ -512,6 +520,8 @@ export async function localGet(tableName, id) {
   } else if (tableName === 'messages') {
     row.conversations = parseJsonText(row.conversations);
   }
+
+
 
   return row;
 }

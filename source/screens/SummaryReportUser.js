@@ -13,13 +13,14 @@ import { api, fetchUser } from '../utils/offlineSync';
 
 const SummaryReportUser = ({ route, navigation }) => {
   const dispatch = useDispatch();
-  const { summarizedUser, selectedUser, user, collector } = useSelector(({ user }) => user);
+    const {collector} = JSON.parse(route.params); // data passed from WinningScreen
   const [includeAll, setIncludeAll] = useState(true);
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState(new Date());
   const [show, setShowDate] = useState(null);
   const [items, setItems] = useState([]);
   const [userObj, setUserObj] = useState(null);
+  const [rnd, setRnd] = useState(null);
   
   
   // 
@@ -41,11 +42,15 @@ const SummaryReportUser = ({ route, navigation }) => {
     
   console.log(start_of_day, end_of_day, 'date range')
     
-    let filters = {}
+    let filters = {
+    	is_deleted: false,
+	    input_type: "normal"
+    }
+    
     if (includeAll) {
   filters = {
     ...filters,
-    uplines: { op: "contains", value: item?.id },
+    uplines: { op: "contains", value: [item?.id] },
     timestamp: { op: "between", from: start_of_day, to: end_of_day },
   };
 } else {
@@ -56,6 +61,7 @@ const SummaryReportUser = ({ route, navigation }) => {
   };
 }
 
+console.log(filters, 'FILTERSS', item)
 
 
       let localBettings = await api.listBettings({
@@ -68,7 +74,7 @@ const SummaryReportUser = ({ route, navigation }) => {
       setItems(localBettings);
       // setLoading(false);
 
-  }, [startDate, endDate, includeAll, userObj]);
+  }, [startDate, endDate, includeAll, userObj, rnd]);
 
 
   // Date picker logic
@@ -93,8 +99,10 @@ const SummaryReportUser = ({ route, navigation }) => {
     }
   };
 
-  const showDatePicker = val => setShowDate(val);
-
+  const showDatePicker = val => {
+    setRnd(Math.random())
+    setShowDate(val);
+  }
   const groupArrays = useMemo(() => {
     const groups = items.reduce((acc, item) => {
       const date = moment(item.timestamp).format('YYYY-MM-DD');
@@ -106,7 +114,7 @@ const SummaryReportUser = ({ route, navigation }) => {
     return Object.keys(groups)
       .sort((a, b) => moment(b).valueOf() - moment(a).valueOf())
       .map(date => ({ date, bets: groups[date] }));
-  }, [items]);
+  }, [items, rnd]);
 
   // Totals calculation
   const totalGross = useMemo(() => items.reduce((n, { gross }) => n + gross, 0), [items]);
@@ -123,9 +131,9 @@ const SummaryReportUser = ({ route, navigation }) => {
   const genTotal = useMemo(() => totalNet - totalHits, [totalNet, totalHits]);
 
   useEffect(() => {
-    if(summarizedUser){
+    if(collector){
       (async () => {
-         let ownUser = await fetchUser(summarizedUser);
+         let ownUser = await fetchUser(collector);
          setUserObj(ownUser)
          fetchItems(ownUser)
       })()
@@ -133,9 +141,10 @@ const SummaryReportUser = ({ route, navigation }) => {
     return () => {
       dispatch({ type: SET_SUMMARIZED_USER, payload: null });
     };
-  }, [summarizedUser]);
+  }, [collector]);
   
   
+  console.log(startDate, endDate, 'DATING RANNGGE')
   
 
   return (
