@@ -65,12 +65,15 @@ const Transactions = ({ navigation }) => {
     
   console.log(start_of_day, end_of_day, 'date range')
     
-    let filters = {}
-    filters.is_deleted = false;
+    let filters = {
+    	is_deleted: false,
+	    input_type: "normal"
+    }
+    // filters.is_deleted = false;
     if (includeAll) {
   filters = {
     ...filters,
-    uplines: { op: "contains", value: userNow },
+    uplines: { op: "contains", value: [userNow] },
     timestamp: { op: "between", from: start_of_day, to: end_of_day },
   };
 } else {

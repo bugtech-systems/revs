@@ -133,7 +133,7 @@ const Dashboard = ({ navigation }) => {
 	let grossCards = grouped_bettings.map((a, index) => {
 			let { game_time, bettings, gross, hits, comm } = a;
 			let currentDraw = draws.filter(dr => dr.game_time == game_time)[0];
-			
+				console.log(a, 'BETTING')
 			let isWin200 = currentDraw?.is_win_to ? getConfiguration(selectedUser, 'withWin200')?.isCheck : false;
 			let winPrize = isWin200 ? getConfiguration(selectedUser, 'withWin200').value : getConfiguration(selectedUser, 'winStraight').value
 				
@@ -309,7 +309,8 @@ const end_of_day = moment(new Date(date)).tz("Asia/Manila").endOf('day').toISOSt
 
 // Build filters
 let filters = {
-	
+	is_deleted: false,
+	input_type: "normal"
 };
 
 if (includeAll) {

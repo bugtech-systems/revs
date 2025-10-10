@@ -61,7 +61,9 @@ export const getConfiguration = (user, type) => {
 
   let current = {}
 
-  configs.map((a, index) => {
+
+console.log(configs, 'CONFIGG')
+  configs?.map((a, index) => {
     if (a.title == type) {
       current = a;
       current.index = index;
