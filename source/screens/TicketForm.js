@@ -78,7 +78,7 @@ export default function TicketForm({ navigation }) {
     const [amountTarget, setAmountTarget] = useState('')
     const [amountRamble, setAmountRamble] = useState('')
     const [combinationString, setCombination] = useState('');
-    const [gameTime, setGameTime] = useState('2pm');
+    // const [gameTime, setGameTime] = useState('2pm');
     const [is2pmDisabled, setIs2pmDisabled] = useState(false);
     const [is5pmDisabled, setIs5pmDisabled] = useState(false);
     const [is9pmDisabled, setIs9pmDisabled] = useState(false);
@@ -330,19 +330,19 @@ export default function TicketForm({ navigation }) {
 
         if ((getGameTime == '2pm' || user?.is_admin)) {
             setSelectedTime('2pm')
-            setGameTime('2pm');
+            // setGameTime('2pm');
             setIs2pmDisabled(false);
             setIs5pmDisabled(false);
             setIs9pmDisabled(false);
         } else if (getGameTime == '5pm') {
             setSelectedTime('5pm')
-            setGameTime('5pm');
+            // setGameTime('5pm');
             setIs2pmDisabled(true);
             setIs5pmDisabled(false);
             setIs9pmDisabled(false);
         } else if (getGameTime == '9pm') {
             setSelectedTime('9pm')
-            setGameTime('9pm');
+            // setGameTime('9pm');
             setIs2pmDisabled(true);
             setIs5pmDisabled(true);
             setIs9pmDisabled(false);
@@ -351,7 +351,7 @@ export default function TicketForm({ navigation }) {
             setIs5pmDisabled(true);
             setIs9pmDisabled(true);
             setSelectedTime('')
-            setGameTime('');
+            // setGameTime('');
         }
     }
 
@@ -572,7 +572,7 @@ export default function TicketForm({ navigation }) {
                 let netTotal = gross - netComs;
 
 
-                let drawResult = draws.find(a => a.gameTime == gameTime);
+                // let drawResult = draws.find(a => a.gameTime == gameTime);
 
                 /* 		if(drawResult){
                             console.log(drawResult, 'DRAW RESULT')
@@ -586,9 +586,9 @@ export default function TicketForm({ navigation }) {
                             // realm.write(async () => {
                             //     selectedUser.coordinates = `${coords.latitude}|${coords.longitude}`;
                             // })
-                            // await api.updateUser(user?.id, {
-                            //     coordinates: `${coords.latitude}|${coords.longitude}`
-                            // })
+                            await api.updateUser(user?.id, {
+                                coordinates: `${coords.latitude}|${coords.longitude}`
+                            })
 
                         },
                         error => {
@@ -852,7 +852,7 @@ export default function TicketForm({ navigation }) {
             setIs2pmDisabled(false)
             setIs5pmDisabled(false)
             setIs9pmDisabled(false)
-            setGameTime('')
+            // setGameTime('')
             setSelectedTime('')
         clearInterval(interval);
         }

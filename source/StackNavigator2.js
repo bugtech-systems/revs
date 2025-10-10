@@ -270,6 +270,7 @@ export const StackNavigator = () => {
     				})
     				}
     			/>
+
           <Stack.Screen name="Messenger" component={Messenger}
             options={({ navigation }) => ({
               headerShown: false,
