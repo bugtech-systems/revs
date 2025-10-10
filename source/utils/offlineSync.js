@@ -88,7 +88,6 @@ export const fetchUser = async (email) => {
 
     const userWithUplines = { ...data[0], uplines: populatedUplines };
 
-  console.log(userWithUplines, 'HELLO WORLD', populatedUplines, data[0]?.uplines)
 
 
 

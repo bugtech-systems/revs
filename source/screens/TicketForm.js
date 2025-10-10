@@ -612,7 +612,7 @@ export default function TicketForm({ navigation }) {
                         is_win_to: false,
                         is_print: false,
                         is_deleted: false,
-                        timestamp: nowISO(),
+                        timestamp: moment(date).tz('Asia/Manila').toISOString(),
                         game_time: time,
                         print_copy: 0,
                         input_type: 'normal',
