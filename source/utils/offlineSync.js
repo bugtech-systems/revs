@@ -442,8 +442,7 @@ async function localUpdate(tableName, id, patch) {
   const res = await DatabaseService.executeQuery(`SELECT * FROM ${tableName} WHERE id = ? LIMIT 1;`, [id]);
   if (res.rows.length === 0) throw new Error('Not found');
   
-  // const existing = res.rows[0];
-  const cleanRecord = { ...patch, updated_at: nowISO() };
+  const cleanRecord = { ...patch, updated_at: new Date().toISOString() };
 
  const { _status, _version, ...updated } = cleanRecord;
 
@@ -479,7 +478,12 @@ async function localUpdate(tableName, id, patch) {
   
   await SyncManager.pushLocalChanges();
   
-  return updated;
+    const resp = await DatabaseService.executeQuery(`SELECT * FROM ${tableName} WHERE id = ? LIMIT 1;`, [id]);
+
+    const existing = resp.rows[0];
+let normalized = normalizeForSupabase(tableName, existing);
+  
+  return normalized;
 }
 
 async function localDelete(tableName, id) {

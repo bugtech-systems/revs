@@ -1,24 +1,24 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useContext } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StyleSheet, Text, View, Alert, TouchableOpacity, Image } from 'react-native';
 import { Input } from '@rneui/base';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import moment from 'moment-timezone';
 import { COLORS, icons } from './constants';
-import supabase  from './utils/supabaseClient'; // Your initialized Supabase client
-import {  fetchUser, api, forceSync } from './utils/offlineSync';
+import supabase from './utils/supabaseClient';
+import { fetchUser } from './utils/offlineSync';
 import { useSync } from './context/SyncContext';
+import { SessionContext } from './context/SessionContext';
 
 export function WelcomeView() {
-  const { forceFullSync, isReady, status, lastSync
-  } = useSync();
+  const { forceFullSync, isReady } = useSync();
+  const { setSession } = useContext(SessionContext);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [passwordHidden, setPasswordHidden] = useState(true);
 
-
-  // Sign in with Supabase
+  // Sign in with Supabase and store session + local user
   const signIn = useCallback(async () => {
     const fullEmail = String(email).trim() + '@collector.com';
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -28,15 +28,22 @@ export function WelcomeView() {
 
     if (error) throw error;
 
-    // Save user locally for offline-first
     if (data?.user?.email) {
-          let localUser = await fetchUser(data?.user?.email);
+      const localUser = await fetchUser(data.user.email);
+      console.log('Fetched local user:', localUser);
     }
-  }, [email, password]);
+
+    // Save session for persistence
+    if (data?.session) {
+      await AsyncStorage.setItem('supabase_session', JSON.stringify(data.session));
+      setSession(data.session);
+    }
+
+    return data;
+  }, [email, password, setSession]);
 
   const onPressSignIn = useCallback(async () => {
     setLoading(true);
-
     try {
       const currentDateTime = moment.tz('Asia/Manila').format('DD MM YYYY hh:mm:ss');
       const existingValue = await AsyncStorage.getItem('dateTimeNumber');
@@ -44,27 +51,24 @@ export function WelcomeView() {
       if (!existingValue) {
         await AsyncStorage.setItem('dateTimeNumber', currentDateTime);
         console.log('DateTime updated to:', currentDateTime);
-      } else {
-        console.log('Stored datetime:', existingValue);
       }
 
       await signIn();
       Alert.alert('Success', 'Logged in successfully!');
     } catch (error) {
-      console.log(error);
+      console.log('Login error:', error);
       Alert.alert('Failed to sign in', error?.message || 'Unknown error');
     } finally {
       setLoading(false);
     }
   }, [signIn]);
-  
-  useEffect(() => {
-  if(isReady){
-      forceFullSync();
-  }
-      console.log('FORCE FULL RESYNCE!')      
-  }, [isReady])
 
+  useEffect(() => {
+    if (isReady) {
+      forceFullSync();
+      console.log('FORCE FULL RESYNC!');
+    }
+  }, [isReady]);
 
   return (
     <SafeAreaProvider>

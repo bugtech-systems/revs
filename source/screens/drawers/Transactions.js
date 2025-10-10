@@ -55,7 +55,7 @@ const Transactions = ({ navigation }) => {
 
   
   
-  const updateTickets =  getConfiguration(selectedUser, 'updateTickets')?.isCheck;
+  const updateTickets =  getConfiguration(user, 'updateTickets')?.isCheck;
 
 
   const load = async () => {

@@ -1,63 +1,45 @@
-import React, { useEffect, useState } from "react";
-import { Provider } from "react-redux";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { store } from "./redux/store";
-import { App, LoadingIndicator } from "./App";
-import { WelcomeView } from "./WelcomeView";
-import supabase from "./utils/supabaseClient";
-import { SessionContext } from "./context/SessionContext";
-import { SyncProvider } from "./context/SyncContext";
-import { DataProvider } from "./context/DataContext";
-import { syncConfig } from "./configs/syncConfig";
-
+import React, { useEffect, useState } from 'react';
+import { Provider } from 'react-redux';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { store } from './redux/store';
+import { App, LoadingIndicator } from './App';
+import { WelcomeView } from './WelcomeView';
+import supabase from './utils/supabaseClient';
+import { SessionContext } from './context/SessionContext';
+import { SyncProvider } from './context/SyncContext';
+import { DataProvider } from './context/DataContext';
+import { syncConfig } from './configs/syncConfig';
 
 export const AppWrapper = () => {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Helper to clear session safely
   const clearSession = async () => {
     try {
-      await AsyncStorage.removeItem("supabase_session");
+      await AsyncStorage.removeItem('supabase_session');
       setSession(null);
+      await supabase.auth.signOut();
     } catch (err) {
-      console.error("Error clearing session:", err);
+      console.error('Error clearing session:', err);
     }
   };
 
-  // Load session from AsyncStorage or Supabase
   useEffect(() => {
     const loadSession = async () => {
       try {
-        const storedSession = await AsyncStorage.getItem("supabase_session");
+        const storedSession = await AsyncStorage.getItem('supabase_session');
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
-
-          // Check if session has expired
-          const isExpired =
-            !parsed?.expires_at || parsed.expires_at * 1000 < Date.now();
-
-          if (isExpired) {
-            console.log("Session expired — clearing storage.");
-            await clearSession();
-          } else {
             setSession(parsed);
-          }
         } else {
-          // Fallback to Supabase auth
           const { data } = await supabase.auth.getSession();
           if (data?.session) {
             setSession(data.session);
-            await AsyncStorage.setItem(
-              "supabase_session",
-              JSON.stringify(data.session)
-            );
-          } else {
-            await clearSession();
+            await AsyncStorage.setItem('supabase_session', JSON.stringify(data.session));
           }
         }
       } catch (err) {
-        console.error("Error loading stored session:", err);
+        console.error('Error loading session:', err);
         await clearSession();
       } finally {
         setLoading(false);
@@ -67,22 +49,16 @@ export const AppWrapper = () => {
     loadSession();
   }, []);
 
-  // Listen for Supabase auth state changes
   useEffect(() => {
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      async (_event, newSession) => {
-        if (newSession) {
-          await AsyncStorage.setItem(
-            "supabase_session",
-            JSON.stringify(newSession)
-          );
-          setSession(newSession);
-        } else {
-          console.log("No Supabase session — clearing storage.");
-          await clearSession();
-        }
+    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+      if (newSession) {
+        await AsyncStorage.setItem('supabase_session', JSON.stringify(newSession));
+        setSession(newSession);
+      } else {
+        console.log('Session cleared by Supabase event.');
+        await clearSession();
       }
-    );
+    });
 
     return () => {
       listener.subscription.unsubscribe();
@@ -93,7 +69,7 @@ export const AppWrapper = () => {
 
   return (
     <Provider store={store}>
-      <SessionContext.Provider value={{ session, setSession }}>
+      <SessionContext.Provider value={{ session, setSession, clearSession }}>
         <SyncProvider config={syncConfig}>
           <DataProvider>{session ? <App /> : <WelcomeView />}</DataProvider>
         </SyncProvider>
