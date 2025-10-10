@@ -154,7 +154,7 @@ const SettingsScreen = ({ navigation }) => {
       console.error('Error signing out:', err.message);
       Alert.alert('Logout Failed', err.message);
     }
-  }, [dispatch, navigation]);
+  }, [dispatch, navigation, user]);
 
 
   const handleSetDefault = () => {

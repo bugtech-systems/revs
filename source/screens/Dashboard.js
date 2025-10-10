@@ -16,7 +16,8 @@ import { useSync } from '../context/SyncContext';
 
 const Dashboard = ({ navigation }) => {
 //   const { dataVersion, api } = useOfflineSync()
-    const {  lastSync } = useSync();
+  
+  const {  lastSync } = useSync();
   const { user, collector, selectedUser } = useSelector(({user}) => user);
 
   const [date, setDate] = useState(new Date());
@@ -133,21 +134,19 @@ const Dashboard = ({ navigation }) => {
 	let grossCards = grouped_bettings.map((a, index) => {
 			let { game_time, bettings, gross, hits, comm } = a;
 			let currentDraw = draws.filter(dr => dr.game_time == game_time)[0];
-				console.log(a, 'BETTING')
-			let isWin200 = currentDraw?.is_win_to ? getConfiguration(selectedUser, 'withWin200')?.isCheck : false;
-			let winPrize = isWin200 ? getConfiguration(selectedUser, 'withWin200').value : getConfiguration(selectedUser, 'winStraight').value
+			let isWin200 = currentDraw?.is_win_to ? getConfiguration(own_user, 'withWin200')?.isCheck : false;
+			let winPrize = isWin200 ? getConfiguration(own_user, 'withWin200').value : getConfiguration(own_user, 'winStraight').value
 				
 			// grand_gross = Number(grand_gross) + Number(gross);
 			let commsTotal = 0
 			let genCommsTotal = 0;
 
 			for (let bet of bettings) {
-			console.log(bet?.commissions, 'COMMSS')
 				if(bet?.commissions){
-						commsTotal += bet?.commissions?.filter(coms => String(coms.referral) == String(selectedUser?.id)).reduce((n, { amount }) => n + amount, 0);
+						commsTotal += bet?.commissions?.filter(coms => String(coms.referral) == String(own_user?.id)).reduce((n, { amount }) => n + amount, 0);
 				}
 			}
-			genCommsTotal += gross * (user?.com_rate / 100);
+			genCommsTotal += gross * (own_user?.com_rate / 100);
 			let comms = commsTotal ? commsTotal : 0;
 			grand_comm = grand_comm + comms;
 			let winning = hits * winPrize;
@@ -288,7 +287,7 @@ const Dashboard = ({ navigation }) => {
   useEffect(() => {
     setOwnUser(selectedUser)
     request_notification_permission();
-  }, [selectedUser]);
+  }, [selectedUser, collector]);
   
   useEffect(() => {
   
@@ -357,10 +356,10 @@ if (includeAll) {
 
 
 	}
-  }, [date, includeAll, collector, lastSync]);
+  }, [date, includeAll, own_user, lastSync]);
 
 
-console.log(bettings.length, 'BETS', draws.length, date)
+console.log(bettings.length, 'BETS', draws.length, own_user?.email)
 
 
   return (

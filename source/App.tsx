@@ -12,7 +12,7 @@ import { SessionContext } from './context/SessionContext';
 // import { useOffline } from './context/OfflineProvider';
 import { fetchUser, saveLocalUser } from "./utils/offlineSync"
 
-const LoadingIndicator = () => (
+export const LoadingIndicator = () => (
   <View style={{ ...styles.activityContainer, backgroundColor: COLORS.transparentBlack7 }}>
     <Progress.CircleSnail color={['blue', 'yellow', 'red']} />
   </View>

@@ -22,10 +22,10 @@ const SummaryReport = ({ navigation }) => {
   // const [user, setUser] = useState(null);
   const [items, setItems] = useState([]);
   const ownUser = selectedUser?.id ? selectedUser?.id : user?.id
-  const isWin200 = useMemo(() => getConfiguration(user, 'withWin200')?.isCheck, [user]);
-  const win200Value = useMemo(() => getConfiguration(user, 'withWin200')?.value, [user]);
-  const winStraightValue = useMemo(() => getConfiguration(user, 'winStraight')?.value, [user]);
-  const com_rate = user?.com_rate || 0;
+  const isWin200 = useMemo(() => getConfiguration(user, 'withWin200')?.isCheck, [selectedUser]);
+  const win200Value = useMemo(() => getConfiguration(user, 'withWin200')?.value, [selectedUser]);
+  const winStraightValue = useMemo(() => getConfiguration(user, 'winStraight')?.value, [selectedUser]);
+  const com_rate = selectedUser?.com_rate || 0;
 
   // Fetch bettings from SQLite
   const fetchItems = useCallback(async () => {
@@ -66,7 +66,7 @@ const SummaryReport = ({ navigation }) => {
       setItems(localBettings);
       // setLoading(false);
       setShowDate(null);
-  }, [startDate, endDate, includeAll, ownUser, rnd]);
+  }, [startDate, endDate, includeAll, ownUser]);
 
   useEffect(() => {
     fetchItems();
@@ -95,8 +95,9 @@ const SummaryReport = ({ navigation }) => {
   };
 
   const showDatePicker = val => {
-    setRnd(Math.random())
     setShowDate(val);
+    setRnd(Math.random())
+    
   }
 
   // Totals calculation
@@ -140,7 +141,7 @@ const SummaryReport = ({ navigation }) => {
         </View>
       </View>
     );
-  }, [items, isWin200, win200Value, winStraightValue, user, com_rate]);
+  }, [items, isWin200, win200Value, winStraightValue, selectedUser, com_rate, rnd]);
 
   // Group bets by date and sort descending
   const groupArrays = useMemo(() => {
@@ -206,7 +207,7 @@ console.log(com_rate, 'COMM RATE', show)
           const grandCommsTotal = Number(grandGross) * Number(com_rate / 100);
           const grandComm = bets.reduce((total, bet) =>
             Number(total) + bet.commissions
-              .filter(coms => String(coms.referral) === String(user?._id))
+              .filter(coms => String(coms.referral) === String(selectedUser?.id))
               .reduce((n, { amount }) => Number(n) + Number(amount), 0), 0);
           const grandHits = bets.reduce((sum, item) => {
             const winPrize = (isWin200 && item.is_win_to) ? win200Value : winStraightValue;
@@ -221,7 +222,7 @@ console.log(com_rate, 'COMM RATE', show)
             const commsTotal = Number(gross) * Number(com_rate / 100);
             const comm = combos.reduce((total, bet) =>
               Number(total) + bet.commissions
-                .filter(coms => String(coms.referral) === String(user?.id))
+                .filter(coms => String(coms.referral) === String(selectedUser?.id))
                 .reduce((n, { amount }) => Number(n) + Number(amount), 0), 0);
             const hits = combos.reduce((sum, data) => {
               const winPrize = (isWin200 && data.is_win_to) ? win200Value : winStraightValue;

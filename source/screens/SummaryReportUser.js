@@ -114,7 +114,7 @@ console.log(filters, 'FILTERSS', item)
     return Object.keys(groups)
       .sort((a, b) => moment(b).valueOf() - moment(a).valueOf())
       .map(date => ({ date, bets: groups[date] }));
-  }, [items, rnd]);
+  }, [items, rnd, userObj]);
 
   // Totals calculation
   const totalGross = useMemo(() => items.reduce((n, { gross }) => n + gross, 0), [items]);
@@ -141,7 +141,7 @@ console.log(filters, 'FILTERSS', item)
     return () => {
       dispatch({ type: SET_SUMMARIZED_USER, payload: null });
     };
-  }, [collector]);
+  }, [collector, startDate, endDate]);
   
   
   console.log(startDate, endDate, 'DATING RANNGGE')
@@ -221,7 +221,7 @@ console.log(filters, 'FILTERSS', item)
             const grandCommsTotal = grandGross * (comRate / 100);
             const grandComm = bets.reduce((total, bet) =>
               total + bet.commissions
-                .filter(coms => String(coms.referral) === String(userObj?._id))
+                .filter(coms => String(coms.referral) === String(userObj?.id))
                 .reduce((n, { amount }) => n + amount, 0), 0);
             const grandHits = bets.reduce((sum, item) => {
               const winPrize = (isWin200 && item.is_win_to) ? win200Value : winStraightValue;
@@ -232,12 +232,12 @@ console.log(filters, 'FILTERSS', item)
             // Game time breakdown
             const gameTimes = ['2pm', '5pm', '9pm'];
             const gameStats = gameTimes.map(time => {
-              const combos = bets.filter(data => data.gameTime === time);
+              const combos = bets.filter(data => data.game_time === time);
               const gross = combos.reduce((n, { gross }) => n + gross, 0);
               const commsTotal = gross * (comRate / 100);
               const comm = combos.reduce((total, bet) =>
                 total + bet.commissions
-                  .filter(coms => String(coms.referral) === String(userObj?._id))
+                  .filter(coms => String(coms.referral) === String(userObj?.id))
                   .reduce((n, { amount }) => n + amount, 0), 0);
               const hits = combos.reduce((sum, data) => {
                 const winPrize = (isWin200 && data.is_win_to) ? win200Value : winStraightValue;

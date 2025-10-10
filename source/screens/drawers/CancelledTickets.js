@@ -277,6 +277,7 @@ const CancelledTickets = ({ navigation }) => {
   
   
   return (
+  <>
     <SafeAreaProvider style={styles.wrapper}>
       {renderHeader()}
       {renderSearchInput()}
@@ -302,7 +303,7 @@ const CancelledTickets = ({ navigation }) => {
             <Text style={{ fontWeight: 'bold', color: COLORS.black, fontSize: 16 }}>{formatNumberWithComma(totalGross)}</Text>
           </View>
           
-          {(selectedUser && selectedUser.role !== 'teller' && getConfiguration(selectedUser, 'showAllData')?.isCheck) &&
+          {(selectedUser && selectedUser?.role !== 'teller' && getConfiguration(selectedUser, 'showAllData')?.isCheck) &&
                     <View style={{ width: '30%', alignItems: 'flex-end', flexDirection: 'column' }}>
                       <View style={{ alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10}}>
                       <Text style={{ color: COLORS.black900, fontSize: 12, fontWeight: 'bold' }}>Show All</Text>
@@ -322,6 +323,7 @@ const CancelledTickets = ({ navigation }) => {
         </View>
       {renderTicketList(filteredList)}
     </SafeAreaProvider>
+    </>
   );
 };
 
