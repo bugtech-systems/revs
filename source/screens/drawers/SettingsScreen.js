@@ -27,27 +27,12 @@ import {
 import { getLocalUsers, saveLocalUsers } from '../../utils/db';
 import { useScreenSize, getConfiguration } from '../../utils/helpers';
 import { api, clearAllStorage, deleteDB, forceSync } from '../../utils/offlineSync';
-import { exportDatabase } from '../../utils/exportHelper';
-import useBatchedPull from '../../hooks/useBatchPulling';
 
 
 const SettingsScreen = ({ navigation }) => {
   const { width, height } = Dimensions.get('window');
   const dispatch = useDispatch();
-  const {
-    isPulling,
-    currentTable,
-    progress,
-    recordsProcessed,
-    error,
-    lastPull,
-    results,
-    pullFromSupabase,
-    pullTables,
-    fullResync,
-    abortPull,
-    resetPullState
-  } = useBatchedPull();
+
 
   const { user, collector } = useSelector(({ user }) => user);
   const { confirmationModal } = useSelector(({ ui }) => ui);

@@ -6,18 +6,17 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import moment from 'moment-timezone';
 import NetInfo from "@react-native-community/netinfo";
 // import { supabase } from '../../lib/supabaseClient'; // 🔹 your Supabase client
-import supabase from '../../utils/supabaseClient';
 import { COLORS, icons } from '../../constants';
-import { useOffline } from '../../context/OfflineProvider';
+import { api } from '../../utils/offlineSync';
 
 const CoordinatorsScreen = ({ navigation }) => {
   const dispatch = useDispatch();
-    const { api } = useOffline();
+    // const { api } = useOffline();
   const { collector, user, selectedUser } = useSelector(({ user }) => user);
 
   const [usersCoord, setUsersCoord] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const userNow = selectedUser ? selectedUser : collector;
+  const userNow = selectedUser ? selectedUser : user;
 
   const today = moment().tz('Asia/Manila').toDate();
 
@@ -99,14 +98,9 @@ const fetchCoordinators = async () => {
   // 🔹 Navigate to Messenger (check if a conversation already exists)
   const handleMessageNavigation = async (recepientId) => {
     try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('is_deleted', false)
-        .eq('recepient', recepientId)
-        .eq('created_by', user?.id);
-
-      if (error) throw error;
+    let data = await api.listMessages({
+          filters: {is_deleted: false, recepient: recepientId, created_by: userNow.id}
+       })
 
       if (data && data.length > 0) {
         navigation.navigate('Messenger', JSON.stringify(data[0].id));

@@ -36,9 +36,9 @@ import ViewSoldOuts from './screens/ViewSoldOuts';
 import TestPrinter2 from './screens/TestPrinter2';
 import TicketForm3 from './screens/TicketForm3';
 import Messenger from './screens/Messenger';
+import SummaryReportUser from './screens/SummaryReportUser';
 import ViewUserForm from './screens/ViewUserForm';
 import UserOptionsForm from './screens/UserOptionsForm';
-
 
 
 const Stack = createStackNavigator();
@@ -254,6 +254,23 @@ export const StackNavigator = () => {
             ),
           })}
           />
+          <Stack.Screen
+    				component={SummaryReportUser}
+    				name="UserSummaryReport"
+    				options={({ navigation }) => ({
+    					headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
+    					headerTitle: '',
+    					headerLeft: () => (
+    						<CustomDrawerIcon route={null} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'Summary Report'} />
+    					),
+    					headerRight: () => (
+    						<View style={{ paddingHorizontal: 16, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' }}>
+    							<SyncComponent />
+    						</View>
+    					),
+    				})
+    				}
+    			/>
           <Stack.Screen name="Messenger" component={Messenger}
             options={({ navigation }) => ({
               headerShown: false,

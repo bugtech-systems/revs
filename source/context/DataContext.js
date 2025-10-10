@@ -3,7 +3,6 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import DatabaseService from '../services/DatabaseService';
 import SyncManager from '../services/SyncManager';
 import { useSync } from './SyncContext';
-import moment from 'moment-timezone';
 
 const DataContext = createContext();
 
@@ -192,12 +191,144 @@ export const DataProvider = ({ children }) => {
       return result.rows;
     };
 
+
+// Enhanced API with fast response strategy
+const createFastResponseApi = (online) => ({
+  // users
+  createUser: async (user) => localInsert('users', { ...user }),
+  updateUser: async (id, patch) => localUpdate('users', id, patch),
+  deleteUser: async (id) => localDelete('users', id),
+  getUser: async (id) => fastResponseGet('users', id),
+  listUsers: async (params) => fastResponseQuery('users', params),
+
+  // draws
+  createDraw: async (draw) => localInsert('draws', { ...draw }),
+  updateDraw: async (id, patch) => localUpdate('draws', id, patch),
+  deleteDraw: async (id) => localDelete('draws', id),
+  getDraw: async (id) => fastResponseGet('draws', id),
+  listDraws: async (params) => fastResponseQuery('draws', params),
+
+  // bettings
+  createBetting: async (b) => localInsert('bettings', { ...b }),
+  updateBetting: async (id, patch) => localUpdate('bettings', id, patch),
+  deleteBetting: async (id) => localDelete('bettings', id),
+  getBetting: async (id) => fastResponseGet('bettings', id),
+  listBettings: async (params) => fastResponseQuery('bettings', params),
+
+  // master_combinations
+  createMasterCombination: async (m) => localInsert('master_combinations', { ...m }),
+  updateMasterCombination: async (id, patch) => localUpdate('master_combinations', id, patch),
+  deleteMasterCombination: async (id) => localDelete('master_combinations', id),
+  getMasterCombination: async (id) => fastResponseGet('master_combinations', id),
+  listMasterCombinations: async (params) => fastResponseQuery('master_combinations', params),
+
+  // messages
+  createMessage: async (m) => localInsert('messages', { ...m }),
+  updateMessage: async (id, patch) => localUpdate('messages', id, patch),
+  deleteMessage: async (id) => localDelete('messages', id),
+  getMessage: async (id) => fastResponseGet('messages', id),
+  listMessages: async (params) => fastResponseList('messages', params),
+
+  // cashflow
+  createCashflow: async (c) => localInsert('cashflow', { ...c }),
+  updateCashflow: async (id, patch) => localUpdate('cashflow', id, patch),
+  deleteCashflow: async (id) => localDelete('cashflow', id),
+  getCashflow: async (id) => fastResponseGet('cashflow', id),
+  listCashflow: async (params) => fastResponseList('cashflow', params),
+
+  // Bulk operations
+  fetchAll: async (tableName, params = {}) => {
+    const localData = await localQuery(tableName, params);
+    
+    if (online && SupabaseService.isConnected()) {
+      syncRemoteDataInBackground(tableName, 'query', { ...params, fetchAll: true });
+    }
+    
+    return localData;
+  },
+
+  bulkInsert: async (tableName, records) => {
+    const inserted = await processBulkInsert(tableName, records);
+    
+    // Queue sync for each record
+    for (const record of records) {
+      const normalized = normalizeRecordForSQLite(tableName, record);
+      await SyncManager.queueChange(tableName, 'INSERT', record.id, normalized);
+    }
+    
+    return inserted;
+  },
+
+  // Force immediate remote sync (for when you need fresh data)
+  forceRemoteSync: async (tableName, params = {}) => {
+    if (!online || !SupabaseService.isConnected()) {
+      throw new Error('No internet connection');
+    }
+
+    console.log(`🔄 Force syncing ${tableName} from remote...`);
+    const supabase = SupabaseService.getClient();
+    
+    let query = supabase.from(tableName).select('*');
+    
+    // Apply filters
+    if (params.filters) {
+      Object.entries(params.filters).forEach(([key, filter]) => {
+        if (typeof filter !== "object" || !filter.op) {
+          query = query.eq(key, filter);
+        } else {
+          switch (filter.op.toLowerCase()) {
+            case "=": query = query.eq(key, filter.value); break;
+            case "!=": query = query.neq(key, filter.value); break;
+            case ">": query = query.gt(key, filter.value); break;
+            case ">=": query = query.gte(key, filter.value); break;
+            case "<": query = query.lt(key, filter.value); break;
+            case "<=": query = query.lte(key, filter.value); break;
+            case "like": query = query.like(key, `%${filter.value}%`); break;
+            case "in": query = query.in(key, filter.value); break;
+          }
+        }
+      });
+    }
+    
+    // Apply ordering
+    if (params.orderBy) {
+      const [column, order] = params.orderBy.split(' ');
+      query = query.order(column, { ascending: order?.toLowerCase() === 'asc' });
+    }
+
+    const allData = await fetchAllRemoteDataWithPagination(tableName, query, params.maxRecords || 10000);
+    
+    if (allData.length > 0) {
+      await processBulkInsert(tableName, allData);
+      console.log(`✅ Force sync completed: ${allData.length} ${tableName} records`);
+      return allData.map(record => normalizeRecordFromSQLite(tableName, record));
+    }
+    
+    return [];
+  }
+});
+
+
+
+  const api = createFastResponseApi(online);
+
+
+
+
+
     // Load data when table is first accessed and database is ready
     useEffect(() => {
       if (isReady) {
         loadData();
       }
     }, [isReady, tableName]);
+
+   
+
+
+
+
+
 
 
 

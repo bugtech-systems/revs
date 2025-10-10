@@ -80,7 +80,6 @@ if (subscription === undefined) {
 }
 
 export default function TestScreen({ data, isPrint, onPrint }) {
-    const { api } = useOffline()
     const { collector, user, selectedUser } = useSelector(({ user }) => user);
     const viewShotRef = useRef();
     const [total, setTotal] = useState(0)
@@ -89,7 +88,6 @@ export default function TestScreen({ data, isPrint, onPrint }) {
     const [rowValue, setRowValue] = useState([]);
     const dispatch = useDispatch();
     const [viewHeight, setViewHeight] = useState(0);
-    const [readyToCapture, setReadyToCapture] = useState(false);
 
 
 

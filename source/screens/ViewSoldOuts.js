@@ -1,15 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Image, View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, Alert } from 'react-native';
-import moment from 'moment-timezone';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSelector } from 'react-redux';
-import SelectDropdown from 'react-native-select-dropdown'
 import { COLORS, icons, SIZES } from '../constants';
 import { formatNumberWithComma } from '../utils/helpers';
-import { useOffline } from '../context/OfflineProvider';
 import { nowISO } from '../utils/offlineSync';
 // import { useApp } from '@realm/react';
-
+import { api } from '../utils/offlineSync';
 
 
 
@@ -32,15 +29,9 @@ const ownItemsSubscriptionName = 'ownItems';
 
 const ViewSoldOuts = ({ route, navigation }) => {
   const ticketDetails = JSON.parse(route.params);
-    const { api, dataVersion } = useOffline()
   
   // const userRealm = useApp();
-  const [total, setTotal] = useState(0);
-  const [gameTime, setGameTime] = useState('')
   const [show, setShowDate] = useState(false);
-  const [date, setDate] = useState(new Date())
-  const [filterTime, setFilterTime] = useState(drawTimes[0].name)
-  // const [loading, setLoading] = useState(false)
   const { collector, user, selectedUser } = useSelector(({ user }) => user);
 
 
@@ -55,39 +46,7 @@ const ViewSoldOuts = ({ route, navigation }) => {
   };
 
 
-  const handlePrint = async () => {
-    // setLoading(true)
-    setPrintCount(+1)
-    let increment = +1
-    console.log(increment, "INC")
-    return
-  }
 
-  function getTimeRange() {
-    const currentTime = new Date();
-    const currentHour = currentTime.getHours();
-    const currentMins = currentTime.getMinutes();
-    console.log(currentMins, 'mins')
-    if (currentHour >= 0 && currentHour < 14) {
-      return "2pm";
-    } else if (currentHour >= 14 && currentHour < 17) {
-      return "5pm";
-    } else {
-      return "9pm";
-    }
-  }
-
-  const handleTimeSelect = (item) => {
-    setFilterTime(item);
-    // toggleModal();
-  };
-
-  const onChangeDate = (event, selectedDate) => {
-    const currentDate = selectedDate || date;
-    setShowDate(false);
-    setDate(currentDate);
-
-  };
 
 
   const handleCancelTicket = useCallback(

@@ -9,8 +9,9 @@ import { useSelector, useDispatch } from 'react-redux'
 import Animated, { BounceOutDown, FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { COLORS, icons } from '../../constants'
 import { formatNumberWithComma, getConfiguration, getDayRange } from '../../utils/helpers';
-import { useOffline } from '../../context/OfflineProvider';
+// import { useOffline } from '../../context/OfflineProvider';
 import { forceFullResync } from '../../utils/batchPull';
+import { api } from '../../utils/offlineSync';
 
 const drawTimes = [
   {
@@ -35,7 +36,7 @@ const itemSubscriptionName = 'items';
 const ownItemsSubscriptionName = 'ownItems';
 
 const Transactions = ({ navigation }) => {
-  const { api, dataVersion, bumpVersion } = useOffline();
+  // const { api, dataVersion, bumpVersion } = useOffline();
   
   const { collector, user, selectedUser } = useSelector(({ user }) => user);
   const [date, setDate] = useState(new Date())
@@ -100,7 +101,7 @@ const Transactions = ({ navigation }) => {
     useEffect(() => {
   
     load();
-  }, [date, userNow, includeAll, dataVersion]);
+  }, [date, userNow, includeAll]);
   
 
   console.log("THE ITEM", show)
@@ -142,7 +143,7 @@ const Transactions = ({ navigation }) => {
     setTimeout(() => {
       setRefreshing(false);
       load();
-      bumpVersion();
+      // bumpVersion();
       setSearchQuery('');
       // setFilteredData(items)
       setLoading(false);

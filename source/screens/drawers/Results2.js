@@ -4,9 +4,11 @@ import moment from 'moment-timezone';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { COLORS } from '../../constants';
 import { useOffline } from '../../context/OfflineProvider';
+import { api } from '../../utils/offlineSync';
+
 
 export default function Results2({ navigation }) {
-  const { api, dataVersion } = useOffline()
+  // const { api,  } = useOffline()
   const today = moment().tz('Asia/Manila').toDate();
 
   const [draws, setDraws] = useState([]);
@@ -60,7 +62,7 @@ export default function Results2({ navigation }) {
 
     fetchDraws();
     fetchWinningDigits();
-  }, [dataVersion]);
+  }, []);
 
 
 // console.log(draws, 'DRWS', winningDigits)

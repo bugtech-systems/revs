@@ -9,15 +9,13 @@ import WarningModal from '../components/WarningModal';
 import ConfirmationModal from '../components/ConfirmationModal';
 import TestScreen from './TestScreen';
 import { getConfiguration } from '../utils/helpers';
-import { useOfflineSync } from '../context/OfflineSyncProvider';
 import { nowISO } from '../utils/offlineSync';
-
+import { api } from '../utils/offlineSync';
 
 
 
 const ReviewScreen = ({ route, navigation, onPress }) => {
   const ticketDetails = JSON.parse(route.params);
-  const {  api, dataVersion } = useOfflineSync();
   const [total, setTotal] = useState(0);
   const [game_time, setgame_time] = useState('')
   const [isPrint, setIsPrint] = useState(false);
@@ -56,8 +54,8 @@ const ReviewScreen = ({ route, navigation, onPress }) => {
       const ticketExpiry = ticketCreated.add(3, 'minutes');
 
       let currentTime = moment().tz('Asia/Manila'); // Get current time in Philippines timezone
-
-      if (currentTime.isAfter(ticketExpiry)) {
+console.log(currentTime.isAfter(ticketExpiry), 'TICKET EXPIRE')
+      if (currentTime.isAfter(ticketExpiry) && !user?.is_admin) {
         // Alert.alert('Every ticket can only be deleted before 3 minutes after Creation, if you want to proceed please contact Administrator.')
         setWarningType('expire')
         dispatch({ type: OPEN_WARNING_MODAL })
@@ -82,8 +80,7 @@ const ReviewScreen = ({ route, navigation, onPress }) => {
           item.is_deleted = true;
         }); */
         setConfirmTecket(null);
-        await api.updateBetting(item?.id, {is_deleted: true, updated_at: nowISO});
-        
+        await api.updateBetting(ticketDetails?.id, {is_deleted: true, updated_at: nowISO});
         navigation.goBack();
       }
     } catch (error) {

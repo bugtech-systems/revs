@@ -4,15 +4,15 @@ import { StyleSheet, Text, Keyboard, View, ScrollView, TouchableOpacity, FlatLis
 import moment from 'moment-timezone';
 import { useSelector, useDispatch } from 'react-redux';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { checkSoldOutParts, generateObjectId, getConfiguration, getWithWin200Config, updateDateTimeIfGreater } from '../utils/helpers';
+import {  generateObjectId, getConfiguration, getWithWin200Config, updateDateTimeIfGreater } from '../utils/helpers';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Geolocation from 'react-native-geolocation-service';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, icons } from '../constants';
 import ConfirmationModal from '../components/ConfirmationModal';
 // import { useOffline } from '../context/OfflineProvider';
-import {  fetchUser } from '../utils/offlineSync';
-import { useOfflineSync } from '../context/OfflineSyncProvider';
+import {  fetchUser, api, nowISO } from '../utils/offlineSync';
+// import { useOfflineSync } from '../context/OfflineSyncProvider';
 
 
 let keyPad = [
@@ -67,7 +67,7 @@ let keyPad = [
 ]
 
 export default function TicketForm({ navigation }) {
-    const {  api, dataVersion } = useOfflineSync();
+    // const {  api, dataVersion } = useOfflineSync();
     const { collector, user, selectedUser } = useSelector(({ user }) => user);
     const [amountVal, setAmountVal] = useState('')
     const [time, setSelectedTime] = useState('2pm')
@@ -84,7 +84,6 @@ export default function TicketForm({ navigation }) {
     const [is9pmDisabled, setIs9pmDisabled] = useState(false);
     const [betType, setBetType] = useState('')
     const [betTypeOption, setBetTypeOption] = useState('')
-    const [inputValue, setInputValue] = useState('');
     const [showDate, setShowDate] = useState(false);
     const [date, setDate] = useState(new Date())
     const [showWin200Modal, setShowWin200Modal] = useState(false);
@@ -377,18 +376,6 @@ export default function TicketForm({ navigation }) {
         }
     }
 
-    const handleRamble = async (item) => {
-        // setBetting([]) // clear test state
-        if (inputValue.length === 3 && amountVal != 0 && time != '') {
-            setBetting(prevState => [...prevState, item]);
-            setCombination('')
-            setInputValue('')
-            setAmountVal('')
-            return
-        } else {
-            Alert.alert(`${inputValue.length == 0 && inputValue.length < 3 && amountVal.length == 0 ? 'Plesae provide 3 digit combination' : amountVal == 0 ? 'Plesae provide amount' : time == '' ? 'Please select time' : 'Something went wrong'}`)
-        }
-    }
 
     const handleBet = async (item) => {
         let { combination, amount, ramble, target } = item;
@@ -496,20 +483,20 @@ export default function TicketForm({ navigation }) {
             let winWin200 = getConfiguration(selectedUser, 'withWin200')?.value;
             let winStraight = getConfiguration(selectedUser, 'winStraight')?.value
             let validDate = await updateDateTimeIfGreater();
-            let selectedUser = await fetchUser(collector)
+            let selectUser = await fetchUser(collector)
             if(!validDate){
             	setLoading(false)
             	Alert.alert('Set Timezone Properly!');
             	return;
             }
             
-            console.log(selectedUser, 'SELECTED USER')
+            console.log(selectUser, 'SELECTED USER')
             
 
             if (data?.length > 0) {
                 let combinations = [];
 
-                let arrayOfBet = data?.map(bet => {
+               data?.map(bet => {
 
                     totalAmount += Number(bet.amount)
                     gross += Number(bet.amount)
@@ -531,9 +518,8 @@ export default function TicketForm({ navigation }) {
                 })
 
 
-
                 let commissions = [];
-                let uplines = selectedUser?.uplines ? selectedUser?.uplines : [];
+                let uplines = selectUser?.uplines ? selectUser?.uplines : [];
                 let newUplines = [];
                 // let comUplines = [...uplines, selectedUser];
 
@@ -600,9 +586,9 @@ export default function TicketForm({ navigation }) {
                             // realm.write(async () => {
                             //     selectedUser.coordinates = `${coords.latitude}|${coords.longitude}`;
                             // })
-                            await api.updateUser(user?.id, {
-                                coordinates: `${coords.latitude}|${coords.longitude}`
-                            })
+                            // await api.updateUser(user?.id, {
+                            //     coordinates: `${coords.latitude}|${coords.longitude}`
+                            // })
 
                         },
                         error => {
@@ -626,7 +612,7 @@ export default function TicketForm({ navigation }) {
                         is_win_to: false,
                         is_print: false,
                         is_deleted: false,
-                        timestamp: new Date().toISOString(),
+                        timestamp: nowISO(),
                         game_time: time,
                         print_copy: 0,
                         input_type: 'normal',
@@ -635,8 +621,8 @@ export default function TicketForm({ navigation }) {
                         combinations: combinations,
                         commissions: newComms,
                         uplines: newUplines,
-                        created_at: moment().tz("Asia/Manila").toISOString(),
-                        updated_at: moment().tz("Asia/Manila").toISOString()
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
                     }
                     console.log('Navigate')
                     await api.createBetting(newBet)
@@ -814,13 +800,16 @@ export default function TicketForm({ navigation }) {
 
     useEffect(() => {
         initializeGameTime()
-    }, [draws, dataVersion])
+    }, [draws])
 
     useEffect(() => {
     const start_of_day = moment(new Date()).startOf('day').toISOString();
     const end_of_day = moment(new Date()).endOf('day').toISOString();
     
     const initData = async () => {
+                let selectUser = await fetchUser(collector)
+
+    
        let localDraws = await api.listDraws({
        filters: { 
         draw_date:  { 
@@ -829,6 +818,8 @@ export default function TicketForm({ navigation }) {
 	      to: end_of_day,
         }}
       });
+
+    console.log(selectUser, 'SELECTEDD')
 
     let localCombinations = await api.listMasterCombinations();
     setDraws(localDraws)
@@ -844,7 +835,7 @@ export default function TicketForm({ navigation }) {
             // setGameTime('')
             // setSelectedTime('')
         }
-    }, [dataVersion])
+    }, [])
 
 
 

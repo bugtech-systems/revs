@@ -5,14 +5,15 @@ import { useSelector, useDispatch } from 'react-redux'
 import { CLOSE_CONFIRMATION_MODAL, OPEN_CONFIRMATION_MODAL, SET_LOADING, STOP_LOADING } from '../../redux/actions/types';
 import axios from 'axios';
 import { COLORS, icons, SIZES } from '../../constants'
-import Config from 'react-native-config';
 import { formatNumberWithComma, getDayRange } from '../../utils/helpers';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import ConfirmationModal from '../../components/ConfirmationModal';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import SelectDropdown from 'react-native-select-dropdown'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
-import { useOffline } from '../../context/OfflineProvider';
+import { api } from '../../utils/offlineSync';
+import Config from 'react-native-config';
+
 
 const drawTimes = [
   { id: 0, name: 'All Time' },
@@ -23,8 +24,7 @@ const drawTimes = [
 
 
 const SoldOuts = ({ navigation }) => {
-  const { api, dataVersion } = useOffline()
-  const { collector, selectedUser, user } = useSelector(({ user }) => user);
+  const { selectedUser, user } = useSelector(({ user }) => user);
   const { loading, confirmationModal } = useSelector(({ ui }) => ui);
   const dispatch = useDispatch();
 
@@ -35,9 +35,9 @@ const SoldOuts = ({ navigation }) => {
   const [filterTime, setFilterTime] = useState(drawTimes[0].name);
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [rnd, setRnd] = useState(null);
 
   // Data States
-  const [users, setUsers] = useState([]);
   const [draws, setDraws] = useState([]);
   const [items, setItems] = useState([]);
 
@@ -49,19 +49,7 @@ const SoldOuts = ({ navigation }) => {
 
 
   /** Fetch Draws */
-  const fetchDraws = async () => {
-    if (!users[0]) return;
-    const startOfDay = moment(startDate).startOf('day').toISOString();
-    const endOfDay = moment(endDate).endOf('day').toISOString();
-    db.transaction(tx => {
-      tx.executeSql(
-        `SELECT * FROM Draws WHERE drawDate >= ? AND drawDate <= ? ORDER BY drawDate ASC`,
-        [startOfDay, endOfDay],
-        (_, { rows }) => setDraws(rows.raw()),
-        (t, error) => console.log('Error fetching draws', error)
-      );
-    });
-  };
+
 
   /** Fetch Items */
   const fetchItems = useCallback(async () => {
@@ -70,7 +58,7 @@ const SoldOuts = ({ navigation }) => {
     const { start_of_day, end_of_day  } = getDayRange(startDate, endDate)
     // Start and end of the day
     
-  console.log(start_of_day, end_of_day, 'date range')
+  // console.log(start_of_day, end_of_day, 'date range')
     
     let filters = {
         timestamp: { op: "between", from: start_of_day, to: end_of_day },
@@ -85,12 +73,22 @@ const SoldOuts = ({ navigation }) => {
         orderBy: 'created_at DESC',
         // limit: 20,
       });
+      
+          let localDraws = await api.listDraws({
+             filters: { 
+              draw_date:  { 
+                 op: "between",
+              from: start_of_day,
+              to: end_of_day,
+              }}
+            });
 
     
       setItems(localBettings);
+      setDraws(localDraws)
       // setLoading(false);
 
-  }, [startDate, endDate,  ownUser, dataVersion]);
+  }, [startDate, endDate,  ownUser, rnd]);
 
 
   /** Filtered Data */
@@ -103,20 +101,21 @@ const SoldOuts = ({ navigation }) => {
   }, [items, filterTime, searchQuery]);
 
   useEffect(() => {
-    fetchDraws();
+    // fetchDraws();
     fetchItems();
-  }, [users, startDate, endDate]);
+  }, [selectedUser, startDate, endDate, rnd]);
 
   /** Handle Refresh */
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     setTimeout(() => {
-      fetchDraws();
+      // fetchDraws();
+      setRnd(Math.random())
       fetchItems();
       setSearchQuery('');
       setRefreshing(false);
     }, 2000);
-  }, [users, startDate, endDate]);
+  }, [startDate, endDate]);
 
   /** Handle Sold Out */
   const getTimeRange = () => {
@@ -131,8 +130,8 @@ const SoldOuts = ({ navigation }) => {
   };
 
   const handleSoldOut = async () => {
-    if (!users[0]) return;
-    const { email } = users[0];
+    if (!selectedUser) return;
+    const { email } = selectedUser;
     const gameTime = getTimeRange();
 
     if (!gameTime) return;
@@ -140,13 +139,20 @@ const SoldOuts = ({ navigation }) => {
     dispatch({ type: SET_LOADING });
 
     try {
-      const res = await axios.get(`${Config.API_URL}/apiv2/v1/bettings/soldout?gameTime=${gameTime}&email=${email}`);
+    
+    console.log(Config.API_URL, gameTime, email, 'GEN SOLDOUT')
+      const res = await axios.get(`https://sharewin.pro/apiv2/v1/bettingsv2/soldout?gameTime=${gameTime}&email=${email}`);
+      setRnd(Math.random());
+      await fetchItems();
       if (!res.data.success) Alert.alert('No Sold-out Available');
+      
     } catch (err) {
       console.log(err);
       Alert.alert('Something Went Wrong!');
     } finally {
+      setRnd(Math.random());
       dispatch({ type: STOP_LOADING });
+      await fetchItems()
     }
   };
 

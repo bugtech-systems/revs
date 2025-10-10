@@ -8,8 +8,8 @@ import { useDispatch, useSelector } from 'react-redux'
 import { COLORS, icons } from '../../constants'
 import { formatNumberWithComma, getConfiguration } from '../../utils/helpers';
 import Animated, { BounceOutDown, FadeInDown, FadeOutDown } from 'react-native-reanimated';
-import { fetchBettings, fetchWinningBettings } from '../../utils/offlineSync';
-import { useOffline } from '../../context/OfflineProvider';
+import { api, fetchUser } from '../../utils/offlineSync';
+// import { useOffline } from '../../context/OfflineProvider';
 
 
 const drawTimes = [
@@ -34,7 +34,7 @@ const drawTimes = [
 const Winnings = ({ navigation }) => {
     const dispatch = useDispatch()
     const { collector, user, selectedUser } = useSelector(({ user }) => user);
-    const { dataVersion, api, fetchUser } = useOffline()
+    // const { dataVersion, api, fetchUser } = useOffline()
     const [date, setDate] = useState(new Date())
     const [show, setShowDate] = useState(false);
     const [selectedTime, setSelectedTime] = useState(null);
@@ -266,7 +266,7 @@ const Winnings = ({ navigation }) => {
     
     
         }
-      }, [date, includeAll, collector, dataVersion]);
+      }, [date, includeAll, collector]);
     
     
     
