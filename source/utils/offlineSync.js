@@ -906,7 +906,7 @@ export async function clearAllStorage() {
      const key = `${LAST_PULLED_KEY}:bettings`;
 
   
-    await AsyncStorage.removeItem(key);
+    await AsyncStorage.clear();
     console.log("✅ AsyncStorage cleared");
   } catch (e) {
     console.error("❌ Failed to clear AsyncStorage", e);

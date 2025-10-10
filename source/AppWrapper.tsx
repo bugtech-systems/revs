@@ -1,51 +1,102 @@
-import React, { useEffect, useState } from 'react';
-import { Provider } from 'react-redux';
-import { store } from './redux/store';
-import { App } from './App';
-// import App1 from './App1';
-import { WelcomeView } from './WelcomeView';
-import supabase from './utils/supabaseClient';
-import { SessionContext } from './context/SessionContext';
-import { OfflineSyncProvider } from "./context/OfflineSyncProvider";
-import { OfflineProvider } from "./context/OfflineProvider";
-// import { ApiProvider } from "./context/ApiContext";
-import { SyncProvider } from './context/SyncContext';
-import { DataProvider } from './context/DataContext';
-import { syncConfig } from './configs/syncConfig';
+import React, { useEffect, useState } from "react";
+import { Provider } from "react-redux";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { store } from "./redux/store";
+import { App, LoadingIndicator } from "./App";
+import { WelcomeView } from "./WelcomeView";
+import supabase from "./utils/supabaseClient";
+import { SessionContext } from "./context/SessionContext";
+import { SyncProvider } from "./context/SyncContext";
+import { DataProvider } from "./context/DataContext";
+import { syncConfig } from "./configs/syncConfig";
 
 
 export const AppWrapper = () => {
-  const [session, setSession] = useState(supabase.auth.getSession());
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
 
+  // Helper to clear session safely
+  const clearSession = async () => {
+    try {
+      await AsyncStorage.removeItem("supabase_session");
+      setSession(null);
+    } catch (err) {
+      console.error("Error clearing session:", err);
+    }
+  };
 
-
+  // Load session from AsyncStorage or Supabase
   useEffect(() => {
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-    });
+    const loadSession = async () => {
+      try {
+        const storedSession = await AsyncStorage.getItem("supabase_session");
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+
+          // Check if session has expired
+          const isExpired =
+            !parsed?.expires_at || parsed.expires_at * 1000 < Date.now();
+
+          if (isExpired) {
+            console.log("Session expired — clearing storage.");
+            await clearSession();
+          } else {
+            setSession(parsed);
+          }
+        } else {
+          // Fallback to Supabase auth
+          const { data } = await supabase.auth.getSession();
+          if (data?.session) {
+            setSession(data.session);
+            await AsyncStorage.setItem(
+              "supabase_session",
+              JSON.stringify(data.session)
+            );
+          } else {
+            await clearSession();
+          }
+        }
+      } catch (err) {
+        console.error("Error loading stored session:", err);
+        await clearSession();
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSession();
+  }, []);
+
+  // Listen for Supabase auth state changes
+  useEffect(() => {
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      async (_event, newSession) => {
+        if (newSession) {
+          await AsyncStorage.setItem(
+            "supabase_session",
+            JSON.stringify(newSession)
+          );
+          setSession(newSession);
+        } else {
+          console.log("No Supabase session — clearing storage.");
+          await clearSession();
+        }
+      }
+    );
 
     return () => {
       listener.subscription.unsubscribe();
     };
   }, []);
-  
 
-  
-  
-
-  
+  if (loading) return <LoadingIndicator />;
 
   return (
     <Provider store={store}>
       <SessionContext.Provider value={{ session, setSession }}>
         <SyncProvider config={syncConfig}>
-          {/* <OfflineSyncProvider session={session}> */}
-          <DataProvider>
-          {session ? <App /> : <WelcomeView />}
-        </DataProvider>
-        {/* </OfflineSyncProvider> */}
+          <DataProvider>{session ? <App /> : <WelcomeView />}</DataProvider>
         </SyncProvider>
-        
       </SessionContext.Provider>
     </Provider>
   );
