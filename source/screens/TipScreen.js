@@ -19,10 +19,9 @@ const { width, height } = Dimensions.get('window');
 
 
 const TipScreen = ({ navigation, route }) => {
-  const { resultDate } = route.params;
+  const { resultDate, resultId } = route.params;
   const { collector, user, selectedUser } = useSelector(({ user }) => user);
   const [selectedImage, setSelectedImage] = useState(null)
-  const [progress, setProgress] = useState(0);
   const [draws, setDraws] = useState([]);
 
  
@@ -136,7 +135,6 @@ const handleDownloadTipImg = async () => {
   // encode to avoid spaces or invalid characters
   url = encodeURI(url);
 
-  console.log('Opening URL:', url);
 
   try {
     // quick debug: test generic URL handler availability (optional)
@@ -148,16 +146,6 @@ const handleDownloadTipImg = async () => {
     console.log('canOpenURL target:', supported);
 
     // // If InAppBrowser is available you can prefer that (optional)
-    // if (InAppBrowser && (await InAppBrowser.isAvailable())) {
-    //   // Open in-app browser (nice UX)
-    //   await InAppBrowser.open(url, {
-    //     // iOS / Android options here — optional
-    //     // toolbarColor: '#6200EE',
-    //     // showTitle: true,
-    //   });
-    //   if (Platform.OS === 'android') ToastAndroid.show('Opened in browser', ToastAndroid.SHORT);
-    //   return;
-    // }
 
     // If supported, open normally
     if (supported) {
@@ -222,14 +210,18 @@ const handleDownloadTipImg = async () => {
       });
 
 
-      console.log(response.data, 'UPLOAD RESPONSE')
+      console.log(response.data, 'UPLOAD RESPONSE', resultId)
        
 
 
       setSelectedImage({ uri: `${Config.FILE_UPLOAD_URL}/apiv2/assets/${response.data.filename}` });
-      await realm.write(async () => {
-        draws[0].tip_url = `${Config.FILE_UPLOAD_URL}/apiv2/assets/${response.data.filename}`;
-      })
+      
+      
+      await api.updateDraw(resultId, { tip_url:  `${Config.FILE_UPLOAD_URL}/apiv2/assets/${response.data.filename}`})
+      
+      // await realm.write(async () => {
+      //   draws[0].tip_url = `${Config.FILE_UPLOAD_URL}/apiv2/assets/${response.data.filename}`;
+      // })
     } catch (error) {
       console.error('Error uploading image:', error);
     }
@@ -260,25 +252,6 @@ const handleDownloadTipImg = async () => {
       });
     });
   };
-
-
-  // const pickImage = () => {
-  //   const options = {
-  //     mediaType: "photo",
-  //     quality: 1,
-  //   };
-
-  //   launchImageLibrary(options, (response) => {
-  //     if (response.didCancel) {
-  //       console.log("User cancelled image picker");
-  //     } else if (response.errorMessage) {
-  //       console.log("ImagePicker Error: ", response.errorMessage);
-  //     } else {
-  //       const source = { uri: response.assets[0].uri };
-  //       setSelectedImage(source);
-  //     }
-  //   });
-  // };
 
 
 
@@ -317,11 +290,9 @@ const handleDownloadTipImg = async () => {
 
 
 
-  console.log(progress, "PROG", resultDate)
   
   
 
-  let displayName = String(collector).split('@')[0];
 
   return (
     <View style={styles.container}>

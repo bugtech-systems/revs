@@ -9,9 +9,13 @@ import supabase from './utils/supabaseClient';
 import { fetchUser } from './utils/offlineSync';
 import { useSync } from './context/SyncContext';
 import { SessionContext } from './context/SessionContext';
+import SyncManager from './services/SyncManager';
+import { SET_ACTIVE_USER, SET_COLLECTOR, SET_USER } from './redux/actions/types';
+import { useDispatch } from 'react-redux';
 
 export function WelcomeView() {
-  const { forceFullSync, isReady } = useSync();
+  const {  isReady } = useSync();
+    const dispatch = useDispatch();
   const { setSession } = useContext(SessionContext);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,23 +25,44 @@ export function WelcomeView() {
   // Sign in with Supabase and store session + local user
   const signIn = useCallback(async () => {
     const fullEmail = String(email).trim() + '@collector.com';
+    
+            if (fullEmail) {
+      const localUser = await fetchUser(fullEmail);
+      console.log('Fetched local user:', localUser);
+          if (localUser) {
+              dispatch({ type: SET_USER, payload: localUser });
+              dispatch({ type: SET_ACTIVE_USER, payload: localUser });
+      }
+    }
+    
+    
     const { data, error } = await supabase.auth.signInWithPassword({
       email: fullEmail,
       password,
     });
 
-    if (error) throw error;
+    if (error) {
+              dispatch({ type: SET_USER, payload: null });
+              dispatch({ type: SET_COLLECTOR, payload: null });
+              dispatch({ type: SET_ACTIVE_USER, payload: null });
+    
+    throw error
+    };
 
-    if (data?.user?.email) {
-      const localUser = await fetchUser(data.user.email);
-      console.log('Fetched local user:', localUser);
-    }
+
 
     // Save session for persistence
     if (data?.session) {
-      await AsyncStorage.setItem('supabase_session', JSON.stringify(data.session));
+    console.log(data, 'DATA SESSION', data?.user?.email)
+
+          await AsyncStorage.setItem('supabase_session', JSON.stringify(data.session));
       setSession(data.session);
+  
     }
+
+
+
+  
 
     return data;
   }, [email, password, setSession]);
@@ -47,7 +72,7 @@ export function WelcomeView() {
     try {
       const currentDateTime = moment.tz('Asia/Manila').format('DD MM YYYY hh:mm:ss');
       const existingValue = await AsyncStorage.getItem('dateTimeNumber');
-
+      SyncManager.clearSync()
       if (!existingValue) {
         await AsyncStorage.setItem('dateTimeNumber', currentDateTime);
         console.log('DateTime updated to:', currentDateTime);
@@ -61,12 +86,16 @@ export function WelcomeView() {
     } finally {
       setLoading(false);
     }
-  }, [signIn]);
+  }, [signIn, dispatch]);
 
   useEffect(() => {
-    if (isReady) {
-      forceFullSync();
-      console.log('FORCE FULL RESYNC!');
+    // if (isReady) {
+    //   forceFullSync();
+    //   console.log('FORCE FULL RESYNC!');
+    // }
+    
+    return () => {
+      SyncManager.clearSync()
     }
   }, [isReady]);
 

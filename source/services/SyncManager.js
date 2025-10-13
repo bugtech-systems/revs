@@ -25,7 +25,7 @@ class SyncManager {
 
   setupAppStateListener() {
     // Use the new subscription API
-    // this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange);
+    this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange);
   }
 
   // Initialize sync manager after database is ready
@@ -204,6 +204,7 @@ async checkColumnExists(tableName, columnName) {
     }
 
     if (this.isSyncing || !SupabaseService.isConnected()) {
+    console.log(this.isSyncing, !SupabaseService.isConnected(), 'skipped reason')
       console.log('⏸️ Sync skipped: already syncing or no connection');
       return;
     }
@@ -1068,9 +1069,18 @@ async queueChange(tableName, operation, recordId, data = null) {
       `DELETE FROM ${SYNC_TABLES.SYNC_METADATA} WHERE key = 'last_sync_time'`
     );
     
+    this.isSyncing = false;
+    
     // Trigger sync
     await this.sync();
   }
+  
+    clearSync() {
+    
+    this.isSyncing = false;
+
+  }
+  
 }
 
 export default new SyncManager();

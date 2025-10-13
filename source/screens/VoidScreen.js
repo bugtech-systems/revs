@@ -154,7 +154,7 @@ const VoidScreen = ({ route, navigation, onPress }) => {
 
         <View style={{ width: '100%', justifyContent: 'space-between', flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: COLORS.gray400, paddingVertical: 6 }}>
           <Text style={styles.detailText}>Bet Date/Time:</Text>
-          <Text style={styles.detailValue}>{moment(ticketDetails.timestamp).format('MMM DD, YYYY hh:mm A')}</Text>
+          <Text style={styles.detailValue}>{moment(ticketDetails.timestamp).format('MMM DD, YYYY')} - {moment(ticketDetails.created_at).tz("Asia/Manila").format('hh:mm A')}</Text>
         </View>
         <View style={{ width: '100%', justifyContent: 'space-between', flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: COLORS.gray400, paddingVertical: 6 }}>
           <Text style={styles.detailText}>Draw Date:</Text>

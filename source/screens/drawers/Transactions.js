@@ -43,7 +43,6 @@ const Transactions = ({ navigation }) => {
   const [show, setShowDate] = useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
   const [filterTime, setFilterTime] = useState(drawTimes[0].name)
-  const [showTime, setShowTime] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [includeAll, setIncludeAll] = useState(false);
   const [items, setItems] = useState([]);
@@ -51,7 +50,7 @@ const Transactions = ({ navigation }) => {
 
 
 
-  const userNow = selectedUser ? selectedUser.id : user.id;
+  const userNow = selectedUser ? selectedUser?.id : user?.id;
 
   
   
@@ -102,9 +101,8 @@ const Transactions = ({ navigation }) => {
   console.log(updateTickets, "CAN EDIT?")
 
     useEffect(() => {
-  
     load();
-  }, [date, userNow, includeAll]);
+  }, [show, date, userNow, includeAll]);
   
 
   console.log("THE ITEM", show)
@@ -134,7 +132,7 @@ const Transactions = ({ navigation }) => {
   };
 
   const handleTimeSelect = (item) => {
-    setShowTime(false)
+    // setShowTime(false)
     setFilterTime(item);
     // toggleModal();
   };
@@ -289,12 +287,12 @@ const Transactions = ({ navigation }) => {
             <View style={{ width: '10%', alignItems: 'center', justifyContent: 'center' }}>
               {
 
-                (item?.isComplete && !item?.isValidated)
-                &&
+                (item?.is_complete && !item?.is_validated)
+                ?
                 <Image
                   source={icons.exclamation}
                   style={{ height: 15, width: 15, resizeMode: 'contain', tintColor: COLORS.warningBorderColor }}
-                />
+                /> : <></>
               }
             </View>
 
@@ -345,58 +343,6 @@ const Transactions = ({ navigation }) => {
         />
       </>
     )
-  }
-
-  // useEffect(() => {
-  // let cur = selectedUser ? selectedUser._id : "";
-  // let filterString = `owner_id == "${cur}"`;
-
-
-  // let data =  realm.objects(Betting).filtered(filterString);
-
-  //   realm.subscriptions.update(mutableSubs => {
-  //     mutableSubs.removeByName(itemSubscriptionName);
-  //     mutableSubs.add(data, { name: ownItemsSubscriptionName });
-  //   });
-
-  // realm.subscriptions.update(mutableSubs => {
-  // mutableSubs.add(userData, {name: 'items3'});
-  // mutableSubs.add(drawsDataArray, { name: drawsSubscriptionName });
-  // });		
-
-
-
-  // }, [realm, users])
-
-
-  // console.log(items, "WEWds")
-  // console.log(collector, "WEWdsasdasdasdasdasda")
-
-  const toggleModal = () => {
-    setIsModalVisible(false);
-  };
-  const handleSelect = (item) => {
-    setItemsPerPage(item.value);
-    toggleModal();
-  };
-
-  function getCircularReplacer() {
-    const ancestors = [];
-    return function (key, value) {
-      if (typeof value !== "object" || value === null) {
-        return value;
-      }
-      // `this` is the object that value is contained in,
-      // i.e., its direct parent.
-      while (ancestors.length > 0 && ancestors.at(-1) !== this) {
-        ancestors.pop();
-      }
-      if (ancestors.includes(value)) {
-        return "[Circular]";
-      }
-      ancestors.push(value);
-      return value;
-    };
   }
 
 

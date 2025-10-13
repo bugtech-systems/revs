@@ -1,14 +1,14 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { StyleSheet, Text, Keyboard, View, ScrollView, TouchableOpacity, FlatList, TextInput, Image, Button, TouchableWithoutFeedback, Alert, Modal } from 'react-native'
-import moment from 'moment-timezone';
+import moment, { tz } from 'moment-timezone';
 import { useSelector, useDispatch } from 'react-redux';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import Icon from 'react-native-vector-icons/MaterialIcons'; // or any other icon library
-import { permuteDigits, getConfiguration, getDayRange, updateDateTimeIfGreater } from '../utils/helpers';
+import { permuteDigits, getConfiguration, getDayRange, updateDateTimeIfGreater, fixDateTimezone } from '../utils/helpers';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, icons } from '../constants';
-import { api, fetchUser } from '../utils/offlineSync';
+import { api, fetchUser, normalizeValue } from '../utils/offlineSync';
+import Geolocation from 'react-native-geolocation-service';
 
 
 let keyPad = [
@@ -224,7 +224,7 @@ export default function TicketForm3({ navigation, route }) {
   }
 
   // setLoading(false)
-    const handleSubmit = useCallback(async (data) => {
+    const handleSubmit = async (data) => {
         let gross = 0;
         let totalRamble = 0;
         let totalStraight = 0;
@@ -330,7 +330,7 @@ export default function TicketForm3({ navigation, route }) {
                             console.log(drawResult, 'DRAW RESULT')
                         return;
                         } */
-                if (collector == user?.email) {
+                if (collector == selectedUser?.email) {
                     Geolocation.getCurrentPosition(
                        async (position) => {
                             let { coords } = position;
@@ -338,7 +338,7 @@ export default function TicketForm3({ navigation, route }) {
                             // realm.write(async () => {
                             //     selectedUser.coordinates = `${coords.latitude}|${coords.longitude}`;
                             // })
-                            await api.updateUser(user?.id, {
+                            await api.updateUser(selectedUser?.id, {
                                 coordinates: `${coords.latitude}|${coords.longitude}`
                             })
 
@@ -350,7 +350,10 @@ export default function TicketForm3({ navigation, route }) {
                         { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
                     );
                 }
-         
+              
+              
+
+              
                 let newBet = {
                       //  ...ticketDetails,
                         ramble: Number(totalRamble),
@@ -364,9 +367,8 @@ export default function TicketForm3({ navigation, route }) {
                         // is_win_to: false,
                         // is_print: false,
                         // is_deleted: false,
-                        timestamp: moment(date).tz('Asia/Manila').toISOString(),
+                        timestamp: fixDateTimezone(date).toISOString(),
                         game_time: time,
-                        print_copy: 0,
                         // input_type: 'normal',
                         // contact: selectedUser.mobile,
                         // hits: [],
@@ -374,7 +376,6 @@ export default function TicketForm3({ navigation, route }) {
                         combinations: combinations,
                         commissions: newComms,
                         // uplines: newUplines,
-                        created_at: new Date(date).toISOString(),
                         updated_at: new Date().toISOString()
                     }
                     console.log('Navigate', newBet.timestamp, 'time', moment(date).tz('Asia/Manila').toISOString())
@@ -384,7 +385,7 @@ export default function TicketForm3({ navigation, route }) {
                     setBetting([]);
                     setDate(new Date());
                     console.log(updated, 'UPDATEDD')
-                    navigation.navigate('VoidScreen', JSON.stringify(updated))
+                    navigation.navigate('VoidScreen', JSON.stringify({...updated, created_at: fixDateTimezone(new Date(ticketDetails.created_at))}))
                 // })
             } else {
                 Alert.alert('No tickets to submit')
@@ -395,7 +396,7 @@ export default function TicketForm3({ navigation, route }) {
         }
         setLoading(false)
 
-    }, [collector, draws, arrayBetting, date])
+    }
 
   function removeItemByRamble(data) {
 
@@ -530,8 +531,15 @@ export default function TicketForm3({ navigation, route }) {
   const onChangeDate = (event, selectedDate) => {
     const currentDate = selectedDate || date;
     setShowDate(Platform.OS === 'ios');
-    console.log(currentDate, 'CUREENT DATE')
-    setDate(currentDate);
+    console.log(currentDate, 'CUREENT DATE', selectedDate)
+    // setDate(currentDate);
+    
+ 
+      setDate(currentDate);
+
+      // Normalize for SQLite (preserve local time)
+      const normalized = normalizeValue('timestamp', current, 'sqlite');
+      console.log('NORMALIZED',normalized);
   };
 
 
@@ -586,15 +594,7 @@ export default function TicketForm3({ navigation, route }) {
     }, []);
     
     
-        useEffect(() => {
-        // Set up the interval to trigger every 3 minutes
-        const interval = setInterval(() => {
-            triggerAction();
-        }, intervalTime);
 
-        // Clean up the interval when the component is unmounted
-        return () => clearInterval(interval);
-    }, []);
 
     const triggerAction = async () => {
         // You can put any logic you want to trigger here
@@ -655,17 +655,17 @@ export default function TicketForm3({ navigation, route }) {
               </Text>
             </View>
             <View style={{ flexDirection: 'row', width: '70%', justifyContent: 'space-around' }}>
-              <TouchableOpacity disabled={is2pmDisabled} onPress={() => setSelectedTime('2pm')} style={{ width: '30%', borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: time == '2pm' ? '#f4b067' : is2pmDisabled == true ? '#ff807f' : COLORS.gray400, borderColor: time == '2pm' ? '#f4b067' : is2pmDisabled == true ? '#ff807f' : COLORS.gray400, opacity: arrayBetting.length && time !== '2pm' && !is2pmDisabled ? 0.2 : 1 }}>
+              <TouchableOpacity disabled={(is2pmDisabled || !user.is_admin)} onPress={() => setSelectedTime('2pm')} style={{ width: '30%', borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: time == '2pm' ? '#f4b067' : is2pmDisabled == true ? '#ff807f' : COLORS.gray400, borderColor: time == '2pm' ? '#f4b067' : is2pmDisabled == true ? '#ff807f' : COLORS.gray400, opacity: arrayBetting.length && time !== '2pm' && !is2pmDisabled ? 0.2 : 1 }}>
                 <Text style={{ color: is2pmDisabled ? COLORS.white : COLORS.black, fontWeight: '600', fontSize: 16, }}>
                   2PM
                 </Text>
               </TouchableOpacity>
-              <TouchableOpacity disabled={is5pmDisabled} onPress={() => setSelectedTime('5pm')} style={{ width: '30%', borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: time == '5pm' ? '#f4b067' : is5pmDisabled == true ? '#ff807f' : COLORS.gray400, borderColor: time == '5pm' ? '#f4b067' : is5pmDisabled == true ? '#ff807f' : COLORS.gray400, opacity: arrayBetting.length && time !== '5pm' && !is5pmDisabled ? 0.2 : 1 }}>
+              <TouchableOpacity disabled={(is5pmDisabled  || !user.is_admin)} onPress={() => setSelectedTime('5pm')} style={{ width: '30%', borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: time == '5pm' ? '#f4b067' : is5pmDisabled == true ? '#ff807f' : COLORS.gray400, borderColor: time == '5pm' ? '#f4b067' : is5pmDisabled == true ? '#ff807f' : COLORS.gray400, opacity: arrayBetting.length && time !== '5pm' && !is5pmDisabled ? 0.2 : 1 }}>
                 <Text style={{ color: is5pmDisabled ? COLORS.white : COLORS.black, fontWeight: '600', fontSize: 16 }}>
                   5PM
                 </Text>
               </TouchableOpacity>
-              <TouchableOpacity disabled={is9pmDisabled} onPress={() => setSelectedTime('9pm')} style={{ width: '30%', borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: time == '9pm' ? '#f4b067' : is9pmDisabled == true ? '#ff807f' : COLORS.gray400, borderColor: time == '9pm' ? '#f4b067' : is9pmDisabled == true ? '#ff807f' : COLORS.gray400, opacity: arrayBetting.length && time !== '9pm' && !is9pmDisabled ? 0.2 : 1 }}>
+              <TouchableOpacity disabled={(is9pmDisabled || !user.is_admin)} onPress={() => setSelectedTime('9pm')} style={{ width: '30%', borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: time == '9pm' ? '#f4b067' : is9pmDisabled == true ? '#ff807f' : COLORS.gray400, borderColor: time == '9pm' ? '#f4b067' : is9pmDisabled == true ? '#ff807f' : COLORS.gray400, opacity: arrayBetting.length && time !== '9pm' && !is9pmDisabled ? 0.2 : 1 }}>
                 <Text style={{ color: is9pmDisabled ? COLORS.white : COLORS.black, fontWeight: '600', fontSize: 16 }}>
                   9PM
                 </Text>
@@ -982,7 +982,7 @@ export default function TicketForm3({ navigation, route }) {
                   <Text style={{ fontWeight: 'bold', fontSize: 24, color: COLORS.black }}>
                     Total: {`${total}`}
                   </Text>
-                  <TouchableOpacity onPress={() => handleSubmit(arrayBetting)} disabled={arrayBetting.length == 0 || curDraw} style={{ padding: 10, backgroundColor: arrayBetting.length == 0 ? COLORS.gray600 : '#2761a2', width: '40%', height: 55, borderRadius: 24, justifyContent: 'center', alignItems: 'center', }}>
+                  <TouchableOpacity onPress={() => handleSubmit(arrayBetting)} disabled={arrayBetting.length == 0 || curDraw || loading} style={{ padding: 10, backgroundColor: arrayBetting.length == 0 ? COLORS.gray600 : '#2761a2', width: '40%', height: 55, borderRadius: 24, justifyContent: 'center', alignItems: 'center', }}>
                     <Text style={{ fontWeight: 'bold', fontSize: 22, color: COLORS.white }}>
                       UPDATE
                     </Text>

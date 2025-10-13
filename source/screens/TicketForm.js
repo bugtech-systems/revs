@@ -328,7 +328,7 @@ export default function TicketForm({ navigation }) {
         const now = new Date();
         const hours = now.getHours();
 
-        if ((getGameTime == '2pm' || user?.is_admin)) {
+        if (getGameTime == '2pm') {
             setSelectedTime('2pm')
             // setGameTime('2pm');
             setIs2pmDisabled(false);
@@ -471,7 +471,7 @@ export default function TicketForm({ navigation }) {
         await AsyncStorage.setItem('dateTimeNumber', currentDateTime);
     }
     // setLoading(false)
-    const handleSubmit = useCallback(async (data) => {
+    const handleSubmit =  async (data) => {
         let gross = 0;
         let totalRamble = 0;
         let totalStraight = 0;
@@ -598,7 +598,10 @@ export default function TicketForm({ navigation }) {
                         { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
                     );
                 }
-         
+                
+                
+                         const fixedDate = new Date(date.getTime() + (8 * 60 * 60 * 1000));
+
                 let newBet = {
                         id: generateObjectId(),
                         ramble: Number(totalRamble),
@@ -612,7 +615,7 @@ export default function TicketForm({ navigation }) {
                         is_win_to: false,
                         is_print: false,
                         is_deleted: false,
-                        timestamp: moment(date).tz('Asia/Manila').toISOString(),
+                        timestamp: fixedDate.toISOString(),
                         game_time: time,
                         print_copy: 0,
                         input_type: 'normal',
@@ -639,11 +642,13 @@ export default function TicketForm({ navigation }) {
         } catch (err) {
             console.log(err, 'ERRRORR')
             return
-        }
+        } finally {
         setLoading(false)
+        }
 
-    }, [collector, draws, arrayBetting])
-
+    }
+    
+    
     function removeItemByRamble(data) {
         let dataList = arrayBetting.filter(item => item?.id !== data.id);
         setBetting(dataList);
@@ -798,15 +803,13 @@ export default function TicketForm({ navigation }) {
         setDate(currentDate);
     };
 
-    useEffect(() => {
-        initializeGameTime()
-    }, [draws])
 
-    useEffect(() => {
-    const start_of_day = moment(new Date()).startOf('day').toISOString();
+    const initData = async () => {
+    
+        const start_of_day = moment(new Date()).startOf('day').toISOString();
     const end_of_day = moment(new Date()).endOf('day').toISOString();
     
-    const initData = async () => {
+    
                 let selectUser = await fetchUser(collector)
 
     
@@ -825,6 +828,13 @@ export default function TicketForm({ navigation }) {
     setDraws(localDraws)
     setCombinations(localCombinations)
     } 
+
+
+    useEffect(() => {
+        initializeGameTime()
+    }, [draws])
+
+    useEffect(() => {
     
     initData()
     
@@ -859,15 +869,7 @@ export default function TicketForm({ navigation }) {
     }, []);
     
     
-        useEffect(() => {
-        // Set up the interval to trigger every 3 minutes
-        const interval = setInterval(() => {
-            triggerAction();
-        }, intervalTime);
-
-        // Clean up the interval when the component is unmounted
-        return () => clearInterval(interval);
-    }, []);
+ 
     
 
     const triggerAction = async () => {
@@ -886,9 +888,7 @@ export default function TicketForm({ navigation }) {
 
     let curDraw = (draws.find(a => !a.combination) || ((hoursNow == 13 && minNow >= 55) || (hoursNow == 16 && minNow >= 55) || (hoursNow == 20 && minNow >= 55)));
 
-    console.log(`Current Draw:, ${JSON.stringify(curDraw)},\n2PM DRAW:${is2pmDisabled},\n5PM DRAW:${is5pmDisabled},\n9PM DRAW:${is9pmDisabled}`)
 
-    console.log(closeDraw, "CLOSE DRAW?")
 
 
     return (
@@ -934,17 +934,17 @@ export default function TicketForm({ navigation }) {
                             </Text>
                         </View>
                         <View style={{ flexDirection: 'row', width: '70%', justifyContent: 'space-around' }}>
-                            <TouchableOpacity disabled={is2pmDisabled} onPress={() => !arrayBetting.length && setSelectedTime('2pm')} style={{ width: '30%', borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: time == '2pm' ? '#f4b067' : is2pmDisabled == true ? '#ff807f' : COLORS.gray400, borderColor: time == '2pm' ? '#f4b067' : is2pmDisabled == true ? '#ff807f' : COLORS.gray400, opacity: arrayBetting.length && time !== '2pm' && !is2pmDisabled ? 0.2 : 1 }}>
+                            <TouchableOpacity disabled={(is2pmDisabled)} onPress={() => !arrayBetting.length && setSelectedTime('2pm')} style={{ width: '30%', borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: time == '2pm' ? '#f4b067' : is2pmDisabled == true ? '#ff807f' : COLORS.gray400, borderColor: time == '2pm' ? '#f4b067' : is2pmDisabled == true ? '#ff807f' : COLORS.gray400, opacity: arrayBetting.length && time !== '2pm' && !is2pmDisabled ? 0.2 : 1 }}>
                                 <Text style={{ color: is2pmDisabled ? COLORS.white : COLORS.black, fontWeight: '600', fontSize: 16, }}>
                                     2PM
                                 </Text>
                             </TouchableOpacity>
-                            <TouchableOpacity disabled={is5pmDisabled} onPress={() => !arrayBetting.length && setSelectedTime('5pm')} style={{ width: '30%', borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: time == '5pm' ? '#f4b067' : is5pmDisabled == true ? '#ff807f' : COLORS.gray400, borderColor: time == '5pm' ? '#f4b067' : is5pmDisabled == true ? '#ff807f' : COLORS.gray400, opacity: arrayBetting.length && time !== '5pm' && !is5pmDisabled ? 0.2 : 1 }}>
+                            <TouchableOpacity disabled={(is5pmDisabled)} onPress={() => !arrayBetting.length && setSelectedTime('5pm')} style={{ width: '30%', borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: time == '5pm' ? '#f4b067' : is5pmDisabled == true ? '#ff807f' : COLORS.gray400, borderColor: time == '5pm' ? '#f4b067' : is5pmDisabled == true ? '#ff807f' : COLORS.gray400, opacity: arrayBetting.length && time !== '5pm' && !is5pmDisabled ? 0.2 : 1 }}>
                                 <Text style={{ color: is5pmDisabled ? COLORS.white : COLORS.black, fontWeight: '600', fontSize: 16 }}>
                                     5PM
                                 </Text>
                             </TouchableOpacity>
-                            <TouchableOpacity disabled={is9pmDisabled} onPress={() => !arrayBetting.length && setSelectedTime('9pm')} style={{ width: '30%', borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: time == '9pm' ? '#f4b067' : is9pmDisabled == true ? '#ff807f' : COLORS.gray400, borderColor: time == '9pm' ? '#f4b067' : is9pmDisabled == true ? '#ff807f' : COLORS.gray400, opacity: arrayBetting.length && time !== '9pm' && !is9pmDisabled ? 0.2 : 1 }}>
+                            <TouchableOpacity disabled={(is9pmDisabled)} onPress={() => !arrayBetting.length && setSelectedTime('9pm')} style={{ width: '30%', borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: time == '9pm' ? '#f4b067' : is9pmDisabled == true ? '#ff807f' : COLORS.gray400, borderColor: time == '9pm' ? '#f4b067' : is9pmDisabled == true ? '#ff807f' : COLORS.gray400, opacity: arrayBetting.length && time !== '9pm' && !is9pmDisabled ? 0.2 : 1 }}>
                                 <Text style={{ color: is9pmDisabled ? COLORS.white : COLORS.black, fontWeight: '600', fontSize: 16 }}>
                                     9PM
                                 </Text>
@@ -1274,7 +1274,7 @@ export default function TicketForm({ navigation }) {
                                     <Text style={{ fontWeight: 'bold', fontSize: 24, color: COLORS.black }}>
                                         Total: {`${total}`}
                                     </Text>
-                                    <TouchableOpacity onPress={() => handleSubmit(arrayBetting)} disabled={arrayBetting.length == 0 || curDraw} style={{ padding: 10, backgroundColor: arrayBetting.length == 0 ? COLORS.gray600 : '#2761a2', width: '40%', height: 55, borderRadius: 24, justifyContent: 'center', alignItems: 'center', }}>
+                                    <TouchableOpacity onPress={() => handleSubmit(arrayBetting)} disabled={arrayBetting.length == 0 || curDraw || loading} style={{ padding: 10, backgroundColor: arrayBetting.length == 0 ? COLORS.gray600 : '#2761a2', width: '40%', height: 55, borderRadius: 24, justifyContent: 'center', alignItems: 'center', }}>
                                         <Text style={{ fontWeight: 'bold', fontSize: 22, color: COLORS.white }}>
                                             SUBMIT
                                         </Text>

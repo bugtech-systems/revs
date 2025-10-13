@@ -1,21 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, FlatList, SafeAreaView, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, View, FlatList, SafeAreaView, TouchableOpacity, RefreshControl } from 'react-native';
 import moment from 'moment-timezone';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { COLORS } from '../../constants';
-import { useOffline } from '../../context/OfflineProvider';
 import { api } from '../../utils/offlineSync';
 
 
 export default function Results2({ navigation }) {
-  // const { api,  } = useOffline()
-  const today = moment().tz('Asia/Manila').toDate();
-
+  const [refreshing, setRefreshing] = React.useState(false);
   const [draws, setDraws] = useState([]);
   const [winningDigits, setWinningDigits] = useState(new Set());
 
-  // Fetch draws from SQLite
-  useEffect(() => {
     const fetchDraws = async () => {
       try {
         const results = await api.listDraws({
@@ -41,6 +36,25 @@ export default function Results2({ navigation }) {
         console.error('Error fetching draws:', err);
       }
     };
+
+
+
+
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    // setLoading(true);
+    setTimeout(() => {
+      // load();
+      fetchDraws()
+          setRefreshing(false);
+      // bumpVersion();
+      // setFilteredData(items)
+    }, 2000);
+  }, []);
+
+
+  // Fetch draws from SQLite
+  useEffect(() => {
 
     const fetchWinningDigits = async () => {
       try {
@@ -86,7 +100,7 @@ export default function Results2({ navigation }) {
         exiting={FadeOutDown.delay(index * 100).duration(500)}
       >
 				<TouchableOpacity
-					onPress={() => navigation.navigate('ViewTip', { resultDate: item.date })}
+					onPress={() => navigation.navigate('ViewTip', { resultDate: item.date, resultId: item.id })}
 					style={{
 						flexDirection: 'row',
 						alignItems: 'flex-start',
@@ -143,6 +157,9 @@ export default function Results2({ navigation }) {
         scrollEnabled
         keyExtractor={(item) => item.index.toString()}
         renderItem={renderList}
+                  refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                  }
         ListEmptyComponent={
           <View style={{ padding: 8, alignItems: 'center', justifyContent: 'center' }}>
             <Text style={{ textAlign: 'center', fontSize: 14, color: COLORS.gray600, fontWeight: '500' }}>

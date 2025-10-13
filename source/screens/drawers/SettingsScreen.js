@@ -55,7 +55,6 @@ const SettingsScreen = ({ navigation }) => {
     let localUsers = await api.listUsers(); // SQLite cache
 
 
-    console.log(localUsers, "LOCAL NA TOKAL")
     
     setUsersList(localUsers);
 
@@ -118,17 +117,6 @@ const SettingsScreen = ({ navigation }) => {
     }).eq('id', user.id);
   };
 
-  const toggleDropdown = key => {
-    setActiveDropDown(prev => (prev === key ? '' : key));
-  };
-
-  const handleDelete = async () => {
-
-    await deleteDB()
-    // now safe to write to RNFS.DownloadDirectoryPath
-
-  }
-
 
 
   // const signOut = useCallback(() => {
@@ -139,22 +127,27 @@ const SettingsScreen = ({ navigation }) => {
   const signOut = useCallback(async () => {
     try {
       // Supabase logout
+  
+      dispatch({ type: SET_COLLECTOR, payload: null });
+      dispatch({ type: SET_USER, payload: null });
+      dispatch({ type: SET_ACTIVE_USER, payload: null });
+      clearAllStorage();
       const { error } = await supabase.auth.signOut();
+      console.log(error, 'ERROR')
+      navigation.navigate('Welcome');
+      
       if (error) throw error;
 
       // Realm logout if needed
       // Redux cleanup
-      dispatch({ type: SET_COLLECTOR, payload: null });
-      dispatch({ type: SET_USER, payload: null });
-      clearAllStorage();
+
 
       // Optional: navigate to login/welcome screen
-      // navigation.navigate('Welcome');
     } catch (err) {
       console.error('Error signing out:', err.message);
       Alert.alert('Logout Failed', err.message);
     }
-  }, [dispatch, navigation, user]);
+  }, [dispatch, navigation]);
 
 
   const handleSetDefault = () => {
@@ -173,7 +166,6 @@ const SettingsScreen = ({ navigation }) => {
 
 
 
-  console.log(selUser.role, "selUserselUserselUserselUserselUser")
 
 
   return (

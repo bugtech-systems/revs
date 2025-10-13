@@ -303,8 +303,8 @@ const Dashboard = ({ navigation }) => {
 //   const today = new Date().toISOString(); 
 
 // Start and end of the day
-const start_of_day = moment(new Date(date)).tz("Asia/Manila").startOf('day').toISOString();
-const end_of_day = moment(new Date(date)).tz("Asia/Manila").endOf('day').toISOString();
+const start_of_day = moment(date).tz("Asia/Manila").startOf('day').toISOString();
+const end_of_day = moment(date).tz("Asia/Manila").endOf('day').toISOString();
 
 // Build filters
 let filters = {
@@ -342,20 +342,26 @@ if (includeAll) {
       let localDraws = await api.listDraws({
        filters: { 
         draw_date:  { 
-           op: "between",
+          op: "between",
 	      from: start_of_day,
 	      to: end_of_day,
-        }}
+         }}
       });
       
+      
+      
+      
+      
+      console.log(localDraws, 'LOCAL DRAWWS', { 
+          op: "between",
+	      from: start_of_day,
+	      to: end_of_day,
+         })
       setBettings(localBettings);
       setDraws(localDraws);
     })();
     
-    return () => {
 
-
-	}
   }, [date, includeAll, own_user, lastSync]);
 
 

@@ -109,6 +109,10 @@ export const formatNumber = (value) => {
   return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
+export const fixDateTimezone = (date) => {
+  return new Date(date.getTime() + (8 * 60 * 60 * 1000))
+}
+
 // Function to get external storage directory
 export const getExternalStoragePath = () => {
   if (Platform.OS === 'android') {
