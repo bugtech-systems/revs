@@ -1069,7 +1069,7 @@ async queueChange(tableName, operation, recordId, data = null) {
       `DELETE FROM ${SYNC_TABLES.SYNC_METADATA} WHERE key = 'last_sync_time'`
     );
     
-    this.isSyncing = false;
+    // this.isSyncing = false;
     
     // Trigger sync
     await this.sync();

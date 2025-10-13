@@ -410,9 +410,9 @@ export default function TicketForm3({ navigation, route }) {
     setBetting(dataList);
 
 
-    const itemComb = realm.objects(Combinations).filtered(
-      'digit == $0',
-      data.combination);
+    // const itemComb = realm.objects(Combinations).filtered(
+    //   'digit == $0',
+    //   data.combination);
 
 
     let totalS = itemComb[0].straightTotal - Number(data.amountTarget);
@@ -420,10 +420,10 @@ export default function TicketForm3({ navigation, route }) {
 
 
 
-    realm.write(() => {
-      itemComb[0].straightTotal = Number(totalS) < 0 ? 0 : Number(totalS);
-      itemComb[0].rambleTotal = Number(totalR) < 0 ? 0 : Number(totalR);
-    });
+    // realm.write(() => {
+    //   itemComb[0].straightTotal = Number(totalS) < 0 ? 0 : Number(totalS);
+    //   itemComb[0].rambleTotal = Number(totalR) < 0 ? 0 : Number(totalR);
+    // });
 
     // console.log(dataList);
   }

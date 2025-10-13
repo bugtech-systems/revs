@@ -61,7 +61,11 @@ export async function init(userId) {
 
 export const fetchUser = async (email) => {
   try {
-  console.log('FETCHING EMAIL', email)
+  console.log('FETCHING EMAIL', email, SupabaseService.isConnected())
+
+  
+  
+  
   let user = null;
   
   user = await fetchUserFromLocal(email);
@@ -108,7 +112,12 @@ console.log(email, 'FETCHING USER', data, error)
 
     // Save to local SQLite for offline access
     // await saveUserToLocal(userWithUplines);
-
+  
+      if (SupabaseService.isConnected()) {
+      
+      await syncRemoteDataInBackground('users', 'query', {filters: {email: email}});
+    }
+  
     return userWithUplines;
   } catch (err) {
     console.log('Supabase fetchUser error, falling back to local', err);
@@ -365,13 +374,13 @@ export function normalizeValue(type, value, target = "supabase") {
       if (shouldLog) console.log(`🔄 Normalize integer: ${value} -> ${result}`);
       break;
 
-    case "timestamp":
+    // case "timestamp":
   //  const date = new Date(value);
   //     result = date.toISOString();
   //     // if (shouldLog)
   //     console.log(`🔄 Normalize timestamp (UTC): ${value} -> ${result}`);
 
-  //     break;
+      // break;
 
 
     case "uuid":
