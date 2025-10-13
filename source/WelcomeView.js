@@ -25,7 +25,7 @@ export function WelcomeView() {
   // Sign in with Supabase and store session + local user
   const signIn = useCallback(async () => {
     const fullEmail = String(email).trim() + '@collector.com';
-    
+   /*  
             if (fullEmail) {
       const localUser = await fetchUser(fullEmail);
       console.log('Fetched local user:', localUser);
@@ -34,7 +34,7 @@ export function WelcomeView() {
               dispatch({ type: SET_ACTIVE_USER, payload: localUser });
       }
     }
-    
+     */
     
     const { data, error } = await supabase.auth.signInWithPassword({
       email: fullEmail,
@@ -42,9 +42,9 @@ export function WelcomeView() {
     });
 
     if (error) {
-              dispatch({ type: SET_USER, payload: null });
-              dispatch({ type: SET_COLLECTOR, payload: null });
-              dispatch({ type: SET_ACTIVE_USER, payload: null });
+              // dispatch({ type: SET_USER, payload: null });
+              // dispatch({ type: SET_COLLECTOR, payload: null });
+              // dispatch({ type: SET_ACTIVE_USER, payload: null });
     
     throw error
     };
@@ -72,7 +72,7 @@ export function WelcomeView() {
     try {
       const currentDateTime = moment.tz('Asia/Manila').format('DD MM YYYY hh:mm:ss');
       const existingValue = await AsyncStorage.getItem('dateTimeNumber');
-      SyncManager.clearSync()
+      // SyncManager.clearSync()
       if (!existingValue) {
         await AsyncStorage.setItem('dateTimeNumber', currentDateTime);
         console.log('DateTime updated to:', currentDateTime);
@@ -88,17 +88,17 @@ export function WelcomeView() {
     }
   }, [signIn, dispatch]);
 
-  useEffect(() => {
-    // if (isReady) {
-    //   forceFullSync();
-    //   console.log('FORCE FULL RESYNC!');
-    // }
+  /* useEffect(() => {
+    if (isReady) {
+      forceFullSync();
+      console.log('FORCE FULL RESYNC!');
+    }
     
     return () => {
-      SyncManager.clearSync()
+      // SyncManager.clearSync()
     }
   }, [isReady]);
-
+ */
   return (
     <SafeAreaProvider>
       <View style={styles.viewWrapper}>
