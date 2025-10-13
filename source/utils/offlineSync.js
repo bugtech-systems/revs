@@ -6,7 +6,7 @@ import supabase from './supabaseClient';
 import { schema } from "../services/schema";
 import { generateObjectId } from './helpers';
 import DatabaseService from '../services/DatabaseService';
-import moment from 'moment-timezone';
+import moment, { tz } from 'moment-timezone';
 import SyncManager from '../services/SyncManager';
 import SupabaseService from '../services/SupabaseService';
 
@@ -61,32 +61,47 @@ export async function init(userId) {
 
 export const fetchUser = async (email) => {
   try {
-    // Try Supabase first when online
+  console.log('FETCHING EMAIL', email)
+  let user = null;
+  
+  user = await fetchUserFromLocal(email);
+  
+    console.log('FETCHING USER', user)
+    
+if(user){
+  return user;
+}
+
+
+
+
+// Try Supabase first when online
     const { data, error } = await supabase
       .from('users')
       .select('*')
       .eq('email', email)
       // .single();
-
-
-
-
     if (error) throw error;
+
+console.log(email, 'FETCHING USER', data, error)
+    user = data[0];
+
+
 
     let populatedUplines = [];
 
-    if (data[0]?.uplines?.length) {
+    if (user?.uplines?.length) {
       // Fetch all uplines as user objects
       const { data: uplineData, error: uplineError } = await supabase
         .from('users')
         .select('*')
-        .in('id', data[0]?.uplines);
+        .in('id', user?.uplines);
 
       if (uplineError) throw uplineError;
       populatedUplines = uplineData || [];
     }
 
-    const userWithUplines = { ...data[0], uplines: populatedUplines };
+    const userWithUplines = { ...user, uplines: populatedUplines };
 
 
 
@@ -145,6 +160,7 @@ export const fetchUserFromLocal = async (email) => {
       `SELECT * FROM users WHERE email = ? LIMIT 1`,
       [email]
     );
+
 
     if (!result.rows || result.rows.length === 0) {
       return null;
@@ -220,7 +236,7 @@ export function parseJsonText(str) {
 
 // ✅ Timestamps: always ISO 8601
 export function nowISO() {
-  return moment().tz("Asia/Manila").format("YYYY-MM-DDTHH:mm:ss.SSSZ");
+   return moment().tz("Asia/Manila").format("YYYY-MM-DDTHH:mm:ss.SSSZ");
 }
 
 // ✅ Normalize row from SQLite -> JS object for Supabase
@@ -263,8 +279,6 @@ export function normalizeForSupabase(table, row) {
   }
 
   // timestamps fallback
-  normalized.created_at = normalized.created_at || moment().tz("Asia/Manila").toISOString();
-  normalized.updated_at = normalized.updated_at || moment().tz("Asia/Manila").toISOString();
 
   return normalized;
 }
@@ -310,9 +324,6 @@ export function normalizeForSQLite(table, remoteRow) {
   }
 
   // Ensure required fields
-  const manilaTime = moment().tz("Asia/Manila").toISOString();
-  normalized.created_at = normalized.created_at || remoteRow.created_at || manilaTime;
-  normalized.updated_at = normalized.updated_at || remoteRow.updated_at || manilaTime;
   
   if (!normalized.id && remoteRow.id) {
     normalized.id = remoteRow.id;
@@ -355,9 +366,13 @@ export function normalizeValue(type, value, target = "supabase") {
       break;
 
     case "timestamp":
-      result = new Date(value).toISOString();
-      if (shouldLog) console.log(`🔄 Normalize timestamp: ${value} -> ${result}`);
-      break;
+  //  const date = new Date(value);
+  //     result = date.toISOString();
+  //     // if (shouldLog)
+  //     console.log(`🔄 Normalize timestamp (UTC): ${value} -> ${result}`);
+
+  //     break;
+
 
     case "uuid":
     case "text":
@@ -384,8 +399,8 @@ async function localInsert(tableName, recordData) {
       const record = {
         ...cleanRecordData,
         id,
-        created_at: manilaTime,
-        updated_at: manilaTime,
+        // created_at: manilaTime,
+        // updated_at: manilaTime,
       };
 
       const columns = Object.keys(record);
@@ -593,6 +608,8 @@ async function localQuery(tableName, query = {}) {
     rows.push(row);
   }
   
+  
+  console.log(res, 'RES QUERY')
   
     if (SupabaseService.isConnected()) {
       syncRemoteDataInBackground(tableName, 'query', query);

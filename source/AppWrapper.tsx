@@ -9,6 +9,7 @@ import { SessionContext } from './context/SessionContext';
 import { SyncProvider } from './context/SyncContext';
 import { DataProvider } from './context/DataContext';
 import { syncConfig } from './configs/syncConfig';
+import SyncManager from './services/SyncManager';
 
 export const AppWrapper = () => {
   const [session, setSession] = useState(null);
@@ -19,23 +20,33 @@ export const AppWrapper = () => {
       await AsyncStorage.removeItem('supabase_session');
       setSession(null);
       await supabase.auth.signOut();
+      setLoading(false)
     } catch (err) {
+      setLoading(false)
       console.error('Error clearing session:', err);
     }
   };
 
-  useEffect(() => {
-    const loadSession = async () => {
+   const loadSession = async () => {
       try {
         const storedSession = await AsyncStorage.getItem('supabase_session');
+        
+        
+        console.log(storedSession, 'STORED SESSION')
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
             setSession(parsed);
         } else {
           const { data } = await supabase.auth.getSession();
+          
+          
+          
+          console.log(data, 'SUPABASE SESSION')
           if (data?.session) {
             setSession(data.session);
             await AsyncStorage.setItem('supabase_session', JSON.stringify(data.session));
+          } else {
+                  await clearSession();
           }
         }
       } catch (err) {
@@ -46,27 +57,41 @@ export const AppWrapper = () => {
       }
     };
 
-    loadSession();
+
+  useEffect(() => {
+        SyncManager.clearSync()
+        loadSession();
   }, []);
 
   useEffect(() => {
     const { data: listener } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+      
+      
+      
+      console.log(newSession, _event, 'auth state change')
       if (newSession) {
         await AsyncStorage.setItem('supabase_session', JSON.stringify(newSession));
         setSession(newSession);
+        
       } else {
-        console.log('Session cleared by Supabase event.');
-        await clearSession();
+          setLoading(false)
+          await clearSession();
       }
     });
 
+
     return () => {
       listener.subscription.unsubscribe();
+      setLoading(false)
     };
   }, []);
 
   if (loading) return <LoadingIndicator />;
 
+
+
+
+console.log(loading, 'WRAPPER')
   return (
     <Provider store={store}>
       <SessionContext.Provider value={{ session, setSession, clearSession }}>

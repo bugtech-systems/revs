@@ -37,6 +37,7 @@ import TestPrinter2 from './screens/TestPrinter2';
 import TicketForm3 from './screens/TicketForm3';
 import Messenger from './screens/Messenger';
 import SummaryReportUser from './screens/SummaryReportUser';
+import { WelcomeView } from './WelcomeView';
 
 
 
@@ -281,6 +282,18 @@ export const StackNavigator = () => {
          <Stack.Screen
             name="UpdateTicket"
             component={TicketForm3}
+            options={({ navigation }) => ({
+              headerTitle: '',
+              headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
+              // headerLeft: () => (
+              //   <CustomDrawerIcon route={null} navigation={navigation} navType={'screen'} selectedUser={null} headerTitle={'Update Ticket'} />
+              // ),
+            })}
+          /> 
+          
+        <Stack.Screen
+            name="Welcome"
+            component={WelcomeView}
             options={({ navigation }) => ({
               headerTitle: '',
               headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },

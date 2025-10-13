@@ -49,6 +49,8 @@ export const SyncProvider = ({ children, config = {} }) => {
         console.error('❌ Sync initialization failed:', error);
       }
     };
+    
+    console.log(SupabaseService.isConnected(), 'SUPABASE')
 
     initialize();
 
@@ -88,6 +90,8 @@ export const SyncProvider = ({ children, config = {} }) => {
       SyncManager.removeSyncListener(syncListener);
     };
   }, []);
+  
+  
 
   // Sync operations
   const manualSync = async () => {
@@ -115,6 +119,9 @@ export const SyncProvider = ({ children, config = {} }) => {
   
   await SyncManager.forceFullSync();
 };
+
+
+
 
 
   const contextValue = {

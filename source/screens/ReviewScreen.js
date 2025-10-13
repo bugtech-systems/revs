@@ -8,7 +8,7 @@ import { COLORS, icons, SIZES } from '../constants';
 import WarningModal from '../components/WarningModal';
 import ConfirmationModal from '../components/ConfirmationModal';
 import TestScreen from './TestScreen';
-import { getConfiguration } from '../utils/helpers';
+import { fixDateTimezone, getConfiguration } from '../utils/helpers';
 import { nowISO } from '../utils/offlineSync';
 import { api } from '../utils/offlineSync';
 
@@ -190,7 +190,7 @@ console.log(ticketDetails, 'TICKET INFO')
 
         <View style={{ width: '100%', justifyContent: 'space-between', flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: COLORS.gray400, paddingVertical: 6 }}>
           <Text style={styles.detailText}>Bet Date/Time:</Text>
-          <Text style={styles.detailValue}>{moment(ticketDetails.timestamp).format('MMM DD, YYYY - hh:ss A')}</Text>
+          <Text style={styles.detailValue}>{moment(ticketDetails.timestamp).format('MMM DD, YYYY')} - {moment(fixDateTimezone(new Date(ticketDetails.created_at))).tz("Asia/Manila").format('hh:mm A')}</Text>
         </View>
         <View style={{ width: '100%', justifyContent: 'space-between', flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: COLORS.gray400, paddingVertical: 6 }}>
           <Text style={styles.detailText}>Draw Date:</Text>
