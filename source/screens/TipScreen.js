@@ -210,14 +210,14 @@ const handleDownloadTipImg = async () => {
       });
 
 
-      console.log(response.data, 'UPLOAD RESPONSE', resultId)
+      console.log(response.data, 'UPLOAD RESPONSE', resultId, draws[0])
        
 
 
       setSelectedImage({ uri: `${Config.FILE_UPLOAD_URL}/apiv2/assets/${response.data.filename}` });
       
       
-      await api.updateDraw(resultId, { tip_url:  `${Config.FILE_UPLOAD_URL}/apiv2/assets/${response.data.filename}`})
+      await api.updateDraw(draws[0].id, { tip_url:  `${Config.FILE_UPLOAD_URL}/apiv2/assets/${response.data.filename}`})
       
       // await realm.write(async () => {
       //   draws[0].tip_url = `${Config.FILE_UPLOAD_URL}/apiv2/assets/${response.data.filename}`;
