@@ -37,9 +37,10 @@ import TestPrinter2 from './screens/TestPrinter2';
 import TicketForm3 from './screens/TicketForm3';
 import Messenger from './screens/Messenger';
 import SummaryReportUser from './screens/SummaryReportUser';
-import { WelcomeView } from './WelcomeView';
 import ViewUserForm from './screens/ViewUserForm';
 import UserOptionsForm from './screens/UserOptionsForm';
+import { WelcomeView } from './WelcomeView';
+
 
 
 const Stack = createStackNavigator();

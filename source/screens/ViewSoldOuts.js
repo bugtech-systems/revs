@@ -25,13 +25,11 @@ const drawTimes = [
   },
 ]
 
-const ownItemsSubscriptionName = 'ownItems';
 
 const ViewSoldOuts = ({ route, navigation }) => {
   const ticketDetails = JSON.parse(route.params);
   
   // const userRealm = useApp();
-  const [show, setShowDate] = useState(false);
   const { collector, user, selectedUser } = useSelector(({ user }) => user);
 
 
@@ -39,32 +37,17 @@ const ViewSoldOuts = ({ route, navigation }) => {
 
 
 
-  console.log(ticketDetails, 'ITEMS')
-
-  const showDatePicker = () => {
-    setShowDate(true);
-  };
-
-
-
-
-
-  const handleCancelTicket = useCallback(
-    async (id) => {
+  const handleCancelTicket = async (id) => {
       // if the realm exists, get the Item with a particular _id and delete it
-      const item = await api.getBetting(id) ; // search for a realm object with a primary key that is an objectId
-      if (item) {
-        if (item.owner_id != selectedUser.id && !user.is_admin) {
+      
+        if (ticketDetails.owner_id != selectedUser.id && !user.is_admin) {
           Alert.alert("You can't delete someone else's ticket!");
         } else {    
-         await api.updateBetting(id, {is_deleted: true, updated_at: nowISO()}) ; // search for a realm object with a primary key that is an objectId
-          //   console.log(dataExplorerMessage);
+          api.updateBetting(id, {is_deleted: true, updated_at: nowISO()}) ; // search for a realm object with a primary key that is an objectId
+          navigation.goBack()
         }
-        navigation.goBack()
       }
-    },
-    [collector, ticketDetails],
-  );
+
 
 
 

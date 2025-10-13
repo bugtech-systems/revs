@@ -1300,9 +1300,9 @@ const StackNavigates = ({ navigation }) => {
 						]
 					)
 				} else if (!user?.deviceId) {
-					realm.write(() => {
+		/* 			realm.write(() => {
 						user.deviceId = uniqueId;
-					});
+					}); */
 				}
 
 			});
