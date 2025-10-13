@@ -64,6 +64,7 @@ const SoldOuts = ({ navigation }) => {
     let filters = {
         timestamp: { op: "between", from: start_of_day, to: end_of_day },
         input_type: 'sold',
+        is_deleted: false
     }
 
 
@@ -75,18 +76,8 @@ const SoldOuts = ({ navigation }) => {
         // limit: 20,
       });
       
-          let localDraws = await api.listDraws({
-             filters: { 
-              draw_date:  { 
-                 op: "between",
-              from: start_of_day,
-              to: end_of_day,
-              }}
-            });
 
-    
       setItems(localBettings);
-      setDraws(localDraws)
       // setLoading(false);
 
   }, [startDate, endDate,  ownUser, rnd]);
@@ -154,6 +145,7 @@ const SoldOuts = ({ navigation }) => {
     const card2pm = draws.find(a => a.game_time === '2pm');
     const card5pm = draws.find(a => a.game_time === '5pm');
     const card9pm = draws.find(a => a.game_time === '9pm');
+console.log(card2pm, card5pm, card2pm, 'ggddr')
 
     if (!card2pm && !card5pm && !card9pm) return '2pm';
     if (card2pm && !card5pm) return '5pm';
@@ -162,10 +154,12 @@ const SoldOuts = ({ navigation }) => {
   };
 
   const handleSoldOut = async () => {
+    
+    console.log('HANDLE SOLDOUT')
     if (!selectedUser) return;
     const { email } = selectedUser;
     const gameTime = getTimeRange();
-
+console.log(gameTime, 'GME')
     if (!gameTime) return;
 
     dispatch({ type: SET_LOADING });
