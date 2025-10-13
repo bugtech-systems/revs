@@ -25,7 +25,7 @@ const drawTimes = [
 
 const SoldOuts = ({ navigation }) => {
   const { selectedUser, user } = useSelector(({ user }) => user);
-  const { loading, confirmationModal } = useSelector(({ ui }) => ui);
+  const { confirmationModal } = useSelector(({ ui }) => ui);
   const dispatch = useDispatch();
 
   // Date & Time States
@@ -56,6 +56,7 @@ const SoldOuts = ({ navigation }) => {
     if (!ownUser) return;
     
     const { start_of_day, end_of_day  } = getDayRange(startDate, endDate)
+
     // Start and end of the day
     
   // console.log(start_of_day, end_of_day, 'date range')
@@ -91,6 +92,37 @@ const SoldOuts = ({ navigation }) => {
   }, [startDate, endDate,  ownUser, rnd]);
 
 
+  const fetchDraws = useCallback(async () => {
+    if (!ownUser) return;
+    
+    const { start_of_day, end_of_day  } = getDayRange(new Date(), new Date())
+
+    // Start and end of the day
+    
+  // console.log(start_of_day, end_of_day, 'date range')
+    
+
+
+
+
+
+      
+          let localDraws = await api.listDraws({
+             filters: { 
+              draw_date:  { 
+                 op: "between",
+              from: start_of_day,
+              to: end_of_day,
+              }}
+            });
+
+    
+      setDraws(localDraws)
+      // setLoading(false);
+
+  }, [startDate, endDate,  ownUser, rnd]);
+
+
   /** Filtered Data */
   useEffect(() => {
     let filteredList = filterTime === 'All Time' ? items : items.filter(a => a.game_time === filterTime);
@@ -101,7 +133,7 @@ const SoldOuts = ({ navigation }) => {
   }, [items, filterTime, searchQuery]);
 
   useEffect(() => {
-    // fetchDraws();
+    fetchDraws();
     fetchItems();
   }, [selectedUser, startDate, endDate, rnd]);
 
@@ -119,9 +151,9 @@ const SoldOuts = ({ navigation }) => {
 
   /** Handle Sold Out */
   const getTimeRange = () => {
-    const card2pm = draws.find(a => a.gameTime === '2pm');
-    const card5pm = draws.find(a => a.gameTime === '5pm');
-    const card9pm = draws.find(a => a.gameTime === '9pm');
+    const card2pm = draws.find(a => a.game_time === '2pm');
+    const card5pm = draws.find(a => a.game_time === '5pm');
+    const card9pm = draws.find(a => a.game_time === '9pm');
 
     if (!card2pm && !card5pm && !card9pm) return '2pm';
     if (card2pm && !card5pm) return '5pm';
@@ -140,7 +172,6 @@ const SoldOuts = ({ navigation }) => {
 
     try {
     
-    console.log(Config.API_URL, gameTime, email, 'GEN SOLDOUT')
       const res = await axios.get(`https://sharewin.pro/apiv2/v1/bettingsv2/soldout?gameTime=${gameTime}&email=${email}`);
       setRnd(Math.random());
       await fetchItems();
