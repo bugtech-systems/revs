@@ -137,20 +137,10 @@ export function getDayRange(date, end) {
   const d = new Date(date);
   const e = new Date(end || date)
   // Start of the day (00:00:00.000)
-  const start_of_day = new Date(
-    d.getFullYear(),
-    d.getMonth(),
-    d.getDate(),
-    0, 0, 0, 0
-  ).toISOString();
+  const start_of_day = moment(d).tz("Asia/Manila").startOf('day').add(8, 'h').toISOString();
 
   // End of the day (23:59:59.999)
-  const end_of_day = new Date(
-    e.getFullYear(),
-    e.getMonth(),
-    e.getDate(),
-    23, 59, 59, 999
-  ).toISOString();
+  const end_of_day = moment(e).tz("Asia/Manila").endOf('day').add(8, 'h').toISOString();
 
   return { start_of_day, end_of_day };
 }

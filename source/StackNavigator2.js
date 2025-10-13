@@ -147,7 +147,6 @@ export const StackNavigator = () => {
   const [selectedUser, setUser] = useState(userRedux);
 
 
-  console.log(user, "THE USER OPTIONS USER")
 
   const notif = new NotifService(reg => console.log('Push registered', reg));
 

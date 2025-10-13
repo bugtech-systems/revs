@@ -9,7 +9,7 @@ import moment from 'moment-timezone';
 import { COLORS, icons, SIZES } from '../constants';
 import Config from 'react-native-config';
 import { getConfiguration, getDayRange } from '../utils/helpers';
-import { api } from '../utils/offlineSync';
+import { api, nowISO } from '../utils/offlineSync';
 
 
 
@@ -217,7 +217,7 @@ const handleDownloadTipImg = async () => {
       setSelectedImage({ uri: `${Config.FILE_UPLOAD_URL}/apiv2/assets/${response.data.filename}` });
       
       
-      await api.updateDraw(draws[0].id, { tip_url:  `${Config.FILE_UPLOAD_URL}/apiv2/assets/${response.data.filename}`})
+      await api.updateDraw(draws[0].id, { tip_url:  `${Config.FILE_UPLOAD_URL}/apiv2/assets/${response.data.filename}`, updated_at: nowISO()})
       
       // await realm.write(async () => {
       //   draws[0].tip_url = `${Config.FILE_UPLOAD_URL}/apiv2/assets/${response.data.filename}`;

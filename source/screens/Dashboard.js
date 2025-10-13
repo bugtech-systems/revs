@@ -5,7 +5,7 @@ import moment from 'moment-timezone';
 import { useSelector, useDispatch } from 'react-redux';
 import { COLORS, SIZES } from '../constants/theme';
 import icons from '../constants/icons';
-import { formatNumber, getConfiguration } from '../utils/helpers';
+import { fixDateTimezone, formatNumber, getConfiguration, getDayRange } from '../utils/helpers';
 // import { useOffline } from '../context/OfflineProvider';
 // import { useOfflineSync } from '../context/OfflineSyncProvider';
 
@@ -299,13 +299,13 @@ const Dashboard = ({ navigation }) => {
       if (!collector) return;
 		let selectedCollector = await fetchUser(collector);
 		
-
+	const { start_of_day, end_of_day  } = getDayRange(date)
 //   const today = new Date().toISOString(); 
 
 // Start and end of the day
-const start_of_day = moment(date).tz("Asia/Manila").startOf('day').toISOString();
-const end_of_day = moment(date).tz("Asia/Manila").endOf('day').toISOString();
-
+// const start_of_day = moment(date).startOf('day').add(8, 'h').toISOString();
+// const end_of_day = moment(date).endOf('day').add(8, 'h').toISOString();
+console.log(start_of_day, end_of_day, 'TIMEZONES')
 // Build filters
 let filters = {
 	is_deleted: false,

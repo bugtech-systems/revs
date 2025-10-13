@@ -61,7 +61,6 @@ export async function init(userId) {
 
 export const fetchUser = async (email) => {
   try {
-  console.log('FETCHING EMAIL', email, SupabaseService.isConnected())
 
   
   
@@ -70,7 +69,6 @@ export const fetchUser = async (email) => {
   
   user = await fetchUserFromLocal(email);
   
-    console.log('FETCHING USER', user)
     
 if(user){
   return user;
@@ -87,7 +85,6 @@ if(user){
       // .single();
     if (error) throw error;
 
-console.log(email, 'FETCHING USER', data, error)
     user = data[0];
 
 
@@ -466,7 +463,7 @@ async function localUpdate(tableName, id, patch) {
   const res = await DatabaseService.executeQuery(`SELECT * FROM ${tableName} WHERE id = ? LIMIT 1;`, [id]);
   if (res.rows.length === 0) throw new Error('Not found');
   
-  const cleanRecord = { ...patch, updated_at: new Date().toISOString() };
+  const cleanRecord = { ...patch, updated_at: nowISO() };
 
  const { _status, _version, ...updated } = cleanRecord;
 
@@ -618,7 +615,6 @@ async function localQuery(tableName, query = {}) {
   }
   
   
-  console.log(res, 'RES QUERY')
   
     if (SupabaseService.isConnected()) {
       syncRemoteDataInBackground(tableName, 'query', query);
