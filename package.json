@@ -29,6 +29,7 @@
     "react-native-barcode-creator": "^0.1.7",
     "react-native-ble-manager": "^7.6.3",
     "react-native-config": "^1.5.5",
+    "react-native-custom-switch": "^1.0.7",
     "react-native-device-info": "^14.0.4",
     "react-native-fs": "^2.20.0",
     "react-native-geolocation-service": "^5.3.1",

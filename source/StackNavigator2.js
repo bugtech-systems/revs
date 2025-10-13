@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useContext } from 'react';
-import { View, Text, Image, Alert } from 'react-native';
+import { View, Text, Image, Alert, TouchableOpacity } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { NavigationContainer } from '@react-navigation/native';
@@ -37,8 +37,13 @@ import TestPrinter2 from './screens/TestPrinter2';
 import TicketForm3 from './screens/TicketForm3';
 import Messenger from './screens/Messenger';
 import SummaryReportUser from './screens/SummaryReportUser';
+<<<<<<< HEAD
+import ViewUserForm from './screens/ViewUserForm';
+import UserOptionsForm from './screens/UserOptionsForm';
+=======
 import { WelcomeView } from './WelcomeView';
 
+>>>>>>> 54b939ce9b5191996076537f40c39b6e4f1f2650
 
 
 const Stack = createStackNavigator();
@@ -140,8 +145,12 @@ const DrawerNavigation = () => {
 export const StackNavigator = () => {
   const { session } = useContext(SessionContext);
   const dispatch = useDispatch();
+  const { user } = useSelector(({ user }) => user);
   const userRedux = useSelector(state => state.user.user);
   const [selectedUser, setUser] = useState(userRedux);
+
+
+  console.log(user, "THE USER OPTIONS USER")
 
   const notif = new NotifService(reg => console.log('Push registered', reg));
 
@@ -278,6 +287,37 @@ export const StackNavigator = () => {
             })
             }
           />
+          <Stack.Screen
+                  component={ViewUserForm}
+                  name="View User"
+                  options={({ navigation }) => ({
+                    headerShown: true,
+                    headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
+                    headerTitle: '',
+                    headerLeft: () => (
+                      <CustomDrawerIcon route={null} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'View User'} />
+                    ),
+                    headerRight: () => (
+                      user?.is_admin ?
+                        <TouchableOpacity
+                          onPress={() => navigation.navigate('UserOptions', JSON.stringify({ selectedUser }))}
+                          style={{ padding: 10, marginRight: 10, alignItems: 'center', justifyContent: 'center' }}>
+                          <Text style={{ fontSize: 15, fontWeight: 'bold', color: COLORS.primary }}>Options</Text>
+                        </TouchableOpacity> : null),
+                  })
+                  }
+                />
+                			<Stack.Screen name="UserOptions" component={UserOptionsForm}
+				options={({ navigation }) => ({
+          headerShown: true,
+					headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
+					headerTitle: '',
+					headerLeft: () => (
+						<CustomDrawerIcon route={null} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'User Options'} />
+					),
+				})
+				}
+			/>
           <Stack.Screen name="Permissions" component={PermissionScreen} options={{ headerShown: false }}/>
          <Stack.Screen
             name="UpdateTicket"
