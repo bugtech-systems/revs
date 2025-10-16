@@ -12,7 +12,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import SelectDropdown from 'react-native-select-dropdown'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { api } from '../../utils/offlineSync';
-import Config from 'react-native-config';
+import { useSync } from '../../context/SyncContext';
 
 
 const drawTimes = [
@@ -24,6 +24,7 @@ const drawTimes = [
 
 
 const SoldOuts = ({ navigation }) => {
+  const {  lastSync } = useSync();
   const { selectedUser, user } = useSelector(({ user }) => user);
   const { confirmationModal } = useSelector(({ ui }) => ui);
   const dispatch = useDispatch();
@@ -36,6 +37,7 @@ const SoldOuts = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [rnd, setRnd] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   // Data States
   const [draws, setDraws] = useState([]);
@@ -80,7 +82,7 @@ const SoldOuts = ({ navigation }) => {
       setItems(localBettings);
       // setLoading(false);
 
-  }, [startDate, endDate,  ownUser, rnd]);
+  }, [startDate, endDate,  ownUser, rnd, lastSync]);
 
 
   const fetchDraws = useCallback(async () => {
@@ -111,7 +113,7 @@ const SoldOuts = ({ navigation }) => {
       setDraws(localDraws)
       // setLoading(false);
 
-  }, [startDate, endDate,  ownUser, rnd]);
+  }, [startDate, endDate,  ownUser, rnd, lastSync]);
 
 
   /** Filtered Data */
@@ -121,12 +123,12 @@ const SoldOuts = ({ navigation }) => {
       filteredList = filteredList.filter(a => String(a.ticket_no).includes(String(searchQuery)));
     }
     setFilteredData(filteredList);
-  }, [items, filterTime, searchQuery]);
+  }, [items, filterTime, searchQuery, lastSync]);
 
   useEffect(() => {
     fetchDraws();
     fetchItems();
-  }, [selectedUser, startDate, endDate, rnd]);
+  }, [selectedUser, startDate, endDate, rnd, lastSync]);
 
   /** Handle Refresh */
   const onRefresh = useCallback(() => {
@@ -138,7 +140,7 @@ const SoldOuts = ({ navigation }) => {
       setSearchQuery('');
       setRefreshing(false);
     }, 2000);
-  }, [startDate, endDate]);
+  }, [startDate, endDate, lastSync]);
 
   /** Handle Sold Out */
   const getTimeRange = () => {
@@ -154,7 +156,7 @@ console.log(card2pm, card5pm, card2pm, 'ggddr')
   };
 
   const handleSoldOut = async () => {
-    
+    setLoading(true)
     console.log('HANDLE SOLDOUT')
     if (!selectedUser) return;
     const { email } = selectedUser;
@@ -177,6 +179,7 @@ console.log(gameTime, 'GME')
     } finally {
       setRnd(Math.random());
       dispatch({ type: STOP_LOADING });
+      setLoading(false)
       await fetchItems()
     }
   };
@@ -363,8 +366,9 @@ console.log(gameTime, 'GME')
           elevation: 4,
           shadowRadius: 4,
         }}
+        disabled={loading}
       >
-        <Text style={{ color: COLORS.white, fontWeight: '600', fontSize: 18 }}>Sold Out</Text>
+        <Text style={{ color: COLORS.white, fontWeight: '600', fontSize: 18 }}>Sold Out </Text>
       </TouchableOpacity>
     </SafeAreaView>
   </SafeAreaProvider>

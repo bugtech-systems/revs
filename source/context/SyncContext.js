@@ -122,8 +122,6 @@ export const SyncProvider = ({ children, config = {} }) => {
 
 
 
-
-
   const contextValue = {
     // State
     isReady,

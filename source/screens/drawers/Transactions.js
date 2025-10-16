@@ -12,6 +12,7 @@ import { formatNumberWithComma, getConfiguration, getDayRange } from '../../util
 // import { useOffline } from '../../context/OfflineProvider';
 import { forceFullResync } from '../../utils/batchPull';
 import { api } from '../../utils/offlineSync';
+import { useSync } from '../../context/SyncContext';
 
 const drawTimes = [
   {
@@ -32,12 +33,10 @@ const drawTimes = [
   },
 ];
 
-const itemSubscriptionName = 'items';
-const ownItemsSubscriptionName = 'ownItems';
 
 const Transactions = ({ navigation }) => {
   // const { api, dataVersion, bumpVersion } = useOffline();
-  
+  const {  lastSync } = useSync();
   const { collector, user, selectedUser } = useSelector(({ user }) => user);
   const [date, setDate] = useState(new Date())
   const [show, setShowDate] = useState(false);
@@ -102,7 +101,7 @@ const Transactions = ({ navigation }) => {
 
     useEffect(() => {
     load();
-  }, [show, date, userNow, includeAll]);
+  }, [show, date, userNow, includeAll, lastSync]);
   
 
   console.log("THE ITEM", show)
@@ -149,7 +148,7 @@ const Transactions = ({ navigation }) => {
       // setFilteredData(items)
       setLoading(false);
     }, 2000);
-  }, [date, userNow, includeAll]);
+  }, [date, userNow, includeAll, lastSync]);
 
 
   const handleSearch = (query) => {

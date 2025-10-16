@@ -460,18 +460,7 @@ export default function TicketForm({ navigation }) {
         }
     }
 
-    const handleRamble = async (item) => {
-        // setBetting([]) // clear test state
-        if (inputValue.length === 3 && amountVal != 0 && time != '') {
-            setBetting(prevState => [...prevState, item]);
-            setCombination('')
-            setInputValue('')
-            setAmountVal('')
-            return
-        } else {
-            Alert.alert(`${inputValue.length == 0 && inputValue.length < 3 && amountVal.length == 0 ? 'Plesae provide 3 digit combination' : amountVal == 0 ? 'Plesae provide amount' : time == '' ? 'Please select time' : 'Something went wrong'}`)
-        }
-    }
+
 
     const handleBet = (item) => {
         let { combination, amount, ramble, target } = item;
@@ -680,6 +669,9 @@ export default function TicketForm({ navigation }) {
 
                 newUps.push(users[0])
                 newUplines.push(String(users[0]._id));
+
+                
+
 
                 for (let i = 0; i < newUps.length; i++) {
                     let agentComAmnt = (newUps[i].comRate / 100) * gross;

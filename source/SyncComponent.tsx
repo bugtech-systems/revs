@@ -21,7 +21,7 @@ console.log(isReady, status, 'STAATS')
         <ActivityIndicator size="small" color="#fff" />
       ) : (
       <TouchableOpacity
-      onPress={forceFullSync}
+      onPress={() => forceFullSync()}
       >
         <Text style={styles.text}>
           {status?.isSyncing ? 'Syncing' : ` • Last: ${new Date(lastSync).toLocaleTimeString()}`}

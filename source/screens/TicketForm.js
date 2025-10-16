@@ -12,6 +12,7 @@ import { COLORS, icons } from '../constants';
 import ConfirmationModal from '../components/ConfirmationModal';
 // import { useOffline } from '../context/OfflineProvider';
 import {  fetchUser, api, nowISO } from '../utils/offlineSync';
+import { useSync } from '../context/SyncContext';
 // import { useOfflineSync } from '../context/OfflineSyncProvider';
 
 
@@ -68,6 +69,8 @@ let keyPad = [
 
 export default function TicketForm({ navigation }) {
     // const {  api, dataVersion } = useOfflineSync();
+    const {  lastSync } = useSync();
+    
     const { collector, user, selectedUser } = useSelector(({ user }) => user);
     const [amountVal, setAmountVal] = useState('')
     const [time, setSelectedTime] = useState('2pm')
@@ -79,9 +82,9 @@ export default function TicketForm({ navigation }) {
     const [amountRamble, setAmountRamble] = useState('')
     const [combinationString, setCombination] = useState('');
     // const [gameTime, setGameTime] = useState('2pm');
-    const [is2pmDisabled, setIs2pmDisabled] = useState(false);
-    const [is5pmDisabled, setIs5pmDisabled] = useState(false);
-    const [is9pmDisabled, setIs9pmDisabled] = useState(false);
+    const [is2pmDisabled, setIs2pmDisabled] = useState(true);
+    const [is5pmDisabled, setIs5pmDisabled] = useState(true);
+    const [is9pmDisabled, setIs9pmDisabled] = useState(true);
     const [betType, setBetType] = useState('')
     const [betTypeOption, setBetTypeOption] = useState('')
     const [showDate, setShowDate] = useState(false);
@@ -326,7 +329,7 @@ export default function TicketForm({ navigation }) {
         let getGameTime = getTimeRange();
         setBetType('')
         const now = new Date();
-        const hours = now.getHours();
+
 
         if (getGameTime == '2pm') {
             setSelectedTime('2pm')
@@ -353,6 +356,12 @@ export default function TicketForm({ navigation }) {
             setSelectedTime('')
             // setGameTime('');
         }
+        
+        if(user.is_admin){
+            setIs2pmDisabled(false);
+            setIs5pmDisabled(false);
+            setIs9pmDisabled(false);       
+        }
     }
 
     function getTimeRange() {
@@ -362,7 +371,7 @@ export default function TicketForm({ navigation }) {
         let card2pm = ((currentHour >= 13 && currentMins >= 55) || draws.filter(a => a.game_time == '2pm')[0]);
         let card5pm = ((currentHour >= 16 && currentMins >= 55) || draws.filter(a => a.game_time == '5pm')[0]);
         let card9pm = ((currentHour >= 20 && currentMins >= 55) || draws.filter(a => a.game_time == '9pm')[0]);
-
+        
 
 
         if (!card2pm && !card5pm && !card9pm) {
@@ -385,7 +394,6 @@ export default function TicketForm({ navigation }) {
         // setBetting([]) // clear test state
         // search for a realm object with a primary key that is an objectId
         // itemComb[0].straight_total += 
-        const currentTime = new Date();
         const comb = await api.listMasterCombinations({
             filters: {  
                 digit: combination
@@ -480,17 +488,17 @@ export default function TicketForm({ navigation }) {
 
 
             setLoading(true)
-            let winWin200 = getConfiguration(selectedUser, 'withWin200')?.value;
-            let winStraight = getConfiguration(selectedUser, 'winStraight')?.value
             let validDate = await updateDateTimeIfGreater();
-            let selectUser = await fetchUser(collector)
+            let selectUser = await fetchUser(selectedUser.email)
+            
+            console.log(validDate, 'VALIDATE')
             if(!validDate){
             	setLoading(false)
             	Alert.alert('Set Timezone Properly!');
             	return;
             }
             
-            console.log(selectUser, 'SELECTED USER')
+            // console.log(selectUser, 'SELECTED USER')
             
 
             if (data?.length > 0) {
@@ -528,17 +536,22 @@ export default function TicketForm({ navigation }) {
 
 
                 let newUps = [];
+                uplines.sort((a, b) => a.user_level - b.user_level)
 
+
+            
 
                 uplines.forEach(line => {
                     newUps.push(line)
                     newUplines.push(line.id)
+                    console.log(line.user_level, line.first_name)
                 });
 
-                newUps.push(selectedUser)
-                newUplines.push(selectedUser?.id);
 
-
+                newUps.push(selectUser)
+                newUplines.push(selectUser?.id);
+                console.log(selectUser.user_level, selectUser.first_name)
+                console.log(newUps.map(a => {return a.first_name}), 'UPLINES')
                 for (let i = 0; i < newUps.length; i++) {
                     let agentComAmnt = (newUps[i]?.com_rate / 100) * gross;
 
@@ -547,16 +560,18 @@ export default function TicketForm({ navigation }) {
                         let comAmnt = agentComAmnt - subAgentComAmnt;
                         commissions.push({
                             user_level: String(newUps[i]?.user_level),
-                            referral: String(newUps[i].user_id),
+                            referral: String(newUps[i].id),
                             rate: Number((comAmnt / gross) * 100).toFixed(2),
-                            amount: Number(comAmnt).toFixed(2)
+                            amount: Number(comAmnt).toFixed(2),
+                            first_name: newUps[i].first_name 
                         })
                     } else {
                         commissions.push({
                             user_level: String(newUps[i]?.user_level),
-                            referral: String(newUps[i].user_id),
+                            referral: String(newUps[i].id),
                             rate: Number((agentComAmnt / gross) * 100).toFixed(2),
-                            amount: Number(agentComAmnt).toFixed(2)
+                            amount: Number(agentComAmnt).toFixed(2),
+                            first_name: newUps[i].first_name 
                         })
                     }
                 }
@@ -570,6 +585,8 @@ export default function TicketForm({ navigation }) {
 
                 let netComs = newComms.reduce((n, { amount }) => n + amount, 0);
                 let netTotal = gross - netComs;
+
+                console.log(newComms, netComs, netTotal,'UPLINES')
 
 
                 // let drawResult = draws.find(a => a.gameTime == gameTime);
@@ -600,7 +617,7 @@ export default function TicketForm({ navigation }) {
                 }
                 
                 
-                         const fixedDate = new Date(date.getTime() + (8 * 60 * 60 * 1000));
+                        //  const fixedDate = new Date(date.getTime() + (8 * 60 * 60 * 1000));
 
                 let newBet = {
                         id: generateObjectId(),
@@ -615,7 +632,7 @@ export default function TicketForm({ navigation }) {
                         is_win_to: false,
                         is_print: false,
                         is_deleted: false,
-                        timestamp: fixedDate.toISOString(),
+                        timestamp: new Date(date).toISOString(),
                         game_time: time,
                         print_copy: 0,
                         input_type: 'normal',
@@ -624,16 +641,17 @@ export default function TicketForm({ navigation }) {
                         combinations: combinations,
                         commissions: newComms,
                         uplines: newUplines,
-                        created_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString()
+                        created_at: nowISO(),
+                        updated_at: nowISO()
                     }
-                    console.log('Navigate')
-                    await api.createBetting(newBet)
-                    setLoading(false)
+                    // console.log('Navigate')
+                    // console.log(newBet, newComms, 'NEW BETTINGS')
+                    let bet = await api.createBetting(newBet)
+                    // setLoading(false)
                     setSelectedTab('keypads')
                     setBetting([]);
                     setDate(new Date());
-                    navigation.navigate('VoidScreen', JSON.stringify(newBet))
+                    navigation.navigate('VoidScreen', JSON.stringify(bet))
 
                 // })
             } else {
@@ -810,7 +828,11 @@ export default function TicketForm({ navigation }) {
     const end_of_day = moment(new Date()).endOf('day').toISOString();
     
     
-                let selectUser = await fetchUser(collector)
+                let selectUsers = await api.listUsers({
+                    filters: {is_deleted: false, user_level: {op: '>=', value: selectedUser.user_level}}
+                })
+
+    console.log(selectUsers, 'USERRS')
 
     
        let localDraws = await api.listDraws({
@@ -822,71 +844,37 @@ export default function TicketForm({ navigation }) {
         }}
       });
 
-    console.log(selectUser, 'SELECTEDD')
 
     let localCombinations = await api.listMasterCombinations();
     setDraws(localDraws)
     setCombinations(localCombinations)
     } 
 
+    
+    useEffect(() => {
+    initializeGameTime();
+    }, [draws, lastSync])
+
+
 
     useEffect(() => {
-        initializeGameTime()
-    }, [draws])
-
-    useEffect(() => {
+    initData();
+    }, [lastSync, selectedUser?.id]);
     
-    initData()
     
-        return () => {
-            // setIs2pmDisabled(false)
-            // setIs5pmDisabled(false)
-            // setIs9pmDisabled(false)
-            // setGameTime('')
-            // setSelectedTime('')
-        }
-    }, [])
-
-
-
-    const intervalTime = 3 * 60 * 1000;
-
-    useEffect(() => {
-        // Set up the interval to trigger every 3 minutes
-        const interval = setInterval(() => {
-            triggerAction();
-        }, intervalTime);
-
-        // Clean up the interval when the component is unmounted
-        return () => {
-            setIs2pmDisabled(false)
-            setIs5pmDisabled(false)
-            setIs9pmDisabled(false)
-            // setGameTime('')
-            setSelectedTime('')
-        clearInterval(interval);
-        }
-    }, []);
     
+
+
     
  
     
 
-    const triggerAction = async () => {
-        // You can put any logic you want to trigger here
-        initializeGameTime();
-        let validDate = await updateDateTimeIfGreater();
-        console.log(validDate, 'VALID DATE?')
-        if (!validDate) {
-            // Alert.alert('Set Timezone Properly!');
-            return;
-        }
-    };
 
     let total = arrayBetting.reduce((n, { amount }) => n + amount, 0)
     let closeDraw = (is2pmDisabled && is5pmDisabled && is9pmDisabled) ? true : false;
 
     let curDraw = (draws.find(a => !a.combination) || ((hoursNow == 13 && minNow >= 55) || (hoursNow == 16 && minNow >= 55) || (hoursNow == 20 && minNow >= 55)));
+
 
 
 
@@ -934,17 +922,17 @@ export default function TicketForm({ navigation }) {
                             </Text>
                         </View>
                         <View style={{ flexDirection: 'row', width: '70%', justifyContent: 'space-around' }}>
-                            <TouchableOpacity disabled={(is2pmDisabled)} onPress={() => !arrayBetting.length && setSelectedTime('2pm')} style={{ width: '30%', borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: time == '2pm' ? '#f4b067' : is2pmDisabled == true ? '#ff807f' : COLORS.gray400, borderColor: time == '2pm' ? '#f4b067' : is2pmDisabled == true ? '#ff807f' : COLORS.gray400, opacity: arrayBetting.length && time !== '2pm' && !is2pmDisabled ? 0.2 : 1 }}>
+                            <TouchableOpacity disabled={(is2pmDisabled)} onPress={() =>  setSelectedTime('2pm')} style={{ width: '30%', borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: time == '2pm' ? '#f4b067' : is2pmDisabled == true ? '#ff807f' : COLORS.gray400, borderColor: time == '2pm' ? '#f4b067' : is2pmDisabled == true ? '#ff807f' : COLORS.gray400, opacity: arrayBetting.length && time !== '2pm' && !is2pmDisabled ? 0.2 : 1 }}>
                                 <Text style={{ color: is2pmDisabled ? COLORS.white : COLORS.black, fontWeight: '600', fontSize: 16, }}>
                                     2PM
                                 </Text>
                             </TouchableOpacity>
-                            <TouchableOpacity disabled={(is5pmDisabled)} onPress={() => !arrayBetting.length && setSelectedTime('5pm')} style={{ width: '30%', borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: time == '5pm' ? '#f4b067' : is5pmDisabled == true ? '#ff807f' : COLORS.gray400, borderColor: time == '5pm' ? '#f4b067' : is5pmDisabled == true ? '#ff807f' : COLORS.gray400, opacity: arrayBetting.length && time !== '5pm' && !is5pmDisabled ? 0.2 : 1 }}>
+                            <TouchableOpacity disabled={(is5pmDisabled)} onPress={() =>  setSelectedTime('5pm')} style={{ width: '30%', borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: time == '5pm' ? '#f4b067' : is5pmDisabled == true ? '#ff807f' : COLORS.gray400, borderColor: time == '5pm' ? '#f4b067' : is5pmDisabled == true ? '#ff807f' : COLORS.gray400, opacity: arrayBetting.length && time !== '5pm' && !is5pmDisabled ? 0.2 : 1 }}>
                                 <Text style={{ color: is5pmDisabled ? COLORS.white : COLORS.black, fontWeight: '600', fontSize: 16 }}>
                                     5PM
                                 </Text>
                             </TouchableOpacity>
-                            <TouchableOpacity disabled={(is9pmDisabled)} onPress={() => !arrayBetting.length && setSelectedTime('9pm')} style={{ width: '30%', borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: time == '9pm' ? '#f4b067' : is9pmDisabled == true ? '#ff807f' : COLORS.gray400, borderColor: time == '9pm' ? '#f4b067' : is9pmDisabled == true ? '#ff807f' : COLORS.gray400, opacity: arrayBetting.length && time !== '9pm' && !is9pmDisabled ? 0.2 : 1 }}>
+                            <TouchableOpacity disabled={(is9pmDisabled)} onPress={() =>  setSelectedTime('9pm')} style={{ width: '30%', borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: time == '9pm' ? '#f4b067' : is9pmDisabled == true ? '#ff807f' : COLORS.gray400, borderColor: time == '9pm' ? '#f4b067' : is9pmDisabled == true ? '#ff807f' : COLORS.gray400, opacity: arrayBetting.length && time !== '9pm' && !is9pmDisabled ? 0.2 : 1 }}>
                                 <Text style={{ color: is9pmDisabled ? COLORS.white : COLORS.black, fontWeight: '600', fontSize: 16 }}>
                                     9PM
                                 </Text>
@@ -1274,7 +1262,7 @@ export default function TicketForm({ navigation }) {
                                     <Text style={{ fontWeight: 'bold', fontSize: 24, color: COLORS.black }}>
                                         Total: {`${total}`}
                                     </Text>
-                                    <TouchableOpacity onPress={() => handleSubmit(arrayBetting)} disabled={arrayBetting.length == 0 || curDraw || loading} style={{ padding: 10, backgroundColor: arrayBetting.length == 0 ? COLORS.gray600 : '#2761a2', width: '40%', height: 55, borderRadius: 24, justifyContent: 'center', alignItems: 'center', }}>
+                                    <TouchableOpacity onPress={() => handleSubmit(arrayBetting)} disabled={arrayBetting.length == 0 || curDraw || loading} style={{ padding: 10, backgroundColor: (arrayBetting.length == 0 || loading) ? COLORS.gray600 : '#2761a2', width: '40%', height: 55, borderRadius: 24, justifyContent: 'center', alignItems: 'center', }}>
                                         <Text style={{ fontWeight: 'bold', fontSize: 22, color: COLORS.white }}>
                                             SUBMIT
                                         </Text>
@@ -1290,40 +1278,6 @@ export default function TicketForm({ navigation }) {
 
                 </View>
             </View>
-            {/* <Modal visible={soldOutModalVisible} transparent animationType="fade">
-                <View style={{
-                    flex: 1,
-                    backgroundColor: 'rgba(0,0,0,0.5)',
-                    justifyContent: 'center',
-                    alignItems: 'center'
-                }}>
-                    <View style={{
-                        backgroundColor: 'white',
-                        padding: 20,
-                        borderRadius: 12,
-                        width: '85%'
-                    }}>
-                        <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 10 }}>
-                            Sold Out Notice
-                        </Text>
-                        <Text style={{ fontSize: 14, color: '#333', marginBottom: 20 }}>
-                            {soldOutMessage}
-                        </Text>
-                        <TouchableOpacity
-                            style={{
-                                alignSelf: 'flex-end',
-                                paddingVertical: 8,
-                                paddingHorizontal: 16,
-                                backgroundColor: '#2563eb',
-                                borderRadius: 8
-                            }}
-                            onPress={() => setSoldOutModalVisible(false)}
-                        >
-                            <Text style={{ color: 'white', fontWeight: '600' }}>OK</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal> */}
 
             {/* Sold Out Modal */}
             <ConfirmationModal

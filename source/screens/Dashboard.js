@@ -39,7 +39,7 @@ const Dashboard = ({ navigation }) => {
   const onChange = (event, selected_date) => {
     if (event?.type === 'neutralButtonPressed') {
       setShow(Platform.OS === 'ios');
-      setDate(moment().toDate());
+      setDate(new Date());
     } else if (event?.type === 'set') {
       setShow(Platform.OS === 'ios');
       setDate(selected_date || date);
@@ -111,7 +111,7 @@ const Dashboard = ({ navigation }) => {
     let grand_net = 0;
 
     const grouped_bettings = ['2pm', '5pm', '9pm'].map((game_time) => {
-      const bets = bettings.filter(b => b.game_time === game_time);
+      const bets = bettings.filter(b => b.game_time == game_time);
 
       let gross = bets.reduce((sum, b) => Number(sum) + Number(b.gross), 0);
       let hits = bets.reduce((sum, b) => Number(sum) + Number(b.winning || 0), 0);
@@ -287,7 +287,7 @@ const Dashboard = ({ navigation }) => {
   useEffect(() => {
     setOwnUser(selectedUser)
     request_notification_permission();
-  }, [selectedUser, collector]);
+  }, [selectedUser, collector, lastSync, date]);
   
   useEffect(() => {
   
@@ -299,7 +299,7 @@ const Dashboard = ({ navigation }) => {
       if (!collector) return;
 		let selectedCollector = await fetchUser(collector);
 		
-	const { start_of_day, end_of_day  } = getDayRange(date)
+	const { start_of_day, end_of_day  } = getDayRange(fixDateTimezone(date))
 //   const today = new Date().toISOString(); 
 
 // Start and end of the day
@@ -351,12 +351,7 @@ if (includeAll) {
       
       
       
-      
-      console.log(localDraws, 'LOCAL DRAWWS', { 
-          op: "between",
-	      from: start_of_day,
-	      to: end_of_day,
-         })
+
       setBettings(localBettings);
       setDraws(localDraws);
     })();
@@ -373,7 +368,7 @@ console.log(bettings.length, 'BETS', draws.length, own_user?.email)
 			<ScrollView style={{ width: '100%' }}>
 				<View style={{ padding: 10, }}>
 					{renderHeader()}
-					{user && user?.role !== 'teller' &&
+					{user &&
 						<View style={{ ...styles.toggleRow }}>
 							<Switch
 								trackColor={{ true: '#00ED64' }}
@@ -398,7 +393,7 @@ console.log(bettings.length, 'BETS', draws.length, own_user?.email)
 						value={date}
 						mode="date"
 						minimumDate={new Date(user?.is_admin && user?.last_summary ? null : user?.last_summary)}
-						maximumDate={new Date(moment().toDate())}
+						// maximumDate={new Date(moment().toDate())}
 						display="default"
 						onChange={onChange}
 						negativeButton={{ label: "Cancel", }}

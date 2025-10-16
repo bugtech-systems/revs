@@ -29,7 +29,7 @@ export const schema = {
     updated_at: "timestamp",
     // Sync columns
     _status: "text",
-    _version: "integer",
+    _version: "numeric",
   },
 
   bettings: {
@@ -47,7 +47,7 @@ export const schema = {
     is_win_to: "boolean",
     collector: "text",
     owner_id: "text",
-    print_copy: "integer",
+    print_copy: "numeric",
     draw_id: "text",
     user_id: "text",
     file_url: "text",
@@ -64,7 +64,7 @@ export const schema = {
     updated_at: "timestamp",
     // Sync columns
     _status: "text",
-    _version: "integer",
+    _version: "numeric",
   },
 
   draws: {
@@ -84,7 +84,7 @@ export const schema = {
     updated_at: "timestamp",
     // Sync columns
     _status: "text",
-    _version: "integer",
+    _version: "numeric",
   },
 
   master_combinations: {
@@ -96,7 +96,7 @@ export const schema = {
     straight_total: "numeric",
     is_win_to: "boolean",
     risk_level: "text",
-    win_frequency: "integer",
+    win_frequency: "numeric",
     straight_max_limit: "numeric",
     ramble_max_limit: "numeric",
     is_deleted: "boolean",
@@ -104,7 +104,7 @@ export const schema = {
     updated_at: "timestamp",
     // Sync columns
     _status: "text",
-    _version: "integer",
+    _version: "numeric",
   },
 
   messages: {
@@ -118,7 +118,7 @@ export const schema = {
     updated_at: "timestamp",
     // Sync columns
     _status: "text",
-    _version: "integer",
+    _version: "numeric",
   },
 
   cashflow: {
@@ -135,7 +135,7 @@ export const schema = {
     updated_at: "timestamp",
     // Sync columns
     _status: "text",
-    _version: "integer",
+    _version: "numeric",
   },
 };
 

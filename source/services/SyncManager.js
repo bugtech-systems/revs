@@ -6,6 +6,7 @@ import { SYNC_TABLES } from './schema';
 import { AppState } from 'react-native';
 import { syncConfig } from '../configs/syncConfig';
 import supabase from '../utils/supabaseClient';
+import { clearAllStorage, normalizeForSQLite, normalizeForSupabase, TABLES } from '../utils/offlineSync';
 
 
 
@@ -263,11 +264,12 @@ async checkColumnExists(tableName, columnName) {
 
 async processSyncItem(item) {
   const { table_name, operation, record_id, data } = item;
-  const recordData = data ? JSON.parse(data) : null;
+  const record = data ? JSON.parse(data) : null;
   // const supabase = SupabaseService.getClient();
 
 
 console.log(recordData, 'RECORD DATA')
+let recordData = normalizeForSupabase(table_name, record)
   console.log(`🔄 Processing ${operation} on ${table_name} for record ${record_id}`);
 
   let result;
@@ -360,7 +362,6 @@ console.log(result, "RESULLT", item.id)
   }
 
   async pullTableChanges(tableName, lastSyncTime, config) {
-    const supabase = SupabaseService.getClient();
     
     if (config.incrementalSync === false || lastSyncTime === 0) {
       // Full sync - pull all records matching query
@@ -424,14 +425,18 @@ console.log(result, "RESULLT", item.id)
     const supabase = SupabaseService.getClient();
     
     // Get records updated since last sync
-    const lastSyncDate = new Date(lastSyncTime).toISOString();
+    const lastSyncDate = moment(lastSyncTime).subtract(1, 'd').toISOString();
     
     let updatedQuery = supabase
       .from(tableName)
       .select('*')
       .gte('updated_at', lastSyncDate)
+      // .eq('is_deleted', false)
       .order('updated_at', { ascending: false });
 
+
+
+console.log(updatedQuery, 'UPDATED QUERY')
     // Apply table-specific query scope
     if (config.query) {
       try {
@@ -537,11 +542,13 @@ console.log(result, "RESULLT", item.id)
     }
   }
 
-  async updateLocalRecord(tableName, record) {
+  async updateLocalRecord(tableName, recordData) {
     try {
       // Get table schema to know which columns exist
       const tableInfo = await DatabaseService.executeQuery(`PRAGMA table_info(${tableName})`);
       const existingColumns = tableInfo.rows.map(col => col.name);
+      const record = normalizeForSQLite(tableName, recordData);
+      
       
       // Filter columns to only those that exist in the table and are not sync metadata
       const columns = Object.keys(record).filter(col => 
@@ -603,7 +610,6 @@ console.log(result, "RESULLT", item.id)
         return value;
       });
 
-console.log(placeholders, values, 'INSERT RECORDD')
 
       await DatabaseService.executeQuery(
         `INSERT INTO ${tableName} (${columns.join(', ')}) 
@@ -1064,10 +1070,29 @@ async queueChange(tableName, operation, recordId, data = null) {
 
     console.log('🔄 Forcing full sync for all tables...');
     
+
     // Reset last sync time to force full sync
     await DatabaseService.executeQuery(
       `DELETE FROM ${SYNC_TABLES.SYNC_METADATA} WHERE key = 'last_sync_time'`
     );
+    
+    await this.pushLocalChanges();
+    
+    await DatabaseService.executeQuery(
+      `DELETE FROM ${SYNC_TABLES.SYNC_QUEUE}`
+    );
+    
+    
+    
+    
+    
+    for(let local_table of TABLES)  {  
+    await DatabaseService.executeQuery(
+      `DELETE FROM ${local_table}`
+    );
+    }
+    
+    
     
     // this.isSyncing = false;
     
@@ -1076,7 +1101,6 @@ async queueChange(tableName, operation, recordId, data = null) {
   }
   
     clearSync() {
-    
     this.isSyncing = false;
 
   }

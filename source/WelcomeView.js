@@ -6,15 +6,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import moment from 'moment-timezone';
 import { COLORS, icons } from './constants';
 import supabase from './utils/supabaseClient';
-import { fetchUser } from './utils/offlineSync';
 import { useSync } from './context/SyncContext';
 import { SessionContext } from './context/SessionContext';
-import SyncManager from './services/SyncManager';
-import { SET_ACTIVE_USER, SET_COLLECTOR, SET_USER } from './redux/actions/types';
 import { useDispatch } from 'react-redux';
 
 export function WelcomeView() {
-  const {  isReady } = useSync();
     const dispatch = useDispatch();
   const { setSession } = useContext(SessionContext);
   const [email, setEmail] = useState('');

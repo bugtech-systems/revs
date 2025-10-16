@@ -27,11 +27,13 @@ import {
 import { getLocalUsers, saveLocalUsers } from '../../utils/db';
 import { useScreenSize, getConfiguration } from '../../utils/helpers';
 import { api, clearAllStorage, deleteDB, forceSync } from '../../utils/offlineSync';
+import { useSync } from '../../context/SyncContext';
 
 
 const SettingsScreen = ({ navigation }) => {
   const { height } = Dimensions.get('window');
   const dispatch = useDispatch();
+  const {  lastSync } = useSync();
 
 
   const { user, collector } = useSelector(({ user }) => user);
@@ -44,8 +46,8 @@ const SettingsScreen = ({ navigation }) => {
   const [activeDropDown, setActiveDropDown] = useState('');
   const [isModalVisible, setModalVisible] = useState(false);
   const [userToUpdate, setUserToUpdate] = useState(null);
-  const [loading, setLoading] = useState(false);
   const apkUrl = Config.APK_URL;
+  const selUser = user;
 
   const screen = useScreenSize();
 
@@ -74,7 +76,7 @@ const SettingsScreen = ({ navigation }) => {
   // --- Supabase realtime subscription for offline-first sync ---
   useEffect(() => {
     loadUsers();
-  }, []);
+  }, [navigation, user]);
 
 
   const openModal = () => setModalVisible(true);
@@ -108,13 +110,13 @@ const SettingsScreen = ({ navigation }) => {
         }
         : u
     );
-    setUsersList(updatedUsers);
-    await saveLocalUsers(updatedUsers);
+    // setUsersList(updatedUsers);
+    // await saveLocalUsers(updatedUsers);
 
     // Online sync
-    await supabase.from('users').update({
-      is_deleted: user.actionType === 'reactivate' ? false : user.actionType === 'deactivate' ? true : user.is_deleted,
-    }).eq('id', user.id);
+    // await supabase.from('users').update({
+    //   is_deleted: user.actionType === 'reactivate' ? false : user.actionType === 'deactivate' ? true : user.is_deleted,
+    // }).eq('id', user.id);
   };
 
 
@@ -156,7 +158,6 @@ const SettingsScreen = ({ navigation }) => {
     dispatch({ type: SET_ACTIVE_USER, payload: user });
   };
 
-  const selUser = user;
 
   const ableToViewDeletedUsers = getConfiguration(selUser, 'deletedUsers')?.isCheck;
   const ableToViewAppUsers = getConfiguration(selUser, 'appUsers')?.isCheck;
@@ -166,6 +167,8 @@ const SettingsScreen = ({ navigation }) => {
 
 
 
+
+console.log(ableToViewAppUsers, selUser, 'SETTINGS')
 
 
   return (
@@ -199,12 +202,7 @@ const SettingsScreen = ({ navigation }) => {
         />
 
         {selUser && (selUser.role == 'coordinator' && selUser.is_admin) &&
-          // <View style={{ padding: 10, backgroundColor: COLORS.gray300, }}>
-          //     <Button title="New User" 
-          // onPress={() => navigation.navigate('Create User', JSON.stringify(users[0]))} 
-          // />
-          //     {/* <Button title="" onPress={() => navigation.navigate('Create User', JSON.stringify(users[0]))} /> */}
-          // </View>
+
           <View style={{ padding: 10, backgroundColor: '#f1f1f1' }}>
 
             <TouchableOpacity
@@ -231,7 +229,7 @@ const SettingsScreen = ({ navigation }) => {
 
         <View style={{ flex: 1, padding: 10, }}>
 
-          {selUser && (selUser.role == 'coordinator' && selUser.is_admin && ableToViewAppUsers) &&
+          {selUser && (selUser.role == 'coordinator' && (selUser.is_admin || ableToViewAppUsers)) &&
             <>
               <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Text style={{ padding: 6, color: COLORS.primary, fontSize: 12, fontWeight: '500' }}>

@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { View, Modal, StyleSheet } from 'react-native';
+import { View, Modal, StyleSheet, Text } from 'react-native';
 import * as Progress from 'react-native-progress';
 import { StackNavigator } from './StackNavigator2';
 import NotifService from './utils/NotificationService';
@@ -8,11 +8,9 @@ import  supabase  from './utils/supabaseClient';
 import {  useDispatch, useSelector } from 'react-redux';
 import { SET_ACTIVE_USER, SET_COLLECTOR, SET_USER } from './redux/actions/types';
 import { SessionContext } from './context/SessionContext';
-// import { useOfflineSync } from './context/OfflineSyncProvider';
-// import { useOffline } from './context/OfflineProvider';
 import { fetchUser } from "./utils/offlineSync"
 import { useSync } from './context/SyncContext';
-import SyncManager from './services/SyncManager';
+import { WelcomeView } from './WelcomeView';
 
 export const LoadingIndicator = () => (
   <View style={{ ...styles.activityContainer, backgroundColor: COLORS.transparentBlack7 }}>
@@ -24,7 +22,7 @@ export const App = () => {
   const dispatch = useDispatch();
   const { user } = useSelector(({ user }) => user);
   const { isReady, status } = useSync();
-  const { session } = useContext(SessionContext);
+  const { session, setSession } = useContext(SessionContext);
   const [loading, setLoading] = useState(true);
 
   const notif = new NotifService((reg) => console.log('Push registered:', reg));
@@ -87,19 +85,26 @@ export const App = () => {
   
   
   useEffect(() => {
-    if(session?.user?.email){
+        if(isReady){
+        if(session?.user?.email){
           initUser(session?.user?.email);
-    } 
-    
-  }, [dispatch, session]);
+        } else {
+          setLoading(false)
+        }
+        }
+        
+  }, [dispatch, session, isReady]);
 
 
-console.log(loading, session, 'loaad', isReady, status, user)
   if (loading) return <LoadingIndicator />;
 
   return (
     <>
-      <StackNavigator />
+      {session ? 
+      
+      <StackNavigator/>
+      : <WelcomeView/>
+      }
     </>
   );
 };

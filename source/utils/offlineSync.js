@@ -242,7 +242,7 @@ export function parseJsonText(str) {
 
 // ✅ Timestamps: always ISO 8601
 export function nowISO() {
-   return moment().tz("Asia/Manila").format("YYYY-MM-DDTHH:mm:ss.SSSZ");
+   return new Date().toISOString();
 }
 
 // ✅ Normalize row from SQLite -> JS object for Supabase
@@ -281,11 +281,12 @@ export function normalizeForSupabase(table, row) {
 
   const normalized = {};
   for (const col in tableSchema) {
-    normalized[col] = normalizeValue(tableSchema[col], row[col], "supabase");
+      if(row[col] != undefined){
+        normalized[col] = normalizeValue(tableSchema[col], row[col], "supabase");
+       }
   }
 
   // timestamps fallback
-
   return normalized;
 }
 
@@ -309,6 +310,8 @@ export function normalizeForSupabase(table, row) {
 // Enhanced normalization with validation
 export function normalizeForSQLite(table, remoteRow) {
   if (!remoteRow) {
+console.log(remoteRow, table, 'ERROR remote row')
+  
     console.error(`❌ Cannot normalize null/undefined row for ${table}`);
     return {};
   }
@@ -322,7 +325,9 @@ export function normalizeForSQLite(table, remoteRow) {
   const normalized = {};
   for (const col in tableSchema) {
     try {
-      normalized[col] = normalizeValue(tableSchema[col], remoteRow[col], "sqlite");
+      if(remoteRow[col] != undefined){
+        normalized[col] = normalizeValue(tableSchema[col], remoteRow[col], "sqlite");
+      }
     } catch (error) {
       console.warn(`⚠️ Normalization error for ${table}.${col}:`, error);
       normalized[col] = remoteRow[col]; // Fallback to original value
@@ -334,6 +339,8 @@ export function normalizeForSQLite(table, remoteRow) {
   if (!normalized.id && remoteRow.id) {
     normalized.id = remoteRow.id;
   }
+  
+  
 
   return normalized;
 }
@@ -366,19 +373,20 @@ export function normalizeValue(type, value, target = "supabase") {
       }
       break;
 
-    case "integer":
+    case "numeric":
       result = Number(value);
       if (shouldLog) console.log(`🔄 Normalize integer: ${value} -> ${result}`);
       break;
 
-    // case "timestamp":
-  //  const date = new Date(value);
-  //     result = date.toISOString();
-  //     // if (shouldLog)
-  //     console.log(`🔄 Normalize timestamp (UTC): ${value} -> ${result}`);
-
-      // break;
-
+    case "timestamp":
+        if (target === "sqlite") {
+    const date = new Date(value);
+      result = date.toISOString();
+      if (shouldLog) console.log(`🔄 Normalize timestamp (UTC): ${value} -> ${result}`);
+        } else {
+          result = new Date(value);
+        }
+      break;
 
     case "uuid":
     case "text":
@@ -402,16 +410,17 @@ async function localInsert(tableName, recordData) {
       // Remove any sync columns from the data being sent to Supabase
       const { _status, _version, ...cleanRecordData } = recordData;
       
-      const record = {
+      const record = normalizeForSQLite(tableName, {
         ...cleanRecordData,
         id,
         // created_at: manilaTime,
         // updated_at: manilaTime,
-      };
+      });
 
       const columns = Object.keys(record);
+      
       const placeholders = columns.map(() => '?').join(', ');
-      const values = columns.map(col => DatabaseService.sanitizeValue(record[col]));
+      const values = columns.map(col => record[col]);
 
       await DatabaseService.executeQuery(
         `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`,
@@ -455,7 +464,16 @@ async function localInsert(tableName, recordData) {
 
   // Return freshly inserted row
   // await SyncManager.pushLocalChanges();
-  return record;
+  
+  
+  // SyncManager.pushLocalChanges();
+  
+    const resp = await DatabaseService.executeQuery(`SELECT * FROM ${tableName} WHERE id = ? LIMIT 1;`, [id]);
+
+    const existing = resp.rows[0];
+     let normalized = normalizeForSupabase(tableName, existing);
+  
+  return normalized;
 }
 
 async function localUpdate(tableName, id, patch) {
@@ -464,9 +482,10 @@ async function localUpdate(tableName, id, patch) {
   if (res.rows.length === 0) throw new Error('Not found');
   
   const cleanRecord = { ...patch, updated_at: nowISO() };
+  let updated = normalizeForSQLite(tableName, cleanRecord);
 
- const { _status, _version, ...updated } = cleanRecord;
-
+   const { _status, _version, ...record } = updated;
+ 
 
   // // JSON fields stringify
   // if (tableName === 'users') {
@@ -480,12 +499,14 @@ async function localUpdate(tableName, id, patch) {
   // } else if (tableName === 'messages') {
   //   updated.conversations = toJsonText(updated.conversations ? parseJsonText(updated.conversations) : []);
   // }
+  
+
 
 
   // build update SQL
-      const columns = Object.keys(updated);
+      const columns = Object.keys(record);
       const setClause = columns.map(col => `${col} = ?`).join(', ');
-      const values = columns.map(col => DatabaseService.sanitizeValue(updated[col]));
+      const values = columns.map(col => record[col]);
 
 
     await DatabaseService.executeQuery(
@@ -494,16 +515,18 @@ async function localUpdate(tableName, id, patch) {
       );
   // await DatabaseService.executeQuery(sql, values);
 
-  await SyncManager.queueChange(tableName, 'UPDATE',  id, updated);
+  
+
+
+  await SyncManager.queueChange(tableName, 'UPDATE',  id, record);
   
   
-  await SyncManager.pushLocalChanges();
+      SyncManager.pushLocalChanges();
   
     const resp = await DatabaseService.executeQuery(`SELECT * FROM ${tableName} WHERE id = ? LIMIT 1;`, [id]);
 
     const existing = resp.rows[0];
-let normalized = normalizeForSupabase(tableName, existing);
-  
+     let normalized = normalizeForSupabase(tableName, existing);
   return normalized;
 }
 
@@ -528,7 +551,6 @@ export async function localGet(tableName, id) {
   const res = await DatabaseService.executeQuery(`SELECT * FROM ${tableName} WHERE id = ? LIMIT 1;`, [id]);
   
   
-  console.log(res, 'GET RES LOCALLS', tableName)
   if (res.rows.length === 0) return null;
   const row = res.rows[0];
 
@@ -550,31 +572,6 @@ export async function localGet(tableName, id) {
   return row;
 }
 
-async function localList(tableName, whereClause = "", params = []) {
-  // Always order by created_at DESC
-  const sql = `SELECT * FROM ${tableName} ${whereClause} ORDER BY created_at DESC;`;
-  const res = await DatabaseService.executeQuery(sql, params);
-  const rows = [];
-
-  for (let i = 0; i < res.rows.length; i++) {
-    const r = res.rows.item(i);
-
-    if (tableName === "users") {
-      r.configuration = parseJsonText(r.configuration);
-      r.uplines = parseJsonText(r.uplines);
-    } else if (tableName === "bettings") {
-      r.hits = parseJsonText(r.hits);
-      r.commissions = parseJsonText(r.commissions);
-      r.combinations = parseJsonText(r.combinations);
-      r.uplines = parseJsonText(r.uplines);
-    } else if (tableName === "messages") {
-      r.conversations = parseJsonText(r.conversations);
-    }
-
-    rows.push(r);
-  }
-  return rows;
-}
 
 async function localQuery(tableName, query = {}) {
   const { filters = {}, limit, offset, orderBy } = query;
@@ -592,26 +589,33 @@ async function localQuery(tableName, query = {}) {
   const offsetSql = offset ? `OFFSET ${offset}` : "";
 
   const sql = `SELECT * FROM ${tableName} ${whereSql} ${orderSql} ${limitSql} ${offsetSql};`;
+  
+  
   const res = await DatabaseService.executeQuery(sql, values);
 
+// console.log(res, sql, 'SQLL QUERY', values)
+
   const rows = [];
-  console.log(res, 'RESSSP', sql, values)
   for (let i = 0; i < res.rows.length; i++) {
     let row = res.rows[i];
     // parse JSON fields
-    if (tableName === "users") {
-      row.configuration = parseJsonText(row.configuration);
-      row.uplines = parseJsonText(row.uplines);
-    } else if (tableName === "bettings") {
-      row.hits = parseJsonText(row.hits);
-      row.commissions = parseJsonText(row.commissions);
-      row.combinations = parseJsonText(row.combinations);
-      row.uplines = parseJsonText(row.uplines);
-    } else if (tableName === "messages") {
-      row.conversations = parseJsonText(row.conversations);
-    }
+    // if (tableName === "users") {
+    //   row.configuration = parseJsonText(row.configuration);
+    //   row.uplines = parseJsonText(row.uplines);
+    // } else if (tableName === "bettings") {
+    //   row.hits = parseJsonText(row.hits);
+    //   row.commissions = parseJsonText(row.commissions);
+    //   row.combinations = parseJsonText(row.combinations);
+    //   row.uplines = parseJsonText(row.uplines);
+    // } else if (tableName === "messages") {
+    //   row.conversations = parseJsonText(row.conversations);
+    // }
+     
+     
+     
+    rows.push(normalizeForSupabase(tableName, row));
+        // rows.push(row);
 
-    rows.push(row);
   }
   
   
@@ -623,159 +627,6 @@ async function localQuery(tableName, query = {}) {
   return rows;
 }
 
-// push: process queue and apply to Supabase
-async function pushQueueToSupabase() {
-
-  await SyncManager.pushLocalChanges();
-
-}
-
-// pull: fetch remote changes since lastPulledAt for each table and write to local
-// ---------- PULL FROM SUPABASE (always source of truth) ----------
-async function pullFromSupabase(userId) {
-
-
-  for (const table of TABLES) {
-    try {
-      const key = `${LAST_PULLED_KEY}:${table}`;
-      const lastPulledAt = (await AsyncStorage.getItem(key)) || null;
-
-      // ✅ Step 1: get all local IDs
-      const localIds = await getAllLocalIds(table);
-
-      // ✅ Step 2: fetch remote rows (always Supabase-first)
-      let query = supabase.from(table).select("*").order("updated_at", { ascending: false });
-      
-      if (lastPulledAt) {
-        query = query.gte('updated_at', lastPulledAt);
-      } else {
-      query = query.limit(500);
-      }
-
-      const { data: remoteData, error } = await query;
-      if (error) {
-        console.warn(`Pull error for ${table}`, error);
-        continue;
-      }
-      console.log(remoteData[0], 'remote data', table)
-      // ✅ Step 3: build a map of Supabase IDs
-      const remoteIds = new Set(remoteData.map(r => r.id));
-
-      // ✅ Step 4: sync Supabase rows into local
-      for (const remoteRowData of remoteData) {
-      let { _status, _version, ...remoteRow } = remoteRowData;
-           remoteIds.add(remoteRow.id);
-
-    // Handle deleted records
-    if (remoteRow.is_deleted) {
-      await DatabaseService.executeQuery(`DELETE FROM ${table} WHERE id = ?`, [remoteRow.id]);
-      continue;
-    }
-
-    // Check if record exists locally and compare timestamps
-    const local = await localGet(table, remoteRow.id);
-    const remoteUpdatedAt = remoteRow.updated_at || nowISO();
-    const localUpdatedAt = local ? local.updated_at || null : null;
-      console.log(table, remoteRow, 'INSERT OR REPLACE')
-
-    if (!local) {
-      // New record - insert
-      const toInsert = normalizeForSQLite(table, remoteRow);
-      await insertOrReplace(table, toInsert);
-    } else if (!localUpdatedAt || remoteUpdatedAt > localUpdatedAt) {
-      // Updated record - replace
-      console.log(table, toInsert, 'INSERT OR REPLACE')
-      const toInsert = normalizeForSQLite(table, remoteRow);
-      await insertOrReplace(table, toInsert);
-    }
-    // Else: local is newer or same, keep local version
-  }
-  
-  
-  
-      let locals = localIds.slice(0, 500);
-
-      // ✅ Step 5: verify "orphaned" local rows before deletion
-      // for (const localId of locals) {
-      //   if (!remoteIds.has(localId)) {
-      //     // double check Supabase directly by ID
-      //     const { data: checkRow, error: checkError } = await supabase
-      //       .from(table)
-      //       .select("id, is_deleted")
-      //       .eq("id", localId)
-      //       .single();
-
-      //     console.log(checkRow, 'CHECKKING PULL DATA', table)
-
-
-      //     if (!checkRow || checkRow?.is_deleted) {
-      //       console.log(`Removing orphaned row from ${table}: ${localId}`);
-      //       await runSql(`DELETE FROM ${table} WHERE id = ?`, [localId]);
-      //     }
-      //   }
-      // }
-
-      // ✅ Step 6: update lastPulledAt
-      
-            await AsyncStorage.setItem(key, nowISO()); 
-    } catch (err) {
-      console.warn('Pull error', err);
-    }
-  }
-}
-
-// ---------- FETCH HELPER (Supabase first, fallback local) ----------
-export async function fetchWithFallback(table, query = {}) {
-  const state = await NetInfo.fetch();
-  if (state.isConnected) {
-    try {
-      // fetch remote
-      const { data, error } = await supabase.from(table).select('*');
-      if (error) throw error;
-
-      // replace local with remote snapshot
-      for (const row of data) {
-        if (row.is_deleted) {
-          await DatabaseService.executeQuery(`DELETE FROM ${table} WHERE id = ?`, [row.id]);
-        } else {
-          const normalized = normalizeForSQLite(table, row);
-          await insertOrReplace(table, normalized);
-        }
-      }
-
-      // return supabase data
-      return await localQuery(table, query);;
-    } catch (err) {
-      console.warn(`Fetch from Supabase failed for ${table}`, err);
-      return await localQuery(table, query); // fallback to local
-    }
-  } else {
-    // offline → use local only
-    return await localQuery(table, query);
-  }
-};
-
-// Full sync: try push first then pull. We check connectivity, else skip.
-async function syncWithSupabase(id) {
-  const state = await NetInfo.fetch();
-  if (!state.isConnected) {
-    console.log('No network - skipping sync.');
-    return { ok: false, reason: 'offline' };
-  }
-  console.log('Starting sync...');
-  try {
-    await pushQueueToSupabase(id)
-      await pullFromSupabase();
-    
-    // await force
-    
-    console.log('Sync completed.');
-    return { ok: true };
-  } catch (err) {
-    console.warn('Sync failed', err);
-    return { ok: false, err };
-  }
-};
 
 // CRUD wrappers for each table (you can call these from your components)
 export const api = {
@@ -830,10 +681,7 @@ export async function deleteDB(){
 
 };
 
-// Force sync manually
-export async function forceSync() {
-  return await syncWithSupabase();
-};
+
 
 function buildWhereClause(filters = {}) {
   const whereClauses = [];
@@ -846,10 +694,14 @@ function buildWhereClause(filters = {}) {
     if (typeof filter !== "object" || !filter.op) {
       if (filter === null) {
         whereClauses.push(`${key} IS NULL`);
+      } else if(typeof filter === 'boolean') { 
+             whereClauses.push(`${key} = ?`);
+             values.push(filter ? 1 : 0);
       } else {
         whereClauses.push(`${key} = ?`);
         values.push(filter);
       }
+      
       continue;
     }
 
@@ -949,14 +801,15 @@ const processBulkInsert = async (tableName, records) => {
 
   for (let i = 0; i < records.length; i += batchSize) {
     const batch = records.slice(i, i + batchSize);
-    
-    const columns = Object.keys(normalizeForSQLite(tableName, batch[0]));
+        const columns = Object.keys(normalizeForSQLite(tableName, records[0]));
     const placeholders = batch.map(() => `(${columns.map(() => '?').join(', ')})`).join(', ');
     const values = batch.flatMap(record => {
       const normalized = normalizeForSQLite(tableName, record);
       return columns.map(col => normalized[col]);
     });
 
+
+  // console.log(columns, values, 'INSERTINGGGG')
 
     await DatabaseService.executeQuery(
       `INSERT OR REPLACE INTO ${tableName} (${columns.join(', ')}) VALUES ${placeholders}`,
@@ -990,6 +843,7 @@ const fetchAllRemoteDataWithPagination = async (tableName, baseQuery, maxRecords
       console.log(`📄 Fetching ${tableName} page ${page + 1} (records ${from}-${to})...`);
 
       const { data, error, count } = await baseQuery.range(from, to);
+      
       if (error) {
         console.error(`ss❌ Error fetching ${tableName} page ${page + 1}:`, error, baseQuery, maxRecords);
         
@@ -1043,9 +897,7 @@ const syncRemoteDataInBackground = async (tableName, operation, params = {}) => 
       let query = supabase.from(tableName).select('*');
       
       // Apply filters for query operations
-    console.log(params.filters, 'PARAMS FILTERS');
       if (operation === 'query' && params.filters) {
-        console.log(`🔍 Applying filters:`, params.filters);
         Object.entries(params.filters).forEach(([key, filter]) => {
           if (typeof filter !== "object" || !filter.op) {
             // Simple equality filter
@@ -1142,6 +994,10 @@ const syncRemoteDataInBackground = async (tableName, operation, params = {}) => 
           }
         });
       }
+      
+      
+      
+      
       
       // Apply ordering
       if (params.orderBy) {
@@ -1264,13 +1120,7 @@ export async function fetchBettings({ includeAll, date, userNow, user }) {
     orderBy: "timestamp ASC",
   });
 
-  console.log("Fetched bettings", {
-    count: items?.length ?? 0,
-    date,
-    includeAll,
-    start: adjustedStart,
-    end: adjustedEnd,
-  });
+
 
   return items;
 };

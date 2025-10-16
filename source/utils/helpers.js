@@ -78,10 +78,6 @@ export const updateDateTimeIfGreater = async () => {
   try {
     // Check if the current timezone is set to Asia/Manila
     const currentTimezone = moment.tz.guess();
-    if (currentTimezone !== 'Asia/Manila') {
-      console.log('Timezone is not set to Asia/Manila.', currentTimezone);
-      // return false; // Return false if the timezone is not Asia/Manila
-    }
 
     // Get the current date and time in number format, considering Asia/Manila timezone
     const currentDateTime = moment.tz('Asia/Manila').format('YYYYMMDDHHmmss');
@@ -89,11 +85,18 @@ export const updateDateTimeIfGreater = async () => {
     // Get the existing value from AsyncStorage
     const existingValue = await AsyncStorage.getItem('dateTimeNumber');
 
-    if ((existingValue === null || currentDateTime > existingValue)) {
+    if (currentDateTime > existingValue) {
       // Update AsyncStorage if no value exists or current datetime is greater
       await AsyncStorage.setItem('dateTimeNumber', currentDateTime);
       console.log('DateTime updated to:', currentDateTime);
       return true; // Successfully updated
+    } else if(existingValue === null){
+    
+    if (currentTimezone !== 'Asia/Manila') {
+      console.log('Timezone is not set to Asia/Manila.', currentTimezone);
+      return false; // Return false if the timezone is not Asia/Manila
+    }
+    
     } else {
       console.log('Current dateTime is not greater than the existing one.');
       return false; // No update needed
@@ -136,11 +139,23 @@ export const readFileFromExternalStorage = async () => {
 export function getDayRange(date, end) {
   const d = new Date(date);
   const e = new Date(end || date)
+  
+  console.log(e.getDate(), 'GET DTE')
   // Start of the day (00:00:00.000)
-  const start_of_day = moment(d).tz("Asia/Manila").startOf('day').add(8, 'h').toISOString();
+  const start_of_day = new Date(
+    d.getFullYear(),
+    d.getMonth(),
+    d.getDate(),
+    0, 0, 0, 0
+  ).toISOString();
 
   // End of the day (23:59:59.999)
-  const end_of_day = moment(e).tz("Asia/Manila").endOf('day').add(8, 'h').toISOString();
+  const end_of_day = new Date(
+    e.getFullYear(),
+    e.getMonth(),
+    e.getDate(),
+    23, 59, 59, 999
+  ).toISOString();
 
   return { start_of_day, end_of_day };
 }

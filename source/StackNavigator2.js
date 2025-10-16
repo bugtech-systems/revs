@@ -73,13 +73,13 @@ const DrawerNavigation = () => {
   return (
     <Drawer.Navigator screenOptions={{ drawerType: 'slide', overlayColor: 'rgba(138, 133, 133, 0.59)', swipeEdgeWidth: 100 }}>
       <Drawer.Screen name="Dashboard" component={Dashboard} options={({ navigation }) => generateDrawerScreenOptions('Dashboard', icons.dashboard, 'Dashboard', navigation)} />
-      {getConfiguration(curUser, 'ticketForm') && (
+      {(getConfiguration(curUser, 'ticketForm')?.isCheck) ? (
         <>
           <Drawer.Screen name="Play" component={TicketForm} options={({ navigation }) => generateDrawerScreenOptions('Play', icons.play, 'Play', navigation)} />
           <Drawer.Screen name="Winnings" component={Winnings} options={({ navigation }) => generateDrawerScreenOptions('Winnings', icons.winnings, 'Winnings', navigation)} />
           <Drawer.Screen name="Transactions" component={Transactions} options={({ navigation }) => generateDrawerScreenOptions('Transactions', icons.tickets, 'Transactions', navigation)} />
         </>
-      )} 
+      ) : <></>} 
 
       {(getConfiguration(curUser, 'cashFlow')?.isCheck) && (
         <>
@@ -115,7 +115,6 @@ const DrawerNavigation = () => {
           <Drawer.Screen name="Summary Report" component={SummaryReport} options={({ navigation }) => generateDrawerScreenOptions('Summary Report', icons.summary, 'Summary Report', navigation)} />
 
         </>
-
       )}
 
 
@@ -167,6 +166,8 @@ export const StackNavigator = () => {
   }, [session]);
 
 
+
+console.log()
   return (
     <SafeAreaProvider>
       <NavigationContainer>

@@ -7,7 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { permuteDigits, getConfiguration, getDayRange, updateDateTimeIfGreater, fixDateTimezone } from '../utils/helpers';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, icons } from '../constants';
-import { api, fetchUser, normalizeValue } from '../utils/offlineSync';
+import { api, fetchUser, normalizeValue, nowISO } from '../utils/offlineSync';
 import Geolocation from 'react-native-geolocation-service';
 
 
@@ -66,7 +66,7 @@ let keyPad = [
 export default function TicketForm3({ navigation, route }) {
   const ticketDetails = JSON.parse(route.params);
 
-  const { collector, user, selectedUser } = useSelector(({ user }) => user);
+  const { collector, user } = useSelector(({ user }) => user);
   const [amountVal, setAmountVal] = useState('')
   const [time, setSelectedTime] = useState(ticketDetails?.game_time || "2pm")
   const [arrayBetting, setBetting] = useState([]);
@@ -82,11 +82,12 @@ export default function TicketForm3({ navigation, route }) {
   const [betType, setBetType] = useState('')
   const [betTypeOption, setBetTypeOption] = useState('')
   const [showDate, setShowDate] = useState(false);
-  const [date, setDate] = useState(new Date(ticketDetails.timestamp))
-
+  const [date, setDate] = useState(moment(ticketDetails.timestamp).tz("Asia/Manila").toDate())
+  const [own_user, setOwnUser] = useState(null);
   const [draws, setDraws] = useState([]);
   const [comb, setComb] = useState([]);
   const [combs, setCombs] = useState([]);
+  const [combinations, setCombinations] = useState([])
 
   const current = new Date();
   const hoursNow = current.getHours();
@@ -151,8 +152,6 @@ export default function TicketForm3({ navigation, route }) {
     // search for a realm object with a primary key that is an objectId
     // itemComb[0].straightTotal += 
     const currentTime = new Date();
-    const currentHour = currentTime.getHours();
-    const currentMins = currentTime.getMinutes();
 
 
 
@@ -170,9 +169,6 @@ export default function TicketForm3({ navigation, route }) {
       return;
     }
 
-
-    let totalS = comb[0]?.straightTotal + Number(amountTarget);
-    let totalR = comb[0]?.rambleTotal + Number(amountRamble);
 
 
     if (((combs.length > 1 && combs.length < 300) && (!comb[0]?.straightTotal && !comb[0]?.rambleTotal))) {
@@ -219,9 +215,7 @@ export default function TicketForm3({ navigation, route }) {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
-  function generateTicketNumber() {
-    return Math.floor(1000000 + Math.random() * 9000000).toString();
-  }
+
 
   // setLoading(false)
     const handleSubmit = async (data) => {
@@ -231,19 +225,17 @@ export default function TicketForm3({ navigation, route }) {
         let totalAmount = 0;
         try {
 
-
+console.log(data, 'DATA')
             setLoading(true)
-            // let winWin200 = getConfiguration(selectedUser, 'withWin200')?.value;
-            // let winStraight = getConfiguration(selectedUser, 'winStraight')?.value
             let validDate = await updateDateTimeIfGreater();
-            let selectUser = await fetchUser(collector)
+            let selectUser = await fetchUser(own_user.email)
             if(!validDate){
               setLoading(false)
               Alert.alert('Set Timezone Properly!');
               return;
             }
             
-            console.log(selectUser, 'SELECTED USER')
+            console.log(selectUser.uplines, 'SELECTED USER')
             
 
             if (data?.length > 0) {
@@ -281,6 +273,7 @@ export default function TicketForm3({ navigation, route }) {
 
 
                 let newUps = [];
+                uplines.sort((a, b) => Number(a.user_level) - Number(b.user_level))
 
 
                 uplines.forEach(line => {
@@ -288,8 +281,8 @@ export default function TicketForm3({ navigation, route }) {
                     newUplines.push(line.id)
                 });
 
-                newUps.push(selectedUser)
-                newUplines.push(selectedUser?.id);
+                newUps.push(selectUser)
+                newUplines.push(selectUser?.id);
 
 
                 for (let i = 0; i < newUps.length; i++) {
@@ -330,7 +323,7 @@ export default function TicketForm3({ navigation, route }) {
                             console.log(drawResult, 'DRAW RESULT')
                         return;
                         } */
-                if (collector == selectedUser?.email) {
+                if (collector == own_user?.email) {
                     Geolocation.getCurrentPosition(
                        async (position) => {
                             let { coords } = position;
@@ -338,7 +331,7 @@ export default function TicketForm3({ navigation, route }) {
                             // realm.write(async () => {
                             //     selectedUser.coordinates = `${coords.latitude}|${coords.longitude}`;
                             // })
-                            await api.updateUser(selectedUser?.id, {
+                            await api.updateUser(own_user?.id, {
                                 coordinates: `${coords.latitude}|${coords.longitude}`
                             })
 
@@ -367,7 +360,7 @@ export default function TicketForm3({ navigation, route }) {
                         // is_win_to: false,
                         // is_print: false,
                         // is_deleted: false,
-                        timestamp: fixDateTimezone(date).toISOString(),
+                        timestamp: new Date(date).toISOString(),
                         game_time: time,
                         // input_type: 'normal',
                         // contact: selectedUser.mobile,
@@ -375,17 +368,18 @@ export default function TicketForm3({ navigation, route }) {
                         // winning: 0,
                         combinations: combinations,
                         commissions: newComms,
-                        // uplines: newUplines,
+                        uplines: newUplines,
                         updated_at: new Date().toISOString()
                     }
+                     
                     console.log('Navigate', newBet.timestamp, 'time', moment(date).tz('Asia/Manila').toISOString())
                    let updated = await api.updateBetting(ticketDetails.id, newBet)
-                    setLoading(false)
-                    setSelectedTab('keypads')
-                    setBetting([]);
-                    setDate(new Date());
+                    // setLoading(false)
+                    // setSelectedTab('keypads')
+                    // setBetting([]);
+                    // setDate(new Date());
                     console.log(updated, 'UPDATEDD')
-                    navigation.navigate('VoidScreen', JSON.stringify({...updated, created_at: fixDateTimezone(new Date(ticketDetails.created_at))}))
+                    navigation.navigate('VoidScreen', JSON.stringify(updated))
                 // })
             } else {
                 Alert.alert('No tickets to submit')
@@ -393,8 +387,9 @@ export default function TicketForm3({ navigation, route }) {
         } catch (err) {
             console.log(err, 'ERRRORR')
             return
-        }
+        } finally {
         setLoading(false)
+        }
 
     }
 
@@ -413,11 +408,6 @@ export default function TicketForm3({ navigation, route }) {
     // const itemComb = realm.objects(Combinations).filtered(
     //   'digit == $0',
     //   data.combination);
-
-
-    let totalS = itemComb[0].straightTotal - Number(data.amountTarget);
-    let totalR = itemComb[0].rambleTotal - Number(data.amountRamble);
-
 
 
     // realm.write(() => {
@@ -542,15 +532,45 @@ export default function TicketForm3({ navigation, route }) {
       console.log('NORMALIZED',normalized);
   };
 
+    const initData = async (id) => {
+    
+        const start_of_day = moment(new Date()).startOf('day').toISOString();
+    const end_of_day = moment(new Date()).endOf('day').toISOString();
+    
+      let selectUser = await api.getUser(id);
+    
+    console.log(selectUser, 'SELLEECT USER')
+     setOwnUser(selectUser)
 
-    useEffect(() => {
-  	initializeGameTime()
-    }, [draws])
+    
+       let localDraws = await api.listDraws({
+       filters: { 
+        draw_date:  { 
+           op: "between",
+        from: start_of_day,
+        to: end_of_day,
+        }}
+      });
+
+
+    let localCombinations = await api.listMasterCombinations();
+    setDraws(localDraws)
+    setCombinations(localCombinations)
+    } 
+
+
+  // useEffect(() => {
+  // 	initializeGameTime()
+  //   }, [draws])
 
   useEffect(() => {
     if (ticketDetails && ticketDetails.id) {
-      let { combinations, game_time } = ticketDetails;
-
+      let { combinations, game_time, owner_id } = ticketDetails;
+        
+        
+        
+      initData(owner_id)
+    
       if (combinations && combinations.length) {
         let newArr = combinations.map(item => {
           let newObj = { id: generateRandomId(), amount: item.amount, combination: item.combination, game_time: ticketDetails.game_time, target: item.targetAmount, ramble: item.rambleAmount, amountRamble: item.rambleAmount, amountTarget: item.targetAmount }
@@ -565,53 +585,27 @@ export default function TicketForm3({ navigation, route }) {
       setBetting([])
     }
     return () => {
-      // setBetting([])
+      setLoading(false);
+      setBetting([]);
     }
 
-  }, [ticketDetails?.id])
+  }, [ticketDetails?.id, collector])
 
 
 
+  
 
-
-
-    const intervalTime = 3 * 60 * 1000;
-
-    useEffect(() => {
-        // Set up the interval to trigger every 3 minutes
-        const interval = setInterval(() => {
-            triggerAction();
-        }, intervalTime);
-
-        // Clean up the interval when the component is unmounted
-        return () => {
-            setIs2pmDisabled(false)
-            setIs5pmDisabled(false)
-            setIs9pmDisabled(false)
-            setSelectedTime('')
-        clearInterval(interval);
-        }
-    }, []);
-    
     
 
-
-    const triggerAction = async () => {
-        // You can put any logic you want to trigger here
-        initializeGameTime();
-        let validDate = await updateDateTimeIfGreater();
-        console.log(validDate, 'VALID DATE?')
-        if (!validDate) {
-            // Alert.alert('Set Timezone Properly!');
-            return;
-        }
-    };
 
 
   let total = arrayBetting.reduce((n, { amount }) => n + amount, 0)
   let closeDraw = (is2pmDisabled && is5pmDisabled && is9pmDisabled) ? true : false;
 
   let curDraw = (draws.find(a => !a.combination) || ((hoursNow == 13 && minNow >= 55) || (hoursNow == 16 && minNow >= 55) || (hoursNow == 20 && minNow >= 55)));
+
+
+console.log(arrayBetting, curDraw, closeDraw, loading, 'statuss', ticketDetails.timestamp)
 
   return (
     <SafeAreaProvider style={{ flexGrow: 1 }}>
@@ -982,7 +976,7 @@ export default function TicketForm3({ navigation, route }) {
                   <Text style={{ fontWeight: 'bold', fontSize: 24, color: COLORS.black }}>
                     Total: {`${total}`}
                   </Text>
-                  <TouchableOpacity onPress={() => handleSubmit(arrayBetting)} disabled={arrayBetting.length == 0 || curDraw || loading} style={{ padding: 10, backgroundColor: arrayBetting.length == 0 ? COLORS.gray600 : '#2761a2', width: '40%', height: 55, borderRadius: 24, justifyContent: 'center', alignItems: 'center', }}>
+                  <TouchableOpacity onPress={() => handleSubmit(arrayBetting)} disabled={arrayBetting.length == 0 || curDraw || loading} style={{ padding: 10, backgroundColor: (arrayBetting.length == 0 || loading) ? COLORS.gray600 : '#2761a2', width: '40%', height: 55, borderRadius: 24, justifyContent: 'center', alignItems: 'center', }}>
                     <Text style={{ fontWeight: 'bold', fontSize: 22, color: COLORS.white }}>
                       UPDATE
                     </Text>

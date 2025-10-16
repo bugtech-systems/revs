@@ -3,13 +3,12 @@ import { Provider } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { store } from './redux/store';
 import { App, LoadingIndicator } from './App';
-import { WelcomeView } from './WelcomeView';
 import supabase from './utils/supabaseClient';
 import { SessionContext } from './context/SessionContext';
 import { SyncProvider } from './context/SyncContext';
 import { DataProvider } from './context/DataContext';
 import { syncConfig } from './configs/syncConfig';
-import SyncManager from './services/SyncManager';
+import { WelcomeView } from './WelcomeView';
 
 export const AppWrapper = () => {
   const [session, setSession] = useState(null);
@@ -96,7 +95,9 @@ console.log(loading, 'WRAPPER')
     <Provider store={store}>
       <SessionContext.Provider value={{ session, setSession, clearSession }}>
         <SyncProvider config={syncConfig}>
-          <DataProvider>{session ? <App /> : <WelcomeView />}</DataProvider>
+          <DataProvider>
+          <App /> 
+          </DataProvider>
         </SyncProvider>
       </SessionContext.Provider>
     </Provider>
