@@ -1,14 +1,14 @@
 // src/config/syncConfig.js
 export const syncConfig = {
-  syncInterval: 1 * 60 * 1000, // 2 minutes
+  syncInterval: 2 * 60 * 1000, // 2 minutes
   
   tables: {
     users: {
       query: "",
-      maxAge: 100, // hours (30 days)
+      maxAge: 2160, // hours (30 days)
       maxRecords: 1000,
       immediateSync: true,
-      cleanupStale: true,
+      cleanupStale: false,
       softDelete: false,
       incrementalSync: false // Use incremental sync for better performance
     },

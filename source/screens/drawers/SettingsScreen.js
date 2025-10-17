@@ -51,7 +51,7 @@ const SettingsScreen = ({ navigation }) => {
   const screen = useScreenSize();
 
   // --- Load local users first (offline-first) ---
-  const loadUsers = useCallback(async () => {
+  const loadUsers = async () => {
 
     let localUsers = await api.listUsers(); // SQLite cache
 
@@ -70,7 +70,7 @@ const SettingsScreen = ({ navigation }) => {
     setTellersCoord(usersTellers);
 
     return;
-  }, [dataVersion]);
+  }
 
   // --- Supabase realtime subscription for offline-first sync ---
   useEffect(() => {

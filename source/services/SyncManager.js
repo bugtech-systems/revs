@@ -1086,11 +1086,11 @@ async queueChange(tableName, operation, recordId, data = null) {
     
     
     
-    for(let local_table of TABLES)  {  
-    await DatabaseService.executeQuery(
-      `DELETE FROM ${local_table}`
-    );
-    }
+    // for(let local_table of TABLES)  {  
+    // await DatabaseService.executeQuery(
+    //   `DELETE FROM ${local_table}`
+    // );
+    // }
     
     
     

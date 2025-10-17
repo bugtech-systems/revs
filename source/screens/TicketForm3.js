@@ -66,7 +66,7 @@ let keyPad = [
 
 export default function TicketForm3({ navigation, route }) {
   const ticketDetails = JSON.parse(route.params);
-  const {  dataVersion } = useSync();
+  const { setDataVersion, dataVersion } = useSync();
 
   const { collector, user } = useSelector(({ user }) => user);
   const [amountVal, setAmountVal] = useState('')
@@ -377,6 +377,7 @@ export default function TicketForm3({ navigation, route }) {
                     setBetting([]);
                     setDate(new Date());
                     console.log(updated, 'UPDATEDD')
+                    setDataVersion(dataVersion + 1);
                     navigation.navigate('VoidScreen', JSON.stringify(updated))
                 // })
             } else {
@@ -522,10 +523,15 @@ export default function TicketForm3({ navigation, route }) {
         setDate(currentDate);
   };
 
-    const initData = useCallback(async (id) => {
+    const initData = async (id) => {
     
     const { start_of_day, end_of_day } = getDayRange(new Date())
 
+                 await api.listUsers({
+                          filters: {is_deleted: false}
+                      })
+      
+     
       let own = await api.getUser(id);
       let selectUser = await fetchUser(own?.email)
     console.log(selectUser, 'SELLEECT USER')
@@ -545,7 +551,7 @@ export default function TicketForm3({ navigation, route }) {
     let localCombinations = await api.listMasterCombinations();
     setDraws(localDraws)
     setCombinations(localCombinations)
-    },[ticketDetails]) 
+    }
 
 
   // useEffect(() => {
@@ -577,7 +583,7 @@ export default function TicketForm3({ navigation, route }) {
       setBetting([]);
     }
 
-  }, [ticketDetails?.owner_id])
+  }, [ticketDetails?.id, dataVersion])
 
 
 
@@ -588,10 +594,9 @@ export default function TicketForm3({ navigation, route }) {
 
 
   let total = arrayBetting.reduce((n, { amount }) => n + amount, 0)
-  let closeDraw = (is2pmDisabled && is5pmDisabled && is9pmDisabled) ? true : false;
+  let closeDraw =  false;
 
-  let curDraw = (draws.find(a => !a.combination) || ((hoursNow == 13 && minNow >= 55) || (hoursNow == 16 && minNow >= 55) || (hoursNow == 20 && minNow >= 55)));
-
+  let curDraw = false
 
 console.log(own_user, loading, 'statuss', ticketDetails.owner_id, ticketDetails.timestamp)
 

@@ -37,8 +37,10 @@ const Dashboard = ({ navigation }) => {
 
 
   const onChange = (event, selected_date) => {
-  setBettings([])
+    setShow(false)
+	setBettings([])
   setDraws([])
+  
     if (event?.type === 'neutralButtonPressed') {
       setShow(Platform.OS === 'ios');
       setDate(new Date());
@@ -48,7 +50,6 @@ const Dashboard = ({ navigation }) => {
     } else {
       setShow(Platform.OS === 'ios');
     }
-    setShow(false)
   };
 
   const showDatePicker = () => setShow(true);
@@ -82,7 +83,7 @@ const Dashboard = ({ navigation }) => {
 //   const today = new Date().toISOString(); 
 
 // Start and end of the day
-// const start_of_day = moment(date).startOf('day').add(8, 'h').toISOString();
+// const start_of_day = moment(date).startOf('day').toISOString();
 // const end_of_day = moment(date).endOf('day').add(8, 'h').toISOString();
 console.log(start_of_day, end_of_day, 'TIMEZONES')
 // Build filters
@@ -103,9 +104,6 @@ let filters = {
     owner_id: selectedCollector.id,
   };
 }
-
-console.log(filters, 'FILTERS')
-
 
       let localBettings = await api.listBettings({
         filters: {...filters, input_type: 'normal'},
@@ -136,7 +134,7 @@ console.log(filters, 'FILTERS')
     
 
 
-  }, [date, includeAll, own_user, user])
+  }, [date, includeAll, own_user, dataVersion])
 
   useEffect(() => {
     setOwnUser(selectedUser)
@@ -148,15 +146,12 @@ console.log(filters, 'FILTERS')
    init();
   }, [date, includeAll, own_user]);
    
-  useEffect(() => {
-   init();
-  }, [dataVersion]) 
 
-useEffect(() => {
-                api.listUsers({
-                    filters: {is_deleted: false}
-                })
-}, [])
+// useEffect(() => {
+//                 api.listUsers({
+//                     filters: {is_deleted: false}
+//                 })
+// }, [])
 
 
   const renderHeader = () => (

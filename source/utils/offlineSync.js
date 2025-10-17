@@ -578,6 +578,10 @@ async function localQuery(tableName, query = {}) {
   // WHERE (dynamic)
   const { whereSql, values } = buildWhereClause(filters);
 
+    if (SupabaseService.isConnected()) {
+      syncRemoteDataInBackground(tableName, 'query', query);
+    }
+
   // ORDER BY (default created_at DESC if not provided)
   const orderSql = orderBy
     ? `ORDER BY ${orderBy}`
@@ -623,9 +627,7 @@ async function localQuery(tableName, query = {}) {
   
   
   
-    if (SupabaseService.isConnected()) {
-      syncRemoteDataInBackground(tableName, 'query', query);
-    }
+
   
   return rows;
 }
