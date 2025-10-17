@@ -595,7 +595,7 @@ console.log(ableToViewAppUsers, selUser, 'SETTINGS')
                 <Text style={{ padding: 6, color: COLORS.primary, fontSize: 12, fontWeight: '500', marginTop: 10 }}>
                   Preferences
                 </Text>
-                <TouchableOpacity
+                {/* <TouchableOpacity
                   style={{
                     paddingVertical: 1,
                     marginVertical: SIZES.padding / 2,
@@ -636,7 +636,7 @@ console.log(ableToViewAppUsers, selUser, 'SETTINGS')
                     source={icons.go}
                     style={{ height: 15, width: 15, tintColor: COLORS.black900 }}
                   />
-                </TouchableOpacity>
+                </TouchableOpacity> */}
               </>
             }
 
@@ -849,25 +849,26 @@ console.log(ableToViewAppUsers, selUser, 'SETTINGS')
 
         <View
           style={{
-            position: 'absolute',
-            bottom: 20,
+            // position: 'absolute',
+            // bottom: 20,
             left: 0,
+             backgroundColor: '#f1f1f1',
             right: 0,
             // alignItems: 'center',
-            zIndex: 999,
+            // zIndex: 999,
             padding: 10
             // width: '100%'
           }}
         >
-          <View style={{ flex: 1, justifyContent: 'flex-end', alignItems: 'center', marginBottom: SIZES.padding * 3 }}>
-            <Text style={{ padding: 6, color: COLORS.gray600, fontSize: 12, fontWeight: '500', marginTop: 10 }}>
+          <View style={{  justifyContent: 'flex-end', alignItems: 'center', marginBottom: SIZES.padding * 3 }}>
+            <Text style={{ padding: 6, color: COLORS.secondaryTransparent2, fontSize: 12, fontWeight: '500', marginTop: 10 }}>
               Current Version {Config.APP_VERSION}
             </Text>
           </View>
           <TouchableOpacity onPress={signOut}>
             <View
               style={{
-                backgroundColor: COLORS.gray400,
+                // backgroundColor: COLORS.gray400,
                 paddingVertical: 12,
                 paddingHorizontal: 24,
                 borderRadius: 12,
@@ -877,10 +878,10 @@ console.log(ableToViewAppUsers, selUser, 'SETTINGS')
                 justifyContent: 'center',
               }}
             >
-              {/* <Image
-            source={icons.back}
-            style={{ height: 16, width: 16, tintColor: COLORS.black900, marginRight: 8 }}
-          /> */}
+              <Image
+            source={icons.logout}
+            style={{ height: 20, width: 20, tintColor: COLORS.secondary, marginRight: 4 }}
+          />
               <Text style={{ fontSize: 16, fontWeight: 'bold', color: COLORS.secondary }}>
                 Logout
               </Text>
