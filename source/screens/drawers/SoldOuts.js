@@ -82,7 +82,7 @@ const SoldOuts = ({ navigation }) => {
       setItems(localBettings);
       // setLoading(false);
 
-  }, [startDate, endDate,  ownUser, rnd, lastSync]);
+  }, [startDate, endDate,  ownUser, rnd, dataVersion]);
 
 
   const fetchDraws = useCallback(async () => {
@@ -113,7 +113,7 @@ const SoldOuts = ({ navigation }) => {
       setDraws(localDraws)
       // setLoading(false);
 
-  }, [startDate, endDate,  ownUser, rnd, lastSync]);
+  }, [startDate, endDate,  ownUser, rnd, dataVersion]);
 
 
   /** Filtered Data */

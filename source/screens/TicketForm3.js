@@ -9,6 +9,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, icons } from '../constants';
 import { api, fetchUser, normalizeValue, nowISO } from '../utils/offlineSync';
 import Geolocation from 'react-native-geolocation-service';
+import { useSync } from '../context/SyncContext';
 
 
 let keyPad = [
@@ -65,6 +66,7 @@ let keyPad = [
 
 export default function TicketForm3({ navigation, route }) {
   const ticketDetails = JSON.parse(route.params);
+  const {  dataVersion } = useSync();
 
   const { collector, user } = useSelector(({ user }) => user);
   const [amountVal, setAmountVal] = useState('')
@@ -82,7 +84,7 @@ export default function TicketForm3({ navigation, route }) {
   const [betType, setBetType] = useState('')
   const [betTypeOption, setBetTypeOption] = useState('')
   const [showDate, setShowDate] = useState(false);
-  const [date, setDate] = useState(new Date())
+  const [date, setDate] = useState(new Date(ticketDetails.timestamp))
   const [own_user, setOwnUser] = useState(null);
   const [draws, setDraws] = useState([]);
   const [comb, setComb] = useState([]);
@@ -520,7 +522,7 @@ export default function TicketForm3({ navigation, route }) {
         setDate(currentDate);
   };
 
-    const initData = async (id) => {
+    const initData = useCallback(async (id) => {
     
     const { start_of_day, end_of_day } = getDayRange(new Date())
 
@@ -543,7 +545,7 @@ export default function TicketForm3({ navigation, route }) {
     let localCombinations = await api.listMasterCombinations();
     setDraws(localDraws)
     setCombinations(localCombinations)
-    } 
+    },[ticketDetails]) 
 
 
   // useEffect(() => {
@@ -554,7 +556,7 @@ export default function TicketForm3({ navigation, route }) {
     if (ticketDetails && ticketDetails.id) {
       let { combinations, game_time, owner_id } = ticketDetails;
         
-        
+      // setDate(new Date(ticketDetails.timestamp))
       initData(owner_id)
     
       if (combinations && combinations.length) {
@@ -575,7 +577,7 @@ export default function TicketForm3({ navigation, route }) {
       setBetting([]);
     }
 
-  }, [ticketDetails?.id])
+  }, [ticketDetails?.owner_id])
 
 
 
@@ -591,7 +593,7 @@ export default function TicketForm3({ navigation, route }) {
   let curDraw = (draws.find(a => !a.combination) || ((hoursNow == 13 && minNow >= 55) || (hoursNow == 16 && minNow >= 55) || (hoursNow == 20 && minNow >= 55)));
 
 
-console.log(own_user, loading, 'statuss', ticketDetails.timestamp)
+console.log(own_user, loading, 'statuss', ticketDetails.owner_id, ticketDetails.timestamp)
 
   return (
     <SafeAreaProvider style={{ flexGrow: 1 }}>
@@ -605,7 +607,7 @@ console.log(own_user, loading, 'statuss', ticketDetails.timestamp)
             onChange={onChangeDate}
           />
         )}
-
+      <Text>{moment(date).format('YYYY-MM-DD')}</Text>
         <View style={{ flex: 1, padding: 5, width: '100%', alignItems: 'flex-start', flexDirection: 'column', marginBottom: 30 }}>
           <View
             style={{

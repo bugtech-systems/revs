@@ -24,7 +24,6 @@ import {
   SET_USER,
   SET_USER_CONFIG,
 } from '../../redux/actions/types';
-import { getLocalUsers, saveLocalUsers } from '../../utils/db';
 import { useScreenSize, getConfiguration } from '../../utils/helpers';
 import { api, clearAllStorage, deleteDB, forceSync } from '../../utils/offlineSync';
 import { useSync } from '../../context/SyncContext';
@@ -33,7 +32,7 @@ import { useSync } from '../../context/SyncContext';
 const SettingsScreen = ({ navigation }) => {
   const { height } = Dimensions.get('window');
   const dispatch = useDispatch();
-  const {  lastSync } = useSync();
+  const {  dataVersion } = useSync();
 
 
   const { user, collector } = useSelector(({ user }) => user);
@@ -52,7 +51,7 @@ const SettingsScreen = ({ navigation }) => {
   const screen = useScreenSize();
 
   // --- Load local users first (offline-first) ---
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
 
     let localUsers = await api.listUsers(); // SQLite cache
 
@@ -71,7 +70,7 @@ const SettingsScreen = ({ navigation }) => {
     setTellersCoord(usersTellers);
 
     return;
-  };
+  }, [dataVersion]);
 
   // --- Supabase realtime subscription for offline-first sync ---
   useEffect(() => {

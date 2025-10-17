@@ -69,8 +69,7 @@ let keyPad = [
 
 export default function TicketForm({ navigation }) {
     // const {  api, dataVersion } = useOfflineSync();
-    const {  lastSync } = useSync();
-    
+    const {  dataVersion } = useSync();
     const { collector, user, selectedUser } = useSelector(({ user }) => user);
     const [amountVal, setAmountVal] = useState('')
     const [time, setSelectedTime] = useState('2pm')
@@ -850,7 +849,7 @@ export default function TicketForm({ navigation }) {
     
     useEffect(() => {
     initializeGameTime();
-    }, [draws, lastSync])
+    }, [draws, dataVersion])
 
 
 
@@ -858,7 +857,7 @@ export default function TicketForm({ navigation }) {
     if(selectedUser){
     initData();
     }
-    }, [lastSync, selectedUser?.id]);
+    }, [selectedUser?.id]);
     
     useEffect(() => {
     if(selectedUser.id){
