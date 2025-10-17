@@ -76,7 +76,7 @@ const SettingsScreen = ({ navigation }) => {
   // --- Supabase realtime subscription for offline-first sync ---
   useEffect(() => {
     loadUsers();
-  }, [navigation, user]);
+  }, [user]);
 
 
   const openModal = () => setModalVisible(true);

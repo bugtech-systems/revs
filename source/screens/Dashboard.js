@@ -17,7 +17,7 @@ import { useSync } from '../context/SyncContext';
 const Dashboard = ({ navigation }) => {
 //   const { dataVersion, api } = useOfflineSync()
   
-  const {  lastSync } = useSync();
+  const {  dataVersion } = useSync();
   const { user, collector, selectedUser } = useSelector(({user}) => user);
 
   const [date, setDate] = useState(new Date());
@@ -37,6 +37,8 @@ const Dashboard = ({ navigation }) => {
 
 
   const onChange = (event, selected_date) => {
+  setBettings([])
+  setDraws([])
     if (event?.type === 'neutralButtonPressed') {
       setShow(Platform.OS === 'ios');
       setDate(new Date());
@@ -46,6 +48,7 @@ const Dashboard = ({ navigation }) => {
     } else {
       setShow(Platform.OS === 'ios');
     }
+    setShow(false)
   };
 
   const showDatePicker = () => setShow(true);
@@ -69,6 +72,92 @@ const Dashboard = ({ navigation }) => {
     await api.updateUser(own_user.id, {last_summary: moment(new Date(date)).tz("Asia/Manila").endOf('day').toISOString()});
     setOwnUser({ ...own_user, last_summary: date });
   };
+  
+  let init = useCallback(async () => {
+      
+      if (!collector) return;
+		let selectedCollector = await fetchUser(collector);
+		
+	const { start_of_day, end_of_day  } = getDayRange(date)
+//   const today = new Date().toISOString(); 
+
+// Start and end of the day
+// const start_of_day = moment(date).startOf('day').add(8, 'h').toISOString();
+// const end_of_day = moment(date).endOf('day').add(8, 'h').toISOString();
+console.log(start_of_day, end_of_day, 'TIMEZONES')
+// Build filters
+let filters = {
+	is_deleted: false,
+	input_type: "normal",
+	timestamp: { op: "between", from: start_of_day, to: end_of_day },
+};
+
+ if (includeAll) {
+  filters = {
+    ...filters,
+    uplines:  { op: "contains", value: [selectedCollector.id] },
+  };
+} else {
+  filters = {
+    ...filters,
+    owner_id: selectedCollector.id,
+  };
+}
+
+console.log(filters, 'FILTERS')
+
+
+      let localBettings = await api.listBettings({
+        filters: {...filters, input_type: 'normal'},
+        orderBy: 'timestamp DESC',
+        bulk: true
+        // limit: 20,
+      });
+
+
+
+    
+
+      let localDraws = await api.listDraws({
+       filters: { 
+        draw_date:  { 
+          op: "between",
+	      from: start_of_day,
+	      to: end_of_day,
+         }}
+      });
+      
+      
+      
+      
+
+      setBettings(localBettings);
+      setDraws(localDraws);
+    
+
+
+  }, [date, includeAll, own_user, user])
+
+  useEffect(() => {
+    setOwnUser(selectedUser)
+    request_notification_permission();
+  }, [selectedUser]);
+  
+  useEffect(() => {
+  setBettings([])
+   init();
+  }, [date, includeAll, own_user]);
+   
+  useEffect(() => {
+   init();
+  }, [dataVersion]) 
+
+useEffect(() => {
+                api.listUsers({
+                    filters: {is_deleted: false}
+                })
+}, [])
+
 
   const renderHeader = () => (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
@@ -284,80 +373,6 @@ const Dashboard = ({ navigation }) => {
     );
   };
 
-  useEffect(() => {
-    setOwnUser(selectedUser)
-    request_notification_permission();
-  }, [selectedUser, collector, lastSync, date]);
-  
-  useEffect(() => {
-  
-  console.log('SOMETHING CHANGED', collector);
-  setBettings([]);
-  setDraws([]);
-  
-    (async () => {
-      if (!collector) return;
-		let selectedCollector = await fetchUser(collector);
-		
-	const { start_of_day, end_of_day  } = getDayRange(fixDateTimezone(date))
-//   const today = new Date().toISOString(); 
-
-// Start and end of the day
-// const start_of_day = moment(date).startOf('day').add(8, 'h').toISOString();
-// const end_of_day = moment(date).endOf('day').add(8, 'h').toISOString();
-console.log(start_of_day, end_of_day, 'TIMEZONES')
-// Build filters
-let filters = {
-	is_deleted: false,
-	input_type: "normal"
-};
-
-if (includeAll) {
-  filters = {
-    ...filters,
-    uplines: { op: "contains", value: [selectedCollector.id] },
-    timestamp: { op: "between", from: start_of_day, to: end_of_day },
-  };
-} else {
-  filters = {
-    ...filters,
-    owner_id: selectedCollector.id,
-    timestamp: { op: "between", from: start_of_day, to: end_of_day },
-  };
-}
-
-
-
-      let localBettings = await api.listBettings({
-        filters: {...filters, input_type: 'normal'},
-        orderBy: 'timestamp DESC',
-        bulk: true
-        // limit: 20,
-      });
-
-
-
-    
-
-      let localDraws = await api.listDraws({
-       filters: { 
-        draw_date:  { 
-          op: "between",
-	      from: start_of_day,
-	      to: end_of_day,
-         }}
-      });
-      
-      
-      
-      
-
-      setBettings(localBettings);
-      setDraws(localDraws);
-    })();
-    
-
-  }, [date, includeAll, own_user, lastSync]);
 
 
 console.log(bettings.length, 'BETS', draws.length, own_user?.email)

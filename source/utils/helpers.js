@@ -140,7 +140,6 @@ export function getDayRange(date, end) {
   const d = new Date(date);
   const e = new Date(end || date)
   
-  console.log(e.getDate(), 'GET DTE')
   // Start of the day (00:00:00.000)
   const start_of_day = new Date(
     d.getFullYear(),

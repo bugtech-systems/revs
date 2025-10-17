@@ -36,7 +36,7 @@ const drawTimes = [
 
 const Transactions = ({ navigation }) => {
   // const { api, dataVersion, bumpVersion } = useOffline();
-  const {  lastSync } = useSync();
+  const {  lastSync, dataVersion, setDataVersion } = useSync();
   const { collector, user, selectedUser } = useSelector(({ user }) => user);
   const [date, setDate] = useState(new Date())
   const [show, setShowDate] = useState(false);
@@ -101,7 +101,7 @@ const Transactions = ({ navigation }) => {
 
     useEffect(() => {
     load();
-  }, [show, date, userNow, includeAll, lastSync]);
+  }, [show, date, userNow, includeAll, dataVersion]);
   
 
   console.log("THE ITEM", show)
@@ -143,12 +143,13 @@ const Transactions = ({ navigation }) => {
     setTimeout(() => {
       setRefreshing(false);
       load();
+      
       // bumpVersion();
       setSearchQuery('');
       // setFilteredData(items)
       setLoading(false);
     }, 2000);
-  }, [date, userNow, includeAll, lastSync]);
+  }, [date, userNow, includeAll, dataVersion]);
 
 
   const handleSearch = (query) => {

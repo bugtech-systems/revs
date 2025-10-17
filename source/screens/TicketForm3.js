@@ -82,7 +82,7 @@ export default function TicketForm3({ navigation, route }) {
   const [betType, setBetType] = useState('')
   const [betTypeOption, setBetTypeOption] = useState('')
   const [showDate, setShowDate] = useState(false);
-  const [date, setDate] = useState(moment(ticketDetails.timestamp).tz("Asia/Manila").toDate())
+  const [date, setDate] = useState(new Date())
   const [own_user, setOwnUser] = useState(null);
   const [draws, setDraws] = useState([]);
   const [comb, setComb] = useState([]);
@@ -225,10 +225,9 @@ export default function TicketForm3({ navigation, route }) {
         let totalAmount = 0;
         try {
 
-console.log(data, 'DATA')
             setLoading(true)
             let validDate = await updateDateTimeIfGreater();
-            let selectUser = await fetchUser(own_user.email)
+            let selectUser = own_user;
             if(!validDate){
               setLoading(false)
               Alert.alert('Set Timezone Properly!');
@@ -351,8 +350,6 @@ console.log(data, 'DATA')
                       //  ...ticketDetails,
                         ramble: Number(totalRamble),
                         straight: Number(totalStraight),
-                        is_complete: false,
-                        // owner_id: String(selectedUser?.id),
                         gross: Number(gross),
                         net: Number(netTotal),
                         // ticket_no: `${generateTicketNumber()}`,
@@ -374,10 +371,9 @@ console.log(data, 'DATA')
                      
                     console.log('Navigate', newBet.timestamp, 'time', moment(date).tz('Asia/Manila').toISOString())
                    let updated = await api.updateBetting(ticketDetails.id, newBet)
-                    // setLoading(false)
-                    // setSelectedTab('keypads')
-                    // setBetting([]);
-                    // setDate(new Date());
+                    setSelectedTab('keypads')
+                    setBetting([]);
+                    setDate(new Date());
                     console.log(updated, 'UPDATEDD')
                     navigation.navigate('VoidScreen', JSON.stringify(updated))
                 // })
@@ -519,26 +515,17 @@ console.log(data, 'DATA')
   };
 
   const onChangeDate = (event, selectedDate) => {
-    const currentDate = selectedDate || date;
-    setShowDate(Platform.OS === 'ios');
-    console.log(currentDate, 'CUREENT DATE', selectedDate)
-    // setDate(currentDate);
-    
- 
-      setDate(currentDate);
-
-      // Normalize for SQLite (preserve local time)
-      const normalized = normalizeValue('timestamp', current, 'sqlite');
-      console.log('NORMALIZED',normalized);
+      const currentDate = selectedDate || date;
+        setShowDate(Platform.OS === 'ios');
+        setDate(currentDate);
   };
 
     const initData = async (id) => {
     
-        const start_of_day = moment(new Date()).startOf('day').toISOString();
-    const end_of_day = moment(new Date()).endOf('day').toISOString();
-    
-      let selectUser = await api.getUser(id);
-    
+    const { start_of_day, end_of_day } = getDayRange(new Date())
+
+      let own = await api.getUser(id);
+      let selectUser = await fetchUser(own?.email)
     console.log(selectUser, 'SELLEECT USER')
      setOwnUser(selectUser)
 
@@ -568,7 +555,6 @@ console.log(data, 'DATA')
       let { combinations, game_time, owner_id } = ticketDetails;
         
         
-        
       initData(owner_id)
     
       if (combinations && combinations.length) {
@@ -589,7 +575,7 @@ console.log(data, 'DATA')
       setBetting([]);
     }
 
-  }, [ticketDetails?.id, collector])
+  }, [ticketDetails?.id])
 
 
 
@@ -605,7 +591,7 @@ console.log(data, 'DATA')
   let curDraw = (draws.find(a => !a.combination) || ((hoursNow == 13 && minNow >= 55) || (hoursNow == 16 && minNow >= 55) || (hoursNow == 20 && minNow >= 55)));
 
 
-console.log(arrayBetting, curDraw, closeDraw, loading, 'statuss', ticketDetails.timestamp)
+console.log(own_user, loading, 'statuss', ticketDetails.timestamp)
 
   return (
     <SafeAreaProvider style={{ flexGrow: 1 }}>

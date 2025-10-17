@@ -24,7 +24,7 @@ const drawTimes = [
 
 
 const SoldOuts = ({ navigation }) => {
-  const {  lastSync } = useSync();
+  const {  dataVersion, manualSync } = useSync();
   const { selectedUser, user } = useSelector(({ user }) => user);
   const { confirmationModal } = useSelector(({ ui }) => ui);
   const dispatch = useDispatch();
@@ -123,12 +123,12 @@ const SoldOuts = ({ navigation }) => {
       filteredList = filteredList.filter(a => String(a.ticket_no).includes(String(searchQuery)));
     }
     setFilteredData(filteredList);
-  }, [items, filterTime, searchQuery, lastSync]);
+  }, [items, filterTime, searchQuery, dataVersion]);
 
   useEffect(() => {
     fetchDraws();
     fetchItems();
-  }, [selectedUser, startDate, endDate, rnd, lastSync]);
+  }, [selectedUser, startDate, endDate, rnd, dataVersion]);
 
   /** Handle Refresh */
   const onRefresh = useCallback(() => {
@@ -140,7 +140,7 @@ const SoldOuts = ({ navigation }) => {
       setSearchQuery('');
       setRefreshing(false);
     }, 2000);
-  }, [startDate, endDate, lastSync]);
+  }, [startDate, endDate, dataVersion]);
 
   /** Handle Sold Out */
   const getTimeRange = () => {
@@ -170,7 +170,7 @@ console.log(gameTime, 'GME')
     
       const res = await axios.get(`https://sharewin.pro/apiv2/v1/bettingsv2/soldout?gameTime=${gameTime}&email=${email}`);
       setRnd(Math.random());
-      await fetchItems();
+      await manualSync();
       if (!res.data.success) Alert.alert('No Sold-out Available');
       
     } catch (err) {
@@ -180,7 +180,7 @@ console.log(gameTime, 'GME')
       setRnd(Math.random());
       dispatch({ type: STOP_LOADING });
       setLoading(false)
-      await fetchItems()
+      await manualSync()
     }
   };
 

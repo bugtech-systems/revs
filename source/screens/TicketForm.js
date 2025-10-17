@@ -4,7 +4,7 @@ import { StyleSheet, Text, Keyboard, View, ScrollView, TouchableOpacity, FlatLis
 import moment from 'moment-timezone';
 import { useSelector, useDispatch } from 'react-redux';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import {  generateObjectId, getConfiguration, getWithWin200Config, updateDateTimeIfGreater } from '../utils/helpers';
+import {  generateObjectId, getConfiguration, getDayRange, getWithWin200Config, updateDateTimeIfGreater } from '../utils/helpers';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Geolocation from 'react-native-geolocation-service';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -95,6 +95,7 @@ export default function TicketForm({ navigation }) {
     const [modalMessage, setModalMessage] = useState('');
     const [pendingBet, setPendingBet] = useState(null);
     const [draws, setDraws] = useState([])
+    const [own_user, setOwnUser] = useState(null);
     const [combinations, setCombinations] = useState([])
 
     let is_win_to = false;
@@ -489,7 +490,7 @@ export default function TicketForm({ navigation }) {
 
             setLoading(true)
             let validDate = await updateDateTimeIfGreater();
-            let selectUser = await fetchUser(selectedUser.email)
+            let selectUser = own_user;
             
             console.log(validDate, 'VALIDATE')
             if(!validDate){
@@ -824,15 +825,11 @@ export default function TicketForm({ navigation }) {
 
     const initData = async () => {
     
-        const start_of_day = moment(new Date()).startOf('day').toISOString();
-    const end_of_day = moment(new Date()).endOf('day').toISOString();
+    const { start_of_day, end_of_day } = getDayRange(new Date())
     
-    
-                let selectUsers = await api.listUsers({
-                    filters: {is_deleted: false, user_level: {op: '>=', value: selectedUser.user_level}}
-                })
 
-    console.log(selectUsers, 'USERRS')
+        
+
 
     
        let localDraws = await api.listDraws({
@@ -847,7 +844,7 @@ export default function TicketForm({ navigation }) {
 
     let localCombinations = await api.listMasterCombinations();
     setDraws(localDraws)
-    setCombinations(localCombinations)
+    // setCombinations(localCombinations)
     } 
 
     
@@ -858,8 +855,24 @@ export default function TicketForm({ navigation }) {
 
 
     useEffect(() => {
+    if(selectedUser){
     initData();
+    }
     }, [lastSync, selectedUser?.id]);
+    
+    useEffect(() => {
+    if(selectedUser.id){
+       (async () => {
+              await api.listUsers({
+                    filters: {is_deleted: false}
+                })
+
+              let selectUser = await fetchUser(selectedUser?.email)
+            console.log(selectUser, 'SELLEECT USER')
+             setOwnUser(selectUser)
+       })()  
+       }
+    }, [user, selectedUser?.id])
     
     
     

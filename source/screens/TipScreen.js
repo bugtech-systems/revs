@@ -290,7 +290,7 @@ const handleDownloadTipImg = async () => {
 
 
 
-  
+  console.log(draws[0], resultDate, 'RESULT DATE')
   
 
 

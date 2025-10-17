@@ -110,10 +110,9 @@ if(user){
     // Save to local SQLite for offline access
     // await saveUserToLocal(userWithUplines);
   
-      if (SupabaseService.isConnected()) {
-      
-      await syncRemoteDataInBackground('users', 'query', {filters: {email: email}});
-    }
+    //   if (SupabaseService.isConnected()) {
+    //   await syncRemoteDataInBackground('users', 'query', {filters: {email: email}});
+    // }
   
     return userWithUplines;
   } catch (err) {
@@ -591,6 +590,10 @@ async function localQuery(tableName, query = {}) {
   const sql = `SELECT * FROM ${tableName} ${whereSql} ${orderSql} ${limitSql} ${offsetSql};`;
   
   
+  console.log(sql, values, 'SQL QUERY');
+  
+  
+  
   const res = await DatabaseService.executeQuery(sql, values);
 
 // console.log(res, sql, 'SQLL QUERY', values)
@@ -701,7 +704,6 @@ function buildWhereClause(filters = {}) {
         whereClauses.push(`${key} = ?`);
         values.push(filter);
       }
-      
       continue;
     }
 

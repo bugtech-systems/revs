@@ -15,6 +15,7 @@ export const useSync = () => {
 
 export const SyncProvider = ({ children, config = {} }) => {
   const [isReady, setIsReady] = useState(false);
+  const [dataVersion, setDataVersion] = useState(0)
   const [status, setStatus] = useState({
     isSyncing: false,
     lastSync: null,
@@ -77,6 +78,7 @@ export const SyncProvider = ({ children, config = {} }) => {
               lastSync: new Date(event.timestamp)
             });
           });
+          setDataVersion(dataVersion + 1)
           break;
         case 'sync_failed':
           setStatus(prev => ({ ...prev, isSyncing: false }));
@@ -97,6 +99,7 @@ export const SyncProvider = ({ children, config = {} }) => {
   const manualSync = async () => {
     if (!isReady) throw new Error('Sync not ready');
     await SyncManager.sync();
+    setDataVersion(dataVersion + 1)
   };
 
   const cleanup = async () => {
@@ -137,7 +140,9 @@ export const SyncProvider = ({ children, config = {} }) => {
     isSyncing: status.isSyncing,
     lastSync: status.lastSync,
     pendingCount: status.pending,
-    failedCount: status.failed
+    failedCount: status.failed,
+    dataVersion,
+    setDataVersion
   };
 
   return (
