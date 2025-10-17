@@ -541,17 +541,20 @@ async function localDelete(tableName, id) {
 export async function localGet(tableName, id) {
 
 
-
+let res = [];
     if (SupabaseService.isConnected()) {
-      await syncRemoteDataInBackground(tableName, 'query', {filters: {id: id}});
+            res = await fetchRemoteData(tableName, 'query', {filters: {id: id}});
+    } else {
+
+  const resData = await DatabaseService.executeQuery(`SELECT * FROM ${tableName} WHERE id = ? LIMIT 1;`, [id]);
+    res = resData.rows;
     }
 
 
-  const res = await DatabaseService.executeQuery(`SELECT * FROM ${tableName} WHERE id = ? LIMIT 1;`, [id]);
   
   
-  if (res.rows.length === 0) return null;
-  const row = res.rows[0];
+  if (res.length === 0) return null;
+  const row = res[0];
 
   // parse JSON fields
   if (tableName === 'users') {
@@ -578,9 +581,6 @@ async function localQuery(tableName, query = {}) {
   // WHERE (dynamic)
   const { whereSql, values } = buildWhereClause(filters);
 
-    if (SupabaseService.isConnected()) {
-      syncRemoteDataInBackground(tableName, 'query', query);
-    }
 
   // ORDER BY (default created_at DESC if not provided)
   const orderSql = orderBy
@@ -595,16 +595,26 @@ async function localQuery(tableName, query = {}) {
   
   
   console.log(sql, values, 'SQL QUERY');
+  let res = [];
+      if (SupabaseService.isConnected()) {
+      // syncRemoteDataInBackground(tableName, 'query', query);
+      res = await fetchRemoteData(tableName, 'query', query);
+
+      } else {
+
+         let resData = await DatabaseService.executeQuery(sql, values);
+          res = resData.rows;
+        //  res = resD
+      }
+      
   
-  
-  
-  const res = await DatabaseService.executeQuery(sql, values);
+  console.log(res, 'RESUTLT QUERY');
 
 // console.log(res, sql, 'SQLL QUERY', values)
 
   const rows = [];
-  for (let i = 0; i < res.rows.length; i++) {
-    let row = res.rows[i];
+  for (let i = 0; i < res.length; i++) {
+    let row = res[i];
     // parse JSON fields
     // if (tableName === "users") {
     //   row.configuration = parseJsonText(row.configuration);
@@ -893,6 +903,7 @@ const fetchAllRemoteDataWithPagination = async (tableName, baseQuery, maxRecords
 // Enhanced background sync with transaction support
 const syncRemoteDataInBackground = async (tableName, operation, params = {}) => {
   // Use requestAnimationFrame for better background execution
+  
   requestAnimationFrame(async () => {
     try {
       console.log(`🔄 Starting background sync for ${tableName} (${operation})...`);
@@ -1066,6 +1077,179 @@ const syncRemoteDataInBackground = async (tableName, operation, params = {}) => 
       console.error(`❌ Background sync failed for ${tableName}:`, error);
     }
   });
+};
+
+
+const fetchRemoteData = async (tableName, operation, params = {}) => {
+  // Use requestAnimationFrame for better background execution
+  
+
+      let query = supabase.from(tableName).select('*');
+      
+      // Apply filters for query operations
+      if (operation === 'query' && params.filters) {
+        Object.entries(params.filters).forEach(([key, filter]) => {
+          if (typeof filter !== "object" || !filter.op) {
+            // Simple equality filter
+            query = query.eq(key, filter);
+          } else {
+            switch (filter.op.toLowerCase()) {
+              case "=": 
+                query = query.eq(key, filter.value); 
+                break;
+              case "!=": 
+              case "<>": 
+                query = query.neq(key, filter.value); 
+                break;
+              case ">": 
+                query = query.gt(key, filter.value); 
+                break;
+              case ">=": 
+                query = query.gte(key, filter.value); 
+                break;
+              case "<": 
+                query = query.lt(key, filter.value); 
+                break;
+              case "<=": 
+                query = query.lte(key, filter.value); 
+                break;
+              case "like": 
+                query = query.like(key, `%${filter.value}%`); 
+                break;
+              case "ilike": 
+                query = query.ilike(key, `%${filter.value}%`); 
+                break;
+              case "in": 
+                if (Array.isArray(filter.value) && filter.value.length > 0) {
+                  query = query.in(key, filter.value);
+                } else {
+                  console.warn(`⚠️ Empty array provided for IN filter on ${key}`);
+                }
+                break;
+              case "not.in": 
+                if (Array.isArray(filter.value) && filter.value.length > 0) {
+                  query = query.not.in(key, filter.value);
+                }
+                break;
+              case "contains": 
+                  // Handle array contains - value should be one of the array elements
+               if (Array.isArray(filter.value)) {
+                query = query.filter(key, 'cs', JSON.stringify(filter.value));
+              } else {
+                query = query.filter(key, 'cs', JSON.stringify([filter.value]));
+              }
+              break;
+              case "contained": 
+                // Array is contained by column (opposite of contains)
+                query = query.containedBy(key, filter.value);
+                break;
+              case "overlap": 
+                // Arrays have overlapping elements
+                query = query.overlap(key, filter.value);
+                break;
+              case "between": 
+                if (filter.from !== undefined && filter.to !== undefined) {
+                  query = query.gte(key, filter.from).lte(key, filter.to);
+                } else {
+                  console.warn(`⚠️ Between filter requires 'from' and 'to' properties`);
+                }
+                break;
+              case "is": 
+                if (filter.value === null) {
+                  query = query.is(key, null);
+                } else if (filter.value === true || filter.value === false) {
+                  query = query.is(key, filter.value);
+                }
+                break;
+              case "is.not": 
+                if (filter.value === null) {
+                  query = query.not.is(key, null);
+                }
+                break;
+              case "textsearch": 
+                // Full text search
+                query = query.textSearch(key, filter.value);
+                break;
+              case "match": 
+                // Match against multiple fields
+                if (typeof filter.value === 'object') {
+                  Object.entries(filter.value).forEach(([field, value]) => {
+                    query = query.eq(field, value);
+                  });
+                }
+                break;
+              default:
+                console.warn(`⚠️ Unsupported filter operator: ${filter.op}`);
+            }
+          }
+        });
+      }
+      
+      
+      
+      
+      
+      // Apply ordering
+      if (params.orderBy) {
+        const [column, order] = params.orderBy.split(' ');
+        query = query.order(column, { ascending: order?.toLowerCase() === 'asc' });
+        console.log(`🔽 Applying order: ${column} ${order}`);
+      } else {
+        query = query.order('created_at', { ascending: false });
+      }
+
+      // Start a transaction for better performance
+      // await DatabaseService.executeQuery('BEGIN TRANSACTION');
+      
+      try {
+        if (operation === 'get' && params.id) {
+          console.log(`🎯 Fetching single record: ${params.id}`);
+          const { data, error } = await query.eq('id', params.id).single();
+          
+          if (error) {
+            console.error(`❌ Error fetching ${tableName} record ${params.id}:`, error);
+          } else if (data) {
+            const normalized = normalizeForSQLite(tableName, data);
+            const columns = Object.keys(normalized);
+            const placeholders = columns.map(() => '?').join(', ');
+            const values = columns.map(col => normalized[col]);
+            
+            await DatabaseService.executeQuery(
+              `INSERT OR REPLACE INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`,
+              values
+            );
+            console.log(`💾 Background updated ${tableName} record: ${params.id}`);
+          }
+          return data;
+        } else {
+          // For query/list operations
+          console.log(`📋 Fetching multiple records for ${tableName}...`);
+          const allData = await fetchAllRemoteDataWithPagination(
+            tableName, 
+            query, 
+            params.maxRecords || 10000
+          );
+          
+          console.log(`📥 Retrieved ${allData.length} records from Supabase for ${tableName}`);
+          
+          if (allData.length > 0) {
+            const insertedCount = await processBulkInsert(tableName, allData);
+            console.log(`💾 Background sync: ${insertedCount}/${allData.length} ${tableName} records saved locally`);
+          } else {
+            console.log(`ℹ️ No data found for ${tableName} with current filters`);
+          }
+          return allData
+        }
+        
+        // await DatabaseService.executeQuery('COMMIT');
+        // console.log(`✅ Background sync completed for ${tableName}`);
+        
+      } catch (error) {
+        // await DatabaseService.executeQuery('ROLLBACK');
+        console.error(`❌ Transaction failed for ${tableName}:`, error);
+        // throw error;
+        return null
+      }
 };
 
 

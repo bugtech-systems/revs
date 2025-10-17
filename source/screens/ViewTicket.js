@@ -17,12 +17,12 @@ const ViewTicket = ({ route }) => {
     const fetchBettingDetails = async () => {
       try {
         const data = await api.getBetting(ticketDetails.id);
-        if (data && data.length > 0) {
-          setBetting(ticketDetails);
-          setHits(ticketDetails?.hits); // assuming hits stored as JSON string
+        console.log(data, 'GETED BET')
+        if (data) {
+          setBetting(data);
+          setHits(data?.hits ? data?.hits : []); // assuming hits stored as JSON string
         }
         
-        console.log(data[0]?.hits, 'TICKET DAT',ticketDetails.id,  ticketDetails.ticket_no, ticketDetails?.hits)
       } catch (error) {
         console.error('Error fetching betting details:', error);
       }
@@ -30,13 +30,14 @@ const ViewTicket = ({ route }) => {
     
     
     
-    // fetchBettingDetails();
+    fetchBettingDetails();
     
-          setBetting(ticketDetails);
-          setHits(ticketDetails?.hits); // assuming hits stored as JSON string
+          // setBetting(ticketDetails);
+          // setHits(ticketDetails?.hits); // assuming hits stored as JSON string
     
     return () => {
               setBetting(null);
+              setHits([]);
       }
     
   }, [ticketDetails.ticket_no]);
@@ -84,6 +85,7 @@ const ViewTicket = ({ route }) => {
     );
   }
   
+console.log(ticketDetails, 'TICKET')
 
   return (
     <View style={styles.container}>
