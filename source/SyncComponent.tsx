@@ -36,6 +36,7 @@ console.log(isReady, status, 'STAATS')
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 8,
+    marginHorizontal: 8,
     paddingVertical: 4,
     backgroundColor: 'rgba(0,0,0,0.3)',
     borderRadius: 8,
