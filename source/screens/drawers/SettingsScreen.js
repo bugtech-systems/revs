@@ -32,12 +32,12 @@ import { useSync } from '../../context/SyncContext';
 const SettingsScreen = ({ navigation }) => {
   const { height } = Dimensions.get('window');
   const dispatch = useDispatch();
-  const {  dataVersion } = useSync();
+  const { dataVersion } = useSync();
 
 
   const { user, collector } = useSelector(({ user }) => user);
   const { confirmationModal } = useSelector(({ ui }) => ui);
-
+  // const [loading, setLoading] = useState(false);
   const [usersList, setUsersList] = useState([]);
   const [deletedUsers, setDeletedUsers] = useState([]);
   const [usersCoord, setUsersCoord] = useState([]);
@@ -56,7 +56,7 @@ const SettingsScreen = ({ navigation }) => {
     let localUsers = await api.listUsers(); // SQLite cache
 
 
-    
+
     setUsersList(localUsers);
 
     const authenticatedEmail = user?.email || collector || '';
@@ -119,37 +119,34 @@ const SettingsScreen = ({ navigation }) => {
   };
 
 
+  // Sign out the logged in user and then navigates to the welcome screen
+ const signOut = useCallback(async () => {
+  try {
+    // setLoading(true);
+    // Supabase Sign-Out
+    const { error } = await supabase.auth.signOut();
+    // Clear Redux and Local Storage
+    dispatch({ type: SET_COLLECTOR, payload: null });
+    dispatch({ type: SET_USER, payload: null });
+    dispatch({ type: SET_ACTIVE_USER, payload: null });
+    await clearAllStorage();
 
-  // const signOut = useCallback(() => {
-  //   dispatch({ type: SET_COLLECTOR, payload: null });
-  //   dispatch({ type: SET_USER, payload: null });
-  // }, [dispatch]);
-  // logged in user and then navigates to the welcome screen
-  const signOut = useCallback(async () => {
-    try {
-      // Supabase logout
-  
-      dispatch({ type: SET_COLLECTOR, payload: null });
-      dispatch({ type: SET_USER, payload: null });
-      dispatch({ type: SET_ACTIVE_USER, payload: null });
-      clearAllStorage();
-      const { error } = await supabase.auth.signOut();
-      console.log(error, 'ERROR')
-      navigation.navigate('Welcome');
-      
-      if (error) throw error;
-
-      // Realm logout if needed
-      // Redux cleanup
-
-
-      // Optional: navigate to login/welcome screen
-    } catch (err) {
-      console.error('Error signing out:', err.message);
-      Alert.alert('Logout Failed', err.message);
+    if (error) {
+      console.error('Supabase logout error:', error.message);
+      throw new Error(error.message);
     }
-  }, [dispatch, navigation]);
 
+    // Navigate to Welcome Screen
+    navigation.navigate('Welcome');
+
+  } catch (err) {
+    console.error('Error signing out:', err.message);
+    Alert.alert('Logout Failed', err.message);
+  } finally {
+    // Always stop loading
+    // setLoading(false);
+  }
+}, [dispatch, navigation]);
 
   const handleSetDefault = () => {
     const authenticatedEmail = user?.email;
@@ -157,17 +154,11 @@ const SettingsScreen = ({ navigation }) => {
     dispatch({ type: SET_ACTIVE_USER, payload: user });
   };
 
-
   const ableToViewDeletedUsers = getConfiguration(selUser, 'deletedUsers')?.isCheck;
   const ableToViewAppUsers = getConfiguration(selUser, 'appUsers')?.isCheck;
   const ableToViewMap = getConfiguration(selUser, 'mapUsers')?.isCheck;
 
-
-
-
-
-
-console.log(ableToViewAppUsers, selUser, 'SETTINGS')
+  console.log(ableToViewAppUsers, selUser, 'SETTINGS')
 
 
   return (
@@ -250,11 +241,12 @@ console.log(ableToViewAppUsers, selUser, 'SETTINGS')
                   </TouchableOpacity>
                 }
               </View>
-              <View style={{ borderWidth: 1, paddingVertical: SIZES.semiRadius, paddingHorizontal: SIZES.padding, backgroundColor: '#ffff', borderColor: '#ffff', elevation: 1, borderRadius: SIZES.semiRadius }}>
-                {usersCoord.length != 0 &&
+              <View style={{ borderWidth: 1, paddingVertical: SIZES.semiRadius, paddingHorizontal: SIZES.padding, backgroundColor: '#ffff', borderColor: '#ffff', elevation: usersCoord?.length == 0 ? 0 : 1, borderRadius: SIZES.semiRadius }}>
+                {/* {usersCoord.length != 0 && */}
 
                   <TouchableOpacity
                     onPress={() => setActiveDropDown((activeDropDown) => activeDropDown == 'coordinators' ? '' : 'coordinators')}
+                    disabled={usersCoord?.length == 0}
                     style={{
                       // marginTop: 10,
                       padding: 6,
@@ -267,7 +259,8 @@ console.log(ableToViewAppUsers, selUser, 'SETTINGS')
                       // borderTopLeftRadius: SIZES.radius / 2,
                       borderBottomRightRadius: SIZES.radius / 3,
                       borderBottomLeftRadius: SIZES.radius / 3,
-                      justifyContent: 'space-between'
+                      justifyContent: 'space-between',
+                      opacity: usersCoord?.length == 0 ? .5 : 1
                     }}
                   >
                     <Text style={{ fontSize: 18, color: COLORS.secondary, fontWeight: 'bold' }}>
@@ -278,7 +271,7 @@ console.log(ableToViewAppUsers, selUser, 'SETTINGS')
                   source={icons.arrow_down}
                   style={{ height: 18, width: 18, resizeMode: 'contain', tintColor: COLORS.primary, transform: [{ rotate: activeDropDown == 'coordinators' ? '0deg' : '-90deg' }] }}
                 /> */}
-                    <View style={{ borderWidth: 1, padding: SIZES.padding / 2, borderColor: COLORS.gray400, backgroundColor: COLORS.gray400, transform: [{ rotate: activeDropDown == 'coordinators' ? '90deg' : '0deg' }], borderRadius: SIZES.semiRadius /  1.5}}>
+                    <View style={{ borderWidth: 1, padding: SIZES.padding / 2, borderColor: COLORS.gray400, backgroundColor: COLORS.gray400, transform: [{ rotate: activeDropDown == 'coordinators' ? '90deg' : '0deg' }], borderRadius: SIZES.semiRadius / 1.5 }}>
                       <Image
                         source={icons.go}
                         style={{ height: 15, width: 15, tintColor: COLORS.black900 }}
@@ -287,7 +280,7 @@ console.log(ableToViewAppUsers, selUser, 'SETTINGS')
                     {/* </Animated.View> */}
                   </TouchableOpacity>
 
-                }
+                {/* } */}
                 <View style={{ flex: 1 }}>
                   {activeDropDown == 'coordinators' &&
                     // <View style={{ maxHeight: '30%' }}>
@@ -368,9 +361,10 @@ console.log(ableToViewAppUsers, selUser, 'SETTINGS')
                   }
 
 
-                  {tellersCoord.length != 0 &&
+                  {/* {tellersCoord.length != 0 && */}
                     <TouchableOpacity
                       onPress={() => setActiveDropDown((activeDropDown) => activeDropDown == 'tellers' ? '' : 'tellers')}
+                      disabled={tellersCoord?.length == 0}
                       // onPress={toggleDropdown}
                       style={{
                         marginTop: 6,
@@ -385,6 +379,7 @@ console.log(ableToViewAppUsers, selUser, 'SETTINGS')
                         borderBottomRightRadius: SIZES.radius / 3,
                         borderBottomLeftRadius: SIZES.radius / 3,
                         alignItems: 'center',
+                        opacity: tellersCoord?.length == 0 ? .5 : 1,
                         justifyContent: 'space-between'
                       }}
                     >
@@ -405,7 +400,7 @@ console.log(ableToViewAppUsers, selUser, 'SETTINGS')
                       </View>
                       {/* </Animated.View> */}
                     </TouchableOpacity>
-                  }
+                  {/* } */}
                   {
                     activeDropDown == 'tellers' &&
                     // <View style={{ maxHeight: '30%' }}>
@@ -493,10 +488,11 @@ console.log(ableToViewAppUsers, selUser, 'SETTINGS')
                     // </View>
                   }
 
-                  {
-                    deletedUsers.length != 0 &&
+                  {/* {
+                    deletedUsers.length != 0 && */}
                     <TouchableOpacity
                       onPress={() => setActiveDropDown((activeDropDown) => activeDropDown == 'deletedUsers' ? '' : 'deletedUsers')}
+                      disabled={deletedUsers?.length == 0}
                       style={{
                         marginTop: 6,
                         padding: 6,
@@ -509,7 +505,8 @@ console.log(ableToViewAppUsers, selUser, 'SETTINGS')
                         borderBottomRightRadius: SIZES.radius / 3,
                         borderBottomLeftRadius: SIZES.radius / 3,
                         alignItems: 'center',
-                        justifyContent: 'space-between'
+                        justifyContent: 'space-between',
+                        opacity: deletedUsers?.length == 0 ? .5 : 1
                       }}
                     >
                       <Text style={{ fontSize: 18, color: COLORS.secondary, fontWeight: 'bold' }}>
@@ -521,14 +518,14 @@ console.log(ableToViewAppUsers, selUser, 'SETTINGS')
                     style={{ height: 18, width: 18, resizeMode: 'contain', tintColor: COLORS.primary, transform: [{ rotate: activeDropDown == 'deletedUsers' ? '0deg' : '-90deg' }] }}
                   /> */}
                       <View style={{ borderWidth: 1, padding: SIZES.padding / 2, borderColor: COLORS.gray400, backgroundColor: COLORS.gray400, transform: [{ rotate: activeDropDown == 'deletedUsers' ? '-90deg' : '0deg' }], borderRadius: SIZES.semiRadius / 1.5 }}>
-                                              <Image
+                        <Image
                           source={icons.go}
                           style={{ height: 15, width: 15, tintColor: COLORS.black900 }}
                         />
                       </View>
                       {/* </Animated.View> */}
                     </TouchableOpacity>
-                  }
+                  {/* } */}
                   {
                     activeDropDown == 'deletedUsers' &&
                     // <View style={{ maxHeight: '40%' }}>
@@ -541,7 +538,7 @@ console.log(ableToViewAppUsers, selUser, 'SETTINGS')
                         const backgroundColor = index % 2 === 0 ? '#ffff' : COLORS.gray200;
 
                         // console.log(list, 'LISTA HA DEETED')
-                        
+
 
                         return (
                           <Animated.View
@@ -665,24 +662,24 @@ console.log(ableToViewAppUsers, selUser, 'SETTINGS')
               onPress={() => navigation.navigate('TestPrinter', {})}
             >
 
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start'}}>
-                    <Image 
-                      source={icons.testPrint}
-                      style={{
-                        height: 30,
-                        width: 30,
-                        tintColor: COLORS.secondary,
-                        resizeMode: 'contain',
-                      }}
-                    />
-                    <Text style={{ fontSize: 18, color: COLORS.secondary, fontWeight: 'bold', paddingHorizontal: 10 }}>
-                      Test Printer
-                    </Text>
-                  </View>
-                    <Image
-                      source={icons.go}
-                      style={{ height: 15, width: 15, tintColor: COLORS.black900 }}
-                    />
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start' }}>
+                <Image
+                  source={icons.testPrint}
+                  style={{
+                    height: 30,
+                    width: 30,
+                    tintColor: COLORS.secondary,
+                    resizeMode: 'contain',
+                  }}
+                />
+                <Text style={{ fontSize: 18, color: COLORS.secondary, fontWeight: 'bold', paddingHorizontal: 10 }}>
+                  Test Printer
+                </Text>
+              </View>
+              <Image
+                source={icons.go}
+                style={{ height: 15, width: 15, tintColor: COLORS.black900 }}
+              />
             </TouchableOpacity>
 
 
@@ -712,66 +709,108 @@ console.log(ableToViewAppUsers, selUser, 'SETTINGS')
                 borderBottomColor: COLORS.gray600
               }}
               onPress={() => openModal()}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start'}}>
-                    <Image 
-                      source={icons.android}
-                      style={{
-                        height: 30,
-                        width: 30,
-                        tintColor: COLORS.secondary,
-                        resizeMode: 'contain',
-                      }}
-                    />
-                    
-              <Text style={{ fontSize: 18, color: COLORS.secondary, fontWeight: 'bold', paddingHorizontal: 10 }}>
-                Update Application
-              </Text>
-                  </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start' }}>
+                <Image
+                  source={icons.android}
+                  style={{
+                    height: 30,
+                    width: 30,
+                    tintColor: COLORS.secondary,
+                    resizeMode: 'contain',
+                  }}
+                />
+
+                <Text style={{ fontSize: 18, color: COLORS.secondary, fontWeight: 'bold', paddingHorizontal: 10 }}>
+                  Update Application
+                </Text>
+              </View>
               <Image
                 source={icons.go}
                 style={{ height: 15, width: 15, tintColor: COLORS.black900 }}
               />
             </TouchableOpacity>
 
+
             <Text style={{ padding: 6, color: COLORS.primary, fontSize: 12, fontWeight: '500', marginTop: 10 }}>
               Security
             </Text>
-            <TouchableOpacity 
-              style={{ 
+            <TouchableOpacity
+              style={{
                 paddingVertical: 1,
                 marginVertical: SIZES.padding / 2,
                 backgroundColor: '#ffffff',
-                  elevation: 1,
-                  padding: 10,
-                  paddingVertical: 14,
-                  borderTopRightRadius: 12,
-                  borderTopLeftRadius: 12,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'flex-start',
-                  borderBottomLeftRadius: 12,
-                  borderColor: COLORS.gray200,
-                  borderBottomRightRadius: 12,
-                  borderWidth: 1,
-                  // borderBottomWidth: 1,
-                  borderBottomColor: COLORS.gray600 
+                elevation: 1,
+                padding: 10,
+                paddingVertical: 14,
+                borderTopRightRadius: 12,
+                borderTopLeftRadius: 12,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+                borderBottomLeftRadius: 12,
+                borderColor: COLORS.gray200,
+                borderBottomRightRadius: 12,
+                borderWidth: 1,
+                // borderBottomWidth: 1,
+                borderBottomColor: COLORS.gray600
               }} onPress={() => navigation.navigate('Permissions', {})}>
 
-                 <Image 
-                      source={icons.configuration}
-                      style={{
-                        height: 30,
-                        width: 30,
-                        tintColor: COLORS.secondary,
-                        resizeMode: 'contain',
-                      }}
-                    />
+              <Image
+                source={icons.configuration}
+                style={{
+                  height: 30,
+                  width: 30,
+                  tintColor: COLORS.secondary,
+                  resizeMode: 'contain',
+                }}
+              />
 
-                <Text style={{ fontSize: 18, color: COLORS.secondary, fontWeight: 'bold', paddingHorizontal: 10 }}>
-                  Permissions
-                </Text>
+              <Text style={{ fontSize: 18, color: COLORS.secondary, fontWeight: 'bold', paddingHorizontal: 10 }}>
+                Permissions
+              </Text>
 
             </TouchableOpacity>
+            {height > 600 &&
+
+
+              <View
+                style={{
+                  marginTop: SIZES.radius * 1.5,
+                  left: 0,
+                  backgroundColor: '#f1f1f1',
+                  right: 0,
+                  padding: 10
+                }}
+              >
+                <View style={{ justifyContent: 'flex-end', alignItems: 'center', marginBottom: SIZES.padding * 3 }}>
+                  <Text style={{ padding: 6, color: COLORS.secondaryTransparent2, fontSize: 12, fontWeight: '500', marginTop: 10 }}>
+                    Current Version {Config.APP_VERSION}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={signOut}>
+                  <View
+                    style={{
+                      // backgroundColor: COLORS.gray400,
+                      paddingVertical: 12,
+                      paddingHorizontal: 24,
+                      borderRadius: 12,
+                      width: '100%',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Image
+                      source={icons.logout}
+                      style={{ height: 20, width: 20, tintColor: COLORS.secondary, marginRight: 4 }}
+                    />
+                    <Text style={{ fontSize: 16, fontWeight: 'bold', color: COLORS.secondary }}>
+                      Logout
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            }
             {/* <TouchableOpacity 
               style={{ 
                 paddingVertical: 1,
@@ -836,59 +875,8 @@ console.log(ableToViewAppUsers, selUser, 'SETTINGS')
               </View>
             </TouchableOpacity>
           }
-
-
-
-
         </View>
       </ScrollView>
-      {/* Fixed Logout button at bottom center */}
-      {height > 600 &&
-
-
-        <View
-          style={{
-            // position: 'absolute',
-            // bottom: 20,
-            left: 0,
-             backgroundColor: '#f1f1f1',
-            right: 0,
-            // alignItems: 'center',
-            // zIndex: 999,
-            padding: 10
-            // width: '100%'
-          }}
-        >
-          <View style={{  justifyContent: 'flex-end', alignItems: 'center', marginBottom: SIZES.padding * 3 }}>
-            <Text style={{ padding: 6, color: COLORS.secondaryTransparent2, fontSize: 12, fontWeight: '500', marginTop: 10 }}>
-              Current Version {Config.APP_VERSION}
-            </Text>
-          </View>
-          <TouchableOpacity onPress={signOut}>
-            <View
-              style={{
-                // backgroundColor: COLORS.gray400,
-                paddingVertical: 12,
-                paddingHorizontal: 24,
-                borderRadius: 12,
-                width: '100%',
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Image
-            source={icons.logout}
-            style={{ height: 20, width: 20, tintColor: COLORS.secondary, marginRight: 4 }}
-          />
-              <Text style={{ fontSize: 16, fontWeight: 'bold', color: COLORS.secondary }}>
-                Logout
-              </Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-      }
-
     </SafeAreaView>
 
   );
