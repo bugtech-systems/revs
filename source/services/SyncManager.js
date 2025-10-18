@@ -425,7 +425,7 @@ console.log(result, "RESULLT", item.id)
     const supabase = SupabaseService.getClient();
     
     // Get records updated since last sync
-    const lastSyncDate = moment(lastSyncTime).subtract(1, 'd').toISOString();
+    const lastSyncDate = new Date(lastSyncTime).toISOString();
     
     let updatedQuery = supabase
       .from(tableName)
@@ -1078,9 +1078,9 @@ async queueChange(tableName, operation, recordId, data = null) {
     
     await this.pushLocalChanges();
     
-    await DatabaseService.executeQuery(
-      `DELETE FROM ${SYNC_TABLES.SYNC_QUEUE}`
-    );
+    // await DatabaseService.executeQuery(
+    //   `DELETE FROM ${SYNC_TABLES.SYNC_QUEUE}`
+    // );
     
     
     
