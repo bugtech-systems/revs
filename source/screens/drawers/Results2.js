@@ -36,27 +36,8 @@ export default function Results2({ navigation }) {
         console.error('Error fetching draws:', err);
       }
     };
-
-
-
-
-  const onRefresh = React.useCallback(() => {
-    setRefreshing(true);
-    // setLoading(true);
-    setTimeout(() => {
-      // load();
-      fetchDraws()
-          setRefreshing(false);
-      // bumpVersion();
-      // setFilteredData(items)
-    }, 2000);
-  }, []);
-
-
-  // Fetch draws from SQLite
-  useEffect(() => {
-
-    const fetchWinningDigits = async () => {
+    
+        const fetchWinningDigits = async () => {
       try {
       
         const results = await api.listMasterCombinations({
@@ -74,6 +55,25 @@ export default function Results2({ navigation }) {
       }
     };
 
+
+
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    // setLoading(true);
+    setTimeout(() => {
+      // load();
+      fetchDraws()
+      fetchWinningDigits();
+
+          setRefreshing(false);
+      // bumpVersion();
+      // setFilteredData(items)
+    }, 2000);
+  }
+
+  // Fetch draws from SQLite
+  useEffect(() => {
     fetchDraws();
     fetchWinningDigits();
   }, []);

@@ -70,7 +70,7 @@ const SummaryReport = ({ navigation }) => {
 
   useEffect(() => {
     fetchItems();
-  }, [fetchItems]);
+  }, [fetchItems, startDate, endDate, includeAll]);
 
   // Date picker logic
   const onChangeDate = (event, selectedDate) => {
@@ -190,7 +190,7 @@ console.log(com_rate, 'COMM RATE', show)
         </TouchableOpacity>
       </View>
       {renderTotals()}
-      {user && user.role !== 'teller' && (
+      {user && (
         <View style={styles.toggleRow}>
           <Switch
             trackColor={{ true: '#00ED64' }}
