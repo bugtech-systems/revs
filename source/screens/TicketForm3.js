@@ -9,7 +9,6 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, icons } from '../constants';
 import { api, fetchUser, normalizeValue, nowISO } from '../utils/offlineSync';
 import Geolocation from 'react-native-geolocation-service';
-import { useSync } from '../context/SyncContext';
 
 
 let keyPad = [
@@ -66,7 +65,6 @@ let keyPad = [
 
 export default function TicketForm3({ navigation, route }) {
   const ticketDetails = JSON.parse(route.params);
-  const { setDataVersion, dataVersion } = useSync();
 
   const { collector, user } = useSelector(({ user }) => user);
   const [amountVal, setAmountVal] = useState('')
@@ -583,7 +581,7 @@ export default function TicketForm3({ navigation, route }) {
       setBetting([]);
     }
 
-  }, [ticketDetails?.id, dataVersion])
+  }, [ticketDetails?.id])
 
 
 

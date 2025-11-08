@@ -5,26 +5,25 @@ import moment from 'moment-timezone';
 import { useSelector, useDispatch } from 'react-redux';
 import { COLORS, SIZES } from '../constants/theme';
 import icons from '../constants/icons';
-import { fixDateTimezone, formatNumber, getConfiguration, getDayRange } from '../utils/helpers';
+import { fixDateTimezone, formatNumber, getConfiguration, getDayRange, isDateGreater } from '../utils/helpers';
+import { fetchUserByEmail, updateUser } from '../redux/actions/user.actions';
+import { fetchBettings, fetchDraws } from '../redux/actions/bettingActions';
+import { SET_ACTIVE_USER } from '../redux/actions/types';
 // import { useOffline } from '../context/OfflineProvider';
 // import { useOfflineSync } from '../context/OfflineSyncProvider';
 
-import {
-  fetchUser, api
-} from "../utils/offlineSync";
-import { useSync } from '../context/SyncContext';
+
 
 const Dashboard = ({ navigation }) => {
 //   const { dataVersion, api } = useOfflineSync()
-  
-  const {  dataVersion } = useSync();
+  const dispatch = useDispatch();
   const { user, collector, selectedUser } = useSelector(({user}) => user);
+    const { dataVersion } = useSelector(({sync}) => sync);
 
   const [date, setDate] = useState(new Date());
   const [show, setShow] = useState(false);
   const [includeAll, setIncludeAll] = useState(false);
 
-  const [own_user, setOwnUser] = useState(null);
   const [bettings, setBettings] = useState([]);
   const [draws, setDraws] = useState([]);
 
@@ -69,15 +68,16 @@ const Dashboard = ({ navigation }) => {
 
   const handle_last_summary = async () => {
     // Update local DB last_summary
-    console.log('Last Summary Updated')
-    await api.updateUser(own_user.id, {last_summary: moment(new Date(date)).tz("Asia/Manila").endOf('day').toISOString()});
-    setOwnUser({ ...own_user, last_summary: date });
+		let newUser = await dispatch(updateUser(selectedUser.id, {last_summary: moment(new Date(date)).toISOString()}))
+        dispatch({type: SET_ACTIVE_USER, payload: newUser})
+    // setOwnUser({ ...selectedUser, last_summary: date });
+    
   };
   
-  let init = useCallback(async () => {
+  let init = async () => {
       
       if (!collector) return;
-		let selectedCollector = await fetchUser(collector);
+
 		
 	const { start_of_day, end_of_day  } = getDayRange(date)
 //   const today = new Date().toISOString(); 
@@ -85,8 +85,23 @@ const Dashboard = ({ navigation }) => {
 // Start and end of the day
 // const start_of_day = moment(date).startOf('day').toISOString();
 // const end_of_day = moment(date).endOf('day').add(8, 'h').toISOString();
-console.log(start_of_day, end_of_day, 'TIMEZONES')
 // Build filters
+
+
+      let localDraws = await dispatch(fetchDraws({ 
+        draw_date:  { 
+          op: "between",
+	      from: start_of_day,
+	      to: end_of_day,
+         }}));
+      
+      setDraws(localDraws);
+	 if(isDateGreater(moment(user?.last_summary).startOf('day'), date)){
+	    setBettings([]);
+	    return
+	 }
+
+
 let filters = {
 	is_deleted: false,
 	input_type: "normal",
@@ -96,63 +111,32 @@ let filters = {
  if (includeAll) {
   filters = {
     ...filters,
-    uplines:  { op: "contains", value: [selectedCollector.id] },
+    uplines:  { op: "json_array_contains", value: [String(selectedUser.id)] },
   };
 } else {
   filters = {
     ...filters,
-    owner_id: selectedCollector.id,
+    owner_id: selectedUser.id,
   };
 }
 
-      let localBettings = await api.listBettings({
-        filters: {...filters, input_type: 'normal'},
-        orderBy: 'timestamp DESC',
-        bulk: true
-        // limit: 20,
-      });
 
 
 
-    
 
-      let localDraws = await api.listDraws({
-       filters: { 
-        draw_date:  { 
-          op: "between",
-	      from: start_of_day,
-	      to: end_of_day,
-         }}
-      });
-      
-      
-      
-      
 
+      let localBettings = await dispatch(fetchBettings({...filters, input_type: 'normal'}));
+  
       setBettings(localBettings);
-      setDraws(localDraws);
-    
-
-
-  }, [date, includeAll, own_user, dataVersion])
+  }
 
   useEffect(() => {
-    setOwnUser(selectedUser)
     request_notification_permission();
-  }, [selectedUser]);
+  }, []);
   
   useEffect(() => {
-  setBettings([])
    init();
-  }, [date, includeAll, own_user]);
-   
-
-// useEffect(() => {
-//                 api.listUsers({
-//                     filters: {is_deleted: false}
-//                 })
-// }, [])
-
+  }, [date, includeAll, selectedUser, collector, dataVersion]);
 
   const renderHeader = () => (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
@@ -218,8 +202,8 @@ let filters = {
 	let grossCards = grouped_bettings.map((a, index) => {
 			let { game_time, bettings, gross, hits, comm } = a;
 			let currentDraw = draws.filter(dr => dr.game_time == game_time)[0];
-			let isWin200 = currentDraw?.is_win_to ? getConfiguration(own_user, 'withWin200')?.isCheck : false;
-			let winPrize = isWin200 ? getConfiguration(own_user, 'withWin200').value : getConfiguration(own_user, 'winStraight').value
+			let isWin200 = currentDraw?.is_win_to ? getConfiguration(selectedUser, 'withWin200')?.isCheck : false;
+			let winPrize = isWin200 ? getConfiguration(selectedUser, 'withWin200').value : getConfiguration(selectedUser, 'winStraight').value
 				
 			// grand_gross = Number(grand_gross) + Number(gross);
 			let commsTotal = 0
@@ -227,10 +211,10 @@ let filters = {
 
 			for (let bet of bettings) {
 				if(bet?.commissions){
-						commsTotal += bet?.commissions?.filter(coms => String(coms.referral) == String(own_user?.id)).reduce((n, { amount }) => n + amount, 0);
+						commsTotal += bet?.commissions?.filter(coms => String(coms.referral) == String(selectedUser?.id)).reduce((n, { amount }) => n + amount, 0);
 				}
 			}
-			genCommsTotal += gross * (own_user?.com_rate / 100);
+			genCommsTotal += gross * (selectedUser?.com_rate / 100);
 			let comms = commsTotal ? commsTotal : 0;
 			grand_comm = grand_comm + comms;
 			let winning = hits * winPrize;
@@ -369,8 +353,7 @@ let filters = {
   };
 
 
-
-console.log(bettings.length, 'BETS', draws.length, own_user?.email)
+console.log(bettings.length, 'BETTINGS', collector, selectedUser.email)
 
 
   return (

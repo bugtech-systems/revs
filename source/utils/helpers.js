@@ -258,6 +258,10 @@ export const checkSoldOutParts = ({
   };
 };
 
+export function isDateGreater(date1, date2) {
+    return new Date(date1) > new Date(date2);
+}
+
 export const checkSoldOut = ({ comb, combination, amountTarget, amountRamble }) => {
   const straightExceeded = comb.straightTotal + Number(amountTarget) > comb.straightLimit;
   const rambleExceeded = comb.rambleTotal + Number(amountRamble) > comb.rambleLimit;

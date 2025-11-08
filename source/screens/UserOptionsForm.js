@@ -30,8 +30,16 @@ const db = SQLite.openDatabase({ name: 'app.db', location: 'default' })
 
 const UserOptionsForm = () => {
   const dispatch = useDispatch()
-  const { userConfig } = useSelector(({ user }) => user)
+  const { selectedUser } = useSelector(({ user }) => user);
+  
   const [mergedConfig, setMergedConfig] = useState([])
+  
+  let handleConfigs = async () => {
+  
+  
+  }
+
+
 
   // 🔹 Merge Supabase or SQLite configuration with defaults
   useEffect(() => {
@@ -47,7 +55,7 @@ const UserOptionsForm = () => {
     } else {
       setMergedConfig(DEFAULT_CONFIG)
     }
-  }, [userConfig])
+  }, [selectedUser])
 
   // 🔹 Toggle Configuration Handler
   const handleConfiguration = async (type) => {

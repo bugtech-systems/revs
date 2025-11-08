@@ -6,15 +6,12 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useDispatch, useSelector } from 'react-redux';
 import { Image } from 'react-native';
 import { FlatList } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
 import { launchImageLibrary } from 'react-native-image-picker';
 import ImageViewer from "react-native-image-zoom-viewer";
 import Config from 'react-native-config';
 import axios from 'axios';
-import RNFS from 'react-native-fs';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { SET_LOADING, STOP_LOADING } from '../redux/actions/types';
-// import { SyncComponent } from '../components/SyncComponent';
 import { useOffline } from '../context/OfflineProvider';
 
 const Messenger = ({ route, navigation }) => {

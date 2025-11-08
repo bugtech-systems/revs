@@ -26,13 +26,12 @@ import {
 } from '../../redux/actions/types';
 import { useScreenSize, getConfiguration } from '../../utils/helpers';
 import { api, clearAllStorage, deleteDB, forceSync } from '../../utils/offlineSync';
-import { useSync } from '../../context/SyncContext';
+import { fetchUserByEmail, signOut } from '../../redux/actions/user.actions';
 
 
 const SettingsScreen = ({ navigation }) => {
   const { height } = Dimensions.get('window');
   const dispatch = useDispatch();
-  const { dataVersion } = useSync();
 
 
   const { user, collector } = useSelector(({ user }) => user);
@@ -47,8 +46,6 @@ const SettingsScreen = ({ navigation }) => {
   const [userToUpdate, setUserToUpdate] = useState(null);
   const apkUrl = Config.APK_URL;
   const selUser = user;
-
-  const screen = useScreenSize();
 
   // --- Load local users first (offline-first) ---
   const loadUsers = async () => {
@@ -81,9 +78,12 @@ const SettingsScreen = ({ navigation }) => {
   const openModal = () => setModalVisible(true);
   const closeModal = () => setModalVisible(false);
 
-  const handleSelectCollector = val => {
+  const handleSelectCollector = async val => {
+    let selected = await dispatch(fetchUserByEmail(val.email));
+    
+  
     dispatch({ type: SET_COLLECTOR, payload: val.email });
-    dispatch({ type: SET_ACTIVE_USER, payload: val });
+    dispatch({ type: SET_ACTIVE_USER, payload: selected });
     console.log(val, 'COORDINATORSS')
     navigation.navigate('Dashboard', JSON.stringify({ user: val.email }));
   };
@@ -120,7 +120,7 @@ const SettingsScreen = ({ navigation }) => {
 
 
   // Sign out the logged in user and then navigates to the welcome screen
- const signOut = useCallback(async () => {
+ const handleSignOut = useCallback(async () => {
   try {
     // setLoading(true);
     // Supabase Sign-Out
@@ -129,6 +129,7 @@ const SettingsScreen = ({ navigation }) => {
     dispatch({ type: SET_COLLECTOR, payload: null });
     dispatch({ type: SET_USER, payload: null });
     dispatch({ type: SET_ACTIVE_USER, payload: null });
+    dispatch(signOut())
     await clearAllStorage();
 
     if (error) {
@@ -137,7 +138,7 @@ const SettingsScreen = ({ navigation }) => {
     }
 
     // Navigate to Welcome Screen
-    navigation.navigate('Welcome');
+    // navigation.navigate('Welcome');
 
   } catch (err) {
     console.error('Error signing out:', err.message);
@@ -158,7 +159,6 @@ const SettingsScreen = ({ navigation }) => {
   const ableToViewAppUsers = getConfiguration(selUser, 'appUsers')?.isCheck;
   const ableToViewMap = getConfiguration(selUser, 'mapUsers')?.isCheck;
 
-  console.log(ableToViewAppUsers, selUser, 'SETTINGS')
 
 
   return (
@@ -787,7 +787,7 @@ const SettingsScreen = ({ navigation }) => {
                     Current Version {Config.APP_VERSION}
                   </Text>
                 </View>
-                <TouchableOpacity onPress={signOut}>
+                <TouchableOpacity onPress={handleSignOut}>
                   <View
                     style={{
                       // backgroundColor: COLORS.gray400,

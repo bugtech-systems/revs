@@ -1,7 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
-    NativeEventEmitter,
-    NativeModules,
     StyleSheet,
     SafeAreaView,
     ScrollView,
@@ -65,19 +63,11 @@ import { DocumentDirectoryPath, downloadFile, writeFile, readDir, stat, readFile
 import { BarcodeCreatorView, BarcodeFormat } from 'react-native-barcode-creator';
 import { useOffline } from '../context/OfflineProvider';
 
-const { ReactNativeLoading } = NativeModules;
 
 // --------------------------------
 // RawBT events listener
 // --------------------------------
-let subscription;
-if (subscription === undefined) {
-    const loadingManagerEmitter = new NativeEventEmitter(ReactNativeLoading);
-    subscription = loadingManagerEmitter.addListener("RawBT", ({ status, progress, message }) => {
-        console.log(status + " " + progress + " " + message);
-        // your code if it needs more <PrinterProgress />
-    });
-}
+
 
 export default function TestScreen({ data, isPrint, onPrint }) {
     const { collector, user, selectedUser } = useSelector(({ user }) => user);

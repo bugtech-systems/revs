@@ -10,9 +10,7 @@ import Animated, { BounceOutDown, FadeInDown, FadeOutDown } from 'react-native-r
 import { COLORS, icons } from '../../constants'
 import { formatNumberWithComma, getConfiguration, getDayRange } from '../../utils/helpers';
 // import { useOffline } from '../../context/OfflineProvider';
-import { forceFullResync } from '../../utils/batchPull';
 import { api } from '../../utils/offlineSync';
-import { useSync } from '../../context/SyncContext';
 
 const drawTimes = [
   {
@@ -36,7 +34,6 @@ const drawTimes = [
 
 const Transactions = ({ navigation }) => {
   // const { api, dataVersion, bumpVersion } = useOffline();
-  const {  lastSync, dataVersion, setDataVersion } = useSync();
   const { collector, user, selectedUser } = useSelector(({ user }) => user);
   const [date, setDate] = useState(new Date())
   const [show, setShowDate] = useState(false);
@@ -101,7 +98,7 @@ const Transactions = ({ navigation }) => {
 
     useEffect(() => {
     load();
-  }, [show, date, userNow, includeAll, dataVersion]);
+  }, [show, date, userNow, includeAll]);
   
 
   console.log("THE ITEM", show)

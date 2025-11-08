@@ -1,6 +1,7 @@
-import { SET_COLLECTOR, SET_ACTIVE_USER, SET_USER, SET_APK_URL, SET_DEVICE_ADDRESS, CLEAR_DEVICE_ADDRESS, SET_USER_CONFIG, SET_SUMMARIZED_USER, INCREMENT_UNREAD_MESSAGES, DECREMENT_UNREAD_MESSAGES } from "../actions/types";
+import { SET_COLLECTOR, SET_AUTHENTICATED, SET_UNAUTHENTICATED, SET_ACTIVE_USER, SET_USER, SET_APK_URL, SET_DEVICE_ADDRESS, CLEAR_DEVICE_ADDRESS, SET_USER_CONFIG, SET_SUMMARIZED_USER, INCREMENT_UNREAD_MESSAGES, DECREMENT_UNREAD_MESSAGES } from "../actions/types";
 
 const initialState = {
+  isAuthenticated: false,
   collector: null,
   user: null,
   apkUrl: 'https://sharewin.pro/apiv2/assets/revs_app.apk',
@@ -13,6 +14,17 @@ const initialState = {
 
 export default (state = initialState, action) => {
   switch (action.type) {
+    
+        case SET_AUTHENTICATED:
+      return {
+        ...state,
+        isAuthenticated: true,
+      };
+          case SET_UNAUTHENTICATED:
+      return {
+        ...state,
+        isAuthenticated: false,
+      };
     
     case SET_USER_CONFIG:
       return {

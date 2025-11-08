@@ -1,12 +1,12 @@
 // src/config/syncConfig.js
 export const syncConfig = {
-  syncInterval: 3 * 60 * 1000, // 2 minutes
+  syncInterval: 1 * 60 * 1000, // 2 minutes
   
   tables: {
     users: {
       query: "",
       maxAge: 2160, // hours (30 days)
-      maxRecords: 100,
+      maxRecords: 1000,
       immediateSync: true,
       cleanupStale: false,
       softDelete: false,
@@ -15,7 +15,7 @@ export const syncConfig = {
     bettings: {
       query: "",
       maxAge: 100, // 7 days
-      maxRecords: 100,
+      maxRecords: 50000,
       immediateSync: true,
       cleanupStale: true,
       softDelete: false,
@@ -27,16 +27,16 @@ export const syncConfig = {
       maxRecords: 1000,
       immediateSync: true,
       cleanupStale: true,
-      softDelete: false,
+      softDelete: true,
       incrementalSync: true
     },
     master_combinations: {
       query: "",
-      maxAge: 2160, // 90 days
-      maxRecords: 500,
-      immediateSync: false,
-      cleanupStale: false,
-      softDelete: false,
+      maxAge: 160, // 90 days
+      maxRecords: 1000,
+      immediateSync: true,
+      cleanupStale: true,
+      softDelete: true,
       incrementalSync: true // Always do full sync for master data
     },
     // messages: {

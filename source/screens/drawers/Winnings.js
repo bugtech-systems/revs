@@ -9,6 +9,7 @@ import { COLORS, icons } from '../../constants'
 import { formatNumberWithComma, getConfiguration } from '../../utils/helpers';
 import Animated, { BounceOutDown, FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { api, fetchUser } from '../../utils/offlineSync';
+import { fetchBettings } from '../../redux/actions/bettingActions';
 // import { useOffline } from '../../context/OfflineProvider';
 
 
@@ -239,7 +240,7 @@ const Winnings = ({ navigation }) => {
     if (includeAll) {
       filters = {
         ...filters,
-        uplines: { op: "contains", value: selectedCollector.id },
+        uplines: { op: "json_contains_batch", value: [String(selectedCollector.id)] },
         timestamp: { op: "between", from: start_of_day, to: end_of_day },
         winning: {op: ">", value: 0},
         winning: {op: "!=", value: "0"}
@@ -255,12 +256,14 @@ const Winnings = ({ navigation }) => {
     }
     
     
+          let localBettings = await dispatch(fetchBettings({...filters, input_type: 'normal'}));
     
-          let localBettings = await api.listBettings({
-        filters: {...filters, input_type: 'normal'},
-            orderBy: 'timestamp DESC',
-            // limit: 20,
-          });
+    
+        //   let localBettings = await api.listBettings({
+        // filters: {...filters, input_type: 'normal'},
+        //     orderBy: 'timestamp DESC',
+        //     // limit: 20,
+        //   });
           
           setItems(localBettings);
         })();

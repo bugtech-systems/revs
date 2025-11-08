@@ -12,7 +12,7 @@ import { COLORS, icons } from '../constants';
 import ConfirmationModal from '../components/ConfirmationModal';
 // import { useOffline } from '../context/OfflineProvider';
 import {  fetchUser, api, nowISO } from '../utils/offlineSync';
-import { useSync } from '../context/SyncContext';
+import { fetchDraws, fetchMasterCombinations } from '../redux/actions/bettingActions';
 // import { useOfflineSync } from '../context/OfflineSyncProvider';
 
 
@@ -69,8 +69,10 @@ let keyPad = [
 
 export default function TicketForm({ navigation }) {
     // const {  api, dataVersion } = useOfflineSync();
-    const {  dataVersion } = useSync();
     const { collector, user, selectedUser } = useSelector(({ user }) => user);
+    const { masterCombinations } = useSelector(({ betting }) => betting);
+    const { dataVersion } = useSelector(({ sync }) => sync);
+    const dispatch = useDispatch()
     const [amountVal, setAmountVal] = useState('')
     const [time, setSelectedTime] = useState('2pm')
     const [arrayBetting, setBetting] = useState([]);
@@ -97,11 +99,11 @@ export default function TicketForm({ navigation }) {
     const [own_user, setOwnUser] = useState(null);
     const [combinations, setCombinations] = useState([])
 
-    let is_win_to = false;
     const current = new Date();
     const hoursNow = current.getHours();
     const minNow = current.getMinutes();
-
+    
+    let comb = combinations.find(a => a.digit == combinationString);
 
 
     // Reusable modal for sold out
@@ -112,192 +114,10 @@ export default function TicketForm({ navigation }) {
     };
 
 
-
-    // let comb = useQuery(Combinations).filtered('digit == $0', combinationString)
-    // , digit => { return digit.filtered('digit == $0', values.digit )}, [values.digit])
-
-
-    //     const checkSoldOut = ({ comb, combination, amountTarget, amountRamble }) => {
-    //     const maxLimit = comb.maxLimit ? comb.maxLimit : 50;
-    //   const straightExceeded = comb.straight_total + Number(amountTarget) > comb.straightLimit;
-    //   const rambleExceeded = comb.ramble_total + Number(amountRamble) > comb.rambleLimit;
-
-    //   const remainingStraight = Math.max(0, comb.straightLimit - comb.straight_total);
-    //   const remainingRamble = Math.max(0, comb.rambleLimit - comb.ramble_total);
-    //   console.log(maxLimit, 'MAX LIMIT')
-
-    //   let messages = [];
-
-    //   if (straightExceeded && Number(amountTarget) > 0) {
-    //     messages.push(
-    //       `❌ Combination ${combination.split('').join('-')} has reached the *Straight* limit.\nAvailable Straight: ₱${remainingStraight}`
-    //     );
-    //   }
-
-    //   if (rambleExceeded && Number(amountRamble) > 0) {
-    //     messages.push(
-    //       `❌ Combination ${combination.split('').join('-')} has reached the *Ramble* limit.\nAvailable Ramble: ₱${remainingRamble}`
-    //     );
-    //   }
-
-    //   if (messages.length > 0) {
-    //     const message = messages.join('\n\n');
-    //     setSoldOutMessage(message);
-    //     setSoldOutModalVisible(true);
-    //     return true; // means sold out
-    //   }
-
-    //   return false; // not sold out
-    // };
-
-    //   const chooseImageSource = () => {
-    //     Alert.alert(
-    //       'Upload Image',
-    //       'Choose an option',
-    //       [
-    //         { text: 'Camera', onPress: openCamera },
-    //         { text: 'Gallery', onPress: selectFile },
-    //         { text: 'Cancel', style: 'cancel' },
-    //       ],
-    //       { cancelable: true }
-    //     );
-    //   };
-
-    //   const uploadImage = async (fileImage) => {
-    //     try {
-    //       setError(null)
-    //        const imagePick = await pickImage();
-    //        const image = imagePick.assets[0];
-    //        const formData = new FormData();
-    //        formData.append('file', {
-    //        uri: image.uri,
-    //        type: image.type,
-    //        name: image.fileName,
-    //        });
-
-    //        const response = await axios.post(file_server_url, formData, {
-    //        headers: {
-    //          'Content-Type': 'multipart/form-data',
-    //          Authorization: `Bearer ${file_server_token}`
-    //        },
-    //        });
-
-    //        setSelectedImage({...response.data, uri: file_download_url + response.data._id });
-
-    //      } catch (error) {
-    //        console.error('Error uploading image:', error);
-    //      }
-    //   };
-
-    //   const selectFile = async () => {
-    // 	setBetTypeOption('file')
-    //     try {
-    //       const result = await launchImageLibrary({
-    //         mediaType: 'photo',
-    //         maxWidth: 300,
-    //         maxHeight: 300,
-    //         quality: 1,
-    //       });
-
-    //       if (result.didCancel) {
-    //         Alert.alert('Canceled');
-    // 		setBetTypeOption('')
-    // 		setBetType('')
-
-    //       } else if (result.errorCode) {
-    //         Alert.alert('Error: ' + result.errorMessage);
-    // 		setBetTypeOption('')
-    // 		setBetType('')
-
-    //       } else {
-    //         // uploadImage(result.assets[0]);
-    //       }
-    //     } catch (err) {
-    //       Alert.alert('Unknown Error: ' + JSON.stringify(err));
-    //       throw err;
-    //     }
-    //   };
-
-    // const checkSoldOut = ({ comb, combination, amountTarget, amountRamble }) => {
-    //     const straightLimit = comb.straightLimit ?? 0;
-    //     const rambleLimit = comb.rambleLimit ?? 0;
-    //     const straightMaxLimit = comb?.straightMaxLimit ?? 0;
-    //     const rambleMaxLimit = comb?.rambleMaxLimit ?? 0;
-    //     const maxLimit = comb.maxLimit ?? 50;
-
-    //     const currentStraight = comb.straight_total ?? 0;
-    //     const currentRamble = comb.ramble_total ?? 0;
-
-    //     const straightBet = Number(amountTarget) || 0;
-    //     const rambleBet = Number(amountRamble) || 0;
-
-    //     const newStraightTotal = currentStraight + straightBet;
-    //     const newRambleTotal = currentRamble + rambleBet;
-    //     const combinedTotal = newStraightTotal + newRambleTotal;
-
-    //     const remainingStraight = Math.max(0, straightLimit - currentStraight);
-    //     const remainingRamble = Math.max(0, rambleLimit - currentRamble);
-    //     const remainingMax = Math.max(0, maxLimit - (currentStraight + currentRamble));
-
-    //     const straightExceeded = newStraightTotal > straightLimit;
-    //     const rambleExceeded = newRambleTotal > rambleLimit;
-    //     const maxLimitExceeded = combinedTotal > maxLimit;
-
-    //     // console.log(combinedTotal, "combinedTotalcombinedTotalcombinedTotalcombinedTotal")
-
-    //     let messages = [];
-
-    //     //   if (straightExceeded && straightBet > 0) {
-    //     //     messages.push(
-    //     //       `❌ Combination ${combination.split('').join('-')} has reached the *Straight* limit.\nAvailable Straight: ₱${remainingStraight}`
-    //     //     );
-    //     //   }
-
-    //     //   if (rambleExceeded && rambleBet > 0) {
-    //     //     messages.push(
-    //     //       `❌ Combination ${combination.split('').join('-')} has reached the *Ramble* limit.\nAvailable Ramble: ₱${remainingRamble}`
-    //     //     );
-    //     //   }
-
-    //     // if (maxLimitExceeded) {
-    //     //     const availableStraight = Math.max(0, maxLimit - currentStraight);
-    //     //     const availableRamble = Math.max(0, maxLimit - currentRamble);
-
-
-
-    //     //     messages.push(
-    //     //         `Combination ${combination.split('').join('-')} has reached the *Max Limit*.\n` +
-    //     //         `Available Total Remaining: ₱${remainingMax}\n`
-    //     //         //   +
-    //     //         //   `Suggested: Straight up to ₱${availableStraight}, Ramble up to ₱${availableRamble}`
-    //     //     );
-    //     // }
-
-    //     if (maxLimitExceeded) {
-    //         const availableStraight = Math.max(0, maxLimit - currentStraight);
-    //         const availableRamble = Math.max(0, maxLimit - currentRamble);
-
-    //         const message =
-    //             `${combination.split('').join('-')}`
-    //         showSoldOutBetModalFn(message);
-    //         return true;
-    //     }
-
-    //     if (messages.length > 0) {
-    //         const message = messages.join('\n\n');
-    //         // setSoldOutMessage(message);
-    //         // setSoldOutModalVisible(true);
-    //         showToastSoldOutBet(message)
-    //         return true; // blocked due to sold out
-    //     }
-
-    //     return false; // passed validation
-    // };
-
-    const checkSoldOut = ({ comb, combination, amountTarget, amountRamble }) => {
+    const checkSoldOut =   (comb, combination, amountTarget, amountRamble ) => {
         let hasMaxLimit = getConfiguration(selectedUser, 'hasMaxLimit').isCheck;
-        const straightMaxLimit = comb?.straightMaxLimit ?? 0;
-        const rambleMaxLimit = comb?.rambleMaxLimit ?? 0;
+        const straightMaxLimit = comb?.straight_max_limit ?? 0;
+        const rambleMaxLimit = comb?.ramble_max_limit ?? 0;
 
         const currentStraight = comb.straight_total ?? 0;
         const currentRamble = comb.ramble_total ?? 0;
@@ -308,22 +128,25 @@ export default function TicketForm({ navigation }) {
         const newStraightTotal = currentStraight + straightBet;
         const newRambleTotal = currentRamble + rambleBet;
 
+
+
         // 🚨 Check if straight exceeds max limit
-        if (hasMaxLimit && newStraightTotal > straightMaxLimit) {
+        if (hasMaxLimit && straightMaxLimit != 0 &&  newStraightTotal > straightMaxLimit) {
             const message = `${combination.split('').join('-')}`;
             showSoldOutBetModalFn(message);
             return true;
         }
 
+
         // 🚨 Check if ramble exceeds max limit
-        if (hasMaxLimit && newRambleTotal > rambleMaxLimit) {
+        if (hasMaxLimit && rambleMaxLimit != 0 && newRambleTotal > rambleMaxLimit) {
             const message = `${combination.split('').join('-')}`;
             showSoldOutBetModalFn(message);
             return true;
         }
 
         return false; // ✅ Passed validation
-    };
+    }
 
     const initializeGameTime = () => {
         let getGameTime = getTimeRange();
@@ -394,16 +217,18 @@ export default function TicketForm({ navigation }) {
         // setBetting([]) // clear test state
         // search for a realm object with a primary key that is an objectId
         // itemComb[0].straight_total += 
-        const comb = await api.listMasterCombinations({
-            filters: {  
-                digit: combination
-            }
-        });
-
+       
 
     
 
-        const isSoldOut = false
+        let isSoldOut = false
+        
+        if(comb){
+             isSoldOut = checkSoldOut(comb, combination, target, ramble);
+        }
+        
+console.log(comb, isSoldOut, item, 'ADD BET')
+        
 
         if (isSoldOut) return;
 
@@ -419,8 +244,8 @@ export default function TicketForm({ navigation }) {
             return;
         }
 
-        let totalS = comb[0]?.straight_total + Number(amountTarget);
-        let totalR = comb[0]?.ramble_total + Number(amountRamble);
+        let totalS = comb?.straight_total + Number(amountTarget);
+        let totalR = comb?.ramble_total + Number(amountRamble);
 
 
         if (((comb.length > 1 && comb.length < 300) && (!comb[0]?.straight_total && !comb[0]?.ramble_total))) {
@@ -823,58 +648,44 @@ export default function TicketForm({ navigation }) {
 
 
     const initData = async () => {
-    
+
     const { start_of_day, end_of_day } = getDayRange(new Date())
     
 
+    let combs = await dispatch(fetchMasterCombinations());
         
-
-
-    
-       let localDraws = await api.listDraws({
-       filters: { 
+     let localDraws = await dispatch(fetchDraws({ 
         draw_date:  { 
            op: "between",
 	      from: start_of_day,
 	      to: end_of_day,
-        }}
-      });
+        }}))
 
+    
+      
 
-    let localCombinations = await api.listMasterCombinations();
     setDraws(localDraws)
-    // setCombinations(localCombinations)
+    setCombinations(combs)
     } 
 
     
     useEffect(() => {
     initializeGameTime();
-    }, [draws, dataVersion])
+    }, [draws])
 
-
+    
 
     useEffect(() => {
-    if(selectedUser){
+    if(selectedUser?.id){
     initData();
     }
-    }, [selectedUser?.id]);
+    }, [selectedUser?.id, dataVersion]);
     
-    useEffect(() => {
-    if(selectedUser.id){
-       (async () => {
-              await api.listUsers({
-                    filters: {is_deleted: false}
-                })
 
-              let selectUser = await fetchUser(selectedUser?.email)
-            console.log(selectUser, 'SELLEECT USER')
-             setOwnUser(selectUser)
-       })()  
-       }
-    }, [user, selectedUser?.id])
     
-    
-    
+        
+
+
 
 
     
@@ -886,7 +697,8 @@ export default function TicketForm({ navigation }) {
     let closeDraw = (is2pmDisabled && is5pmDisabled && is9pmDisabled) ? true : false;
 
     let curDraw = (draws.find(a => !a.combination) || ((hoursNow == 13 && minNow >= 55) || (hoursNow == 16 && minNow >= 55) || (hoursNow == 20 && minNow >= 55)));
-
+    
+    console.log(comb, 'COMB')
 
 
 

@@ -12,7 +12,6 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import SelectDropdown from 'react-native-select-dropdown'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { api } from '../../utils/offlineSync';
-import { useSync } from '../../context/SyncContext';
 
 
 const drawTimes = [
@@ -24,7 +23,6 @@ const drawTimes = [
 
 
 const SoldOuts = ({ navigation }) => {
-  const {  dataVersion, manualSync } = useSync();
   const { selectedUser, user } = useSelector(({ user }) => user);
   const { confirmationModal } = useSelector(({ ui }) => ui);
   const dispatch = useDispatch();
@@ -82,7 +80,7 @@ const SoldOuts = ({ navigation }) => {
       setItems(localBettings);
       // setLoading(false);
 
-  }, [startDate, endDate,  ownUser, rnd, dataVersion]);
+  }, [startDate, endDate,  ownUser, rnd]);
 
 
   const fetchDraws = useCallback(async () => {
@@ -113,7 +111,7 @@ const SoldOuts = ({ navigation }) => {
       setDraws(localDraws)
       // setLoading(false);
 
-  }, [startDate, endDate,  ownUser, rnd, dataVersion]);
+  }, [startDate, endDate,  ownUser, rnd]);
 
 
   /** Filtered Data */

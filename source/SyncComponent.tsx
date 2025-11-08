@@ -6,8 +6,7 @@ import { useSync } from './context/SyncContext';
 
 
 const SyncComponent = () => {
-  const { forceFullSync, isReady, status, lastSync
-  } = useSync();
+
   
 
 
