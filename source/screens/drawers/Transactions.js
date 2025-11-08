@@ -9,8 +9,8 @@ import { useSelector, useDispatch } from 'react-redux'
 import Animated, { BounceOutDown, FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { COLORS, icons } from '../../constants'
 import { formatNumberWithComma, getConfiguration, getDayRange } from '../../utils/helpers';
+import { fetchBettings } from '../../redux/actions/bettingActions';
 // import { useOffline } from '../../context/OfflineProvider';
-import { api } from '../../utils/offlineSync';
 
 const drawTimes = [
   {
@@ -34,7 +34,9 @@ const drawTimes = [
 
 const Transactions = ({ navigation }) => {
   // const { api, dataVersion, bumpVersion } = useOffline();
-  const { collector, user, selectedUser } = useSelector(({ user }) => user);
+  const dispatch = useDispatch();
+  const { user, selectedUser } = useSelector(({ user }) => user);
+    const { dataVersion } = useSelector(({ sync }) => sync);
   const [date, setDate] = useState(new Date())
   const [show, setShowDate] = useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
@@ -54,7 +56,6 @@ const Transactions = ({ navigation }) => {
 
 
   const load = async () => {
-    console.log(date, 'LOOOADED')
     const { start_of_day, end_of_day  } = getDayRange(date)
     // Start and end of the day
     
@@ -81,11 +82,8 @@ const Transactions = ({ navigation }) => {
 
 
 
-      let localBettings = await api.listBettings({
-        filters: {...filters, input_type: 'normal'},
-        orderBy: 'created_at DESC',
-        // limit: 20,
-      });
+
+     let localBettings = await dispatch(fetchBettings({...filters, input_type: 'normal'}));
 
     
       setItems(localBettings);
@@ -98,7 +96,7 @@ const Transactions = ({ navigation }) => {
 
     useEffect(() => {
     load();
-  }, [show, date, userNow, includeAll]);
+  }, [show, date, userNow, includeAll, dataVersion]);
   
 
   console.log("THE ITEM", show)

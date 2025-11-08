@@ -111,12 +111,12 @@ let filters = {
  if (includeAll) {
   filters = {
     ...filters,
-    uplines:  { op: "json_array_contains", value: [String(selectedUser.id)] },
+    uplines:  { op: "contains", value: [selectedUser?.id] },
   };
 } else {
   filters = {
     ...filters,
-    owner_id: selectedUser.id,
+    owner_id: selectedUser?.id,
   };
 }
 
@@ -204,7 +204,7 @@ let filters = {
 			let currentDraw = draws.filter(dr => dr.game_time == game_time)[0];
 			let isWin200 = currentDraw?.is_win_to ? getConfiguration(selectedUser, 'withWin200')?.isCheck : false;
 			let winPrize = isWin200 ? getConfiguration(selectedUser, 'withWin200').value : getConfiguration(selectedUser, 'winStraight').value
-				
+				console.log(winPrize, 'WWIN PRINze')
 			// grand_gross = Number(grand_gross) + Number(gross);
 			let commsTotal = 0
 			let genCommsTotal = 0;
@@ -353,10 +353,9 @@ let filters = {
   };
 
 
-console.log(bettings.length, 'BETTINGS', collector, selectedUser.email)
 
-
-  return (
+console.log(bettings, 'BETTINGS', selectedUser)
+  return (  
   	<SafeAreaView style={{ ...styles.wrapper }}>
 			<ScrollView style={{ width: '100%' }}>
 				<View style={{ padding: 10, }}>

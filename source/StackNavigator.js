@@ -278,7 +278,7 @@ const StackNavigates = () => {
                     headerRight: () => (
                       user?.is_admin ?
                         <TouchableOpacity
-                          onPress={() => navigation.navigate('UserOptions', {id: selectedUser?.id})}
+                          onPress={() => navigation.navigate('UserOptions', JSON.stringify({email: selectedUser?.email}))}
                           style={{ padding: 10, marginRight: 10, alignItems: 'center', justifyContent: 'center' }}>
                           <Text style={{ fontSize: 15, fontWeight: 'bold', color: COLORS.primary }}>Options</Text>
                         </TouchableOpacity> : null),

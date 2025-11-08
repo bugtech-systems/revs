@@ -1,18 +1,26 @@
-// src/utils/offlineSync.js
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import supabase from './supabaseClient';
+// import { schema } from './schema';
 import { schema } from "../services/schema";
 import { generateObjectId } from './helpers';
 import DatabaseService from '../services/DatabaseService';
-import SupabaseService from '../services/SupabaseService';
+import moment, { tz } from 'moment-timezone';
 import SyncManager from '../services/SyncManager';
+import SupabaseService from '../services/SupabaseService';
 
-export const BATCH_SIZE = 1000;
-export const DB_NAME = 'leov4.db';
+// Enable debug (optional for development)
+// SQLite.DEBUG(false);
+// SQLite.enablePromise(false); // optional, to use promises
+
+export const BATCH_SIZE = 1000; // Supabase limit
+
+export const DB_NAME = 'leov3.db';
+
 export const LAST_PULLED_KEY = 'offline:lastPulledAt';
 
-// Table list for water distribution system
+// Table list (as used in Supabase). Must match Supabase table names.
 export const TABLES = [
 'users', 
 'bettings', 
@@ -24,26 +32,30 @@ export const TABLES = [
 
 // Cache for frequently accessed data
 const queryCache = new Map();
-const CACHE_TTL = 2 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 3 * 60 * 1000; // 5 minutes
 
-// ---------- INITIALIZATION ----------
+// ---------- INIT ----------
 export async function init(userId) {
-  // Create tables if not exists
+  // Ensure single DB open
+  // if (!db) {
+  //   db = SQLite.openDatabase(
+  //     { name: DB_NAME, location: "default" },
+  //     async () => {  console.log("SQLite opened", DB_NAME);},
+  //     (err) => console.error("SQLite open error", err)
+  //   );
+  // }
+
+  // create tables if not exists
   await createTablesIfNotExists();
-  
-  // Initialize SyncManager
-  await SyncManager.init();
-  
-  // Preload essential data for offline use
-  await preloadEssentialData(userId);
-  
-  // Start background sync if online
+  // Optionally fire an initial sync in background (not blocking)
   NetInfo.fetch().then((s) => {
     if (s.isConnected && userId) {
+      // kick off sync in background
       syncWithSupabase(userId).catch((e) => console.warn("Initial sync error", e));
     }
   });
 }
+
 
 // ---------- CACHE MANAGEMENT ----------
 function getCacheKey(tableName, operation, params = {}) {
@@ -74,489 +86,83 @@ export function clearCacheForTable(tableName) {
   }
 }
 
-// ---------- USER MANAGEMENT ----------
+
 export const fetchUser = async (email) => {
-  const cacheKey = getCacheKey('users', 'fetchUser', { email });
-  const cached = getCache(cacheKey);
-  if (cached) return cached;
-
   try {
-    // Try local first (offline-first approach)
-    let user = await fetchUserFromLocal(email);
-    if (user) {
-      setCache(cacheKey, user);
-      return user;
-    }
 
-    // If online and not found locally, fetch from Supabase
-    if (SupabaseService.isConnected()) {
-      console.log(`🔍 Searching for user with email: ${email}`);
-      
-      // Use select with limit instead of single() to avoid PGRST116
-      const { data, error } = await supabase
+  
+  
+  
+  let user = null;
+  
+  user = await fetchUserFromLocal(email);
+  
+    
+if(user){
+  return user;
+}
+
+
+
+
+// Try Supabase first when online
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      // .single();
+    if (error) throw error;
+
+    user = data[0];
+
+
+
+    let populatedUplines = [];
+
+    if (user?.uplines?.length) {
+      // Fetch all uplines as user objects
+      const { data: uplineData, error: uplineError } = await supabase
         .from('users')
         .select('*')
-        .eq('email', email)
-        .limit(1);
+        .in('id', user?.uplines);
 
-      if (error) {
-        console.log('Supabase fetchUser error:', error);
-        return null;
-      }
-
-      if (data && data.length > 0) {
-        user = data[0];
-        console.log(`✅ User found remotely: ${user.id}`);
-        
-        // Populate uplines if they exist
-        if (user?.uplines?.length) {
-          try {
-            const { data: uplineData, error: uplineError } = await supabase
-              .from('users')
-              .select('*')
-              .in('id', user.uplines);
-
-            if (!uplineError && uplineData) {
-              user.uplines = uplineData;
-            }
-          } catch (uplineErr) {
-            console.warn('⚠️ Error fetching upline users:', uplineErr);
-          }
-        }
-
-        // Save to local database (async, don't wait)
-        saveUserToLocal(user).catch(console.error);
-        setCache(cacheKey, user);
-        return user;
-      } else {
-        console.log(`❌ No user found with email: ${email}`);
-        setCache(cacheKey, null);
-        return null;
-      }
+      if (uplineError) throw uplineError;
+      populatedUplines = uplineData || [];
     }
 
-    return null;
+    const userWithUplines = { ...user, uplines: populatedUplines };
+
+
+
+
+    // Save to local SQLite for offline access
+    // await saveUserToLocal(userWithUplines);
+  
+    //   if (SupabaseService.isConnected()) {
+    //   await syncRemoteDataInBackground('users', 'query', {filters: {email: email}});
+    // }
+  
+    return userWithUplines;
   } catch (err) {
-    console.log('Unexpected error in fetchUser:', err);
+    console.log('Supabase fetchUser error, falling back to local', err);
+    
+    // Fallback to SQLite using DatabaseService
     return await fetchUserFromLocal(email);
   }
 };
 
-// ---------- REMOTE DATA SYNC ----------
-const fetchRemoteData = async (tableName, operation, params = {}) => {
-  let query = supabase.from(tableName).select('*');
-  
-  // Apply filters for query operations
-  if (operation === 'query' && params.filters) {
-    const applyFilters = (query, filters) => {
-      if (Array.isArray(filters)) {
-        // Handle OR conditions - array of filter groups
-        const orConditions = filters.map(filterGroup => {
-          if (typeof filterGroup === 'string') {
-            return filterGroup; // Direct filter string
-          } else if (typeof filterGroup === 'object' && !filterGroup.op) {
-            // Build filter string from object with multiple AND conditions
-            const conditions = [];
-            Object.entries(filterGroup).forEach(([key, filter]) => {
-              if (typeof filter === 'object' && filter.op) {
-                const { op, value } = filter;
-                switch (op.toLowerCase()) {
-                  case "=": conditions.push(`${key}.eq.${value}`); break;
-                  case "!=": conditions.push(`${key}.neq.${value}`); break;
-                  case ">": conditions.push(`${key}.gt.${value}`); break;
-                  case ">=": conditions.push(`${key}.gte.${value}`); break;
-                  case "<": conditions.push(`${key}.lt.${value}`); break;
-                  case "<=": conditions.push(`${key}.lte.${value}`); break;
-                  case "like": conditions.push(`${key}.like.%${value}%`); break;
-                  case "ilike": conditions.push(`${key}.ilike.%${value}%`); break;
-                  case "in": 
-                    if (Array.isArray(value)) {
-                      conditions.push(`${key}.in.(${value.join(',')})`);
-                    }
-                    break;
-                  case "between":
-                    if (filter.from !== undefined && filter.to !== undefined) {
-                      conditions.push(`${key}.gte.${filter.from},${key}.lte.${filter.to}`);
-                    }
-                    break;
-                  case "is":
-                    if (value === null) conditions.push(`${key}.is.null`);
-                    else if (value === true || value === false) conditions.push(`${key}.is.${value}`);
-                    break;
-                }
-              } else {
-                // Simple equality
-                conditions.push(`${key}.eq.${filter}`);
-              }
-            });
-            return conditions.join(',');
-          }
-          return null;
-        }).filter(Boolean);
-        
-        if (orConditions.length > 0) {
-          query = query.or(orConditions.join(','));
-        }
-      } else if (typeof filters === 'object') {
-        // Handle AND conditions and logical operators
-        Object.entries(filters).forEach(([key, filter]) => {
-          if (key === '$or' && Array.isArray(filter)) {
-            // Handle OR operator
-            const orConditions = filter.map(filterGroup => {
-              if (typeof filterGroup === 'object') {
-                const conditions = [];
-                Object.entries(filterGroup).forEach(([subKey, subFilter]) => {
-                  if (typeof subFilter === 'object' && subFilter.op) {
-                    const { op, value } = subFilter;
-                    switch (op.toLowerCase()) {
-                      case "=": conditions.push(`${subKey}.eq.${value}`); break;
-                      case "!=": conditions.push(`${subKey}.neq.${value}`); break;
-                      case ">": conditions.push(`${subKey}.gt.${value}`); break;
-                      case ">=": conditions.push(`${subKey}.gte.${value}`); break;
-                      case "<": conditions.push(`${subKey}.lt.${value}`); break;
-                      case "<=": conditions.push(`${subKey}.lte.${value}`); break;
-                      case "like": conditions.push(`${subKey}.like.%${value}%`); break;
-                      case "ilike": conditions.push(`${subKey}.ilike.%${value}%`); break;
-                      case "in": 
-                        if (Array.isArray(value)) {
-                          conditions.push(`${subKey}.in.(${value.join(',')})`);
-                        }
-                        break;
-                      case "between":
-                        if (subFilter.from !== undefined && subFilter.to !== undefined) {
-                          conditions.push(`${subKey}.gte.${subFilter.from},${subKey}.lte.${subFilter.to}`);
-                        }
-                        break;
-                      case "is":
-                        if (value === null) conditions.push(`${subKey}.is.null`);
-                        else if (value === true || value === false) conditions.push(`${subKey}.is.${value}`);
-                        break;
-                    }
-                  } else {
-                    conditions.push(`${subKey}.eq.${subFilter}`);
-                  }
-                });
-                return conditions.join(',');
-              }
-              return filterGroup;
-            }).filter(Boolean);
-            
-            if (orConditions.length > 0) {
-              query = query.or(orConditions.join(','));
-            }
-          } else if (key === '$and' && Array.isArray(filter)) {
-            // Handle AND operator - apply all filters directly
-            filter.forEach(filterGroup => {
-              if (typeof filterGroup === 'object') {
-                Object.entries(filterGroup).forEach(([subKey, subFilter]) => {
-                  if (typeof subFilter !== "object" || !subFilter.op) {
-                    query = query.eq(subKey, subFilter);
-                  } else {
-                    const { op, value } = subFilter;
-                    switch (op.toLowerCase()) {
-                      case "=": query = query.eq(subKey, value); break;
-                      case "!=": query = query.neq(subKey, value); break;
-                      case ">": query = query.gt(subKey, value); break;
-                      case ">=": query = query.gte(subKey, value); break;
-                      case "<": query = query.lt(subKey, value); break;
-                      case "<=": query = query.lte(subKey, value); break;
-                      case "like": query = query.like(subKey, `%${value}%`); break;
-                      case "ilike": query = query.ilike(subKey, `%${value}%`); break;
-                      case "in": 
-                        if (Array.isArray(value) && value.length > 0) {
-                          query = query.in(subKey, value);
-                        }
-                        break;
-                      case "between": 
-                        if (subFilter.from !== undefined && subFilter.to !== undefined) {
-                          query = query.gte(subKey, subFilter.from).lte(subKey, subFilter.to);
-                        }
-                        break;
-                      case "is": 
-                        if (value === null) {
-                          query = query.is(subKey, null);
-                        } else if (value === true || value === false) {
-                          query = query.is(subKey, value);
-                        }
-                        break;
-                      case "contains":
-                        if (typeof value === 'string') {
-                          query = query.contains(subKey, value);
-                        } else if (Array.isArray(value)) {
-                          query = query.contains(subKey, value);
-                        }
-                        break;
-                      case "containedBy":
-                        query = query.containedBy(subKey, value);
-                        break;
-                    }
-                  }
-                });
-              }
-            });
-          } else {
-            // Regular filter (AND by default)
-            if (typeof filter !== "object" || !filter.op) {
-              query = query.eq(key, filter);
-            } else {
-              const { op, value } = filter;
-              switch (op.toLowerCase()) {
-                case "=": query = query.eq(key, value); break;
-                case "!=": query = query.neq(key, value); break;
-                case ">": query = query.gt(key, value); break;
-                case ">=": query = query.gte(key, value); break;
-                case "<": query = query.lt(key, value); break;
-                case "<=": query = query.lte(key, value); break;
-                case "like": query = query.like(key, `%${value}%`); break;
-                case "ilike": query = query.ilike(key, `%${value}%`); break;
-                case "in": 
-                  if (Array.isArray(value) && value.length > 0) {
-                    query = query.in(key, value);
-                  }
-                  break;
-                case "between": 
-                  if (filter.from !== undefined && filter.to !== undefined) {
-                    query = query.gte(key, filter.from).lte(key, filter.to);
-                  }
-                  break;
-                case "is": 
-                  if (value === null) {
-                    query = query.is(key, null);
-                  } else if (value === true || value === false) {
-                    query = query.is(key, value);
-                  }
-                  break;
-                case "contains":
-                  if (typeof value === 'string') {
-                    query = query.contains(key, value);
-                  } else if (Array.isArray(value)) {
-                    query = query.contains(key, value);
-                  }
-                  break;
-                case "containedBy":
-                  query = query.containedBy(key, value);
-                  break;
-              }
-            }
-          }
-        });
-      }
-      return query;
-    };
-
-    query = applyFilters(query, params.filters);
-  }
-  
-  // Apply ordering
-  if (params.orderBy) {
-    const [column, order] = params.orderBy.split(' ');
-    query = query.order(column, { ascending: order?.toLowerCase() === 'asc' });
-  } else {
-    query = query.order('created_at', { ascending: false });
-  }
-
-  try {
-    if (operation === 'get' && params.id) {
-      console.log(`🎯 Fetching single record: ${params.id}`);
-      const { data, error } = await query.eq('id', params.id).single();
-      
-      if (error) {
-        console.error(`❌ Error fetching ${tableName} record ${params.id}:`, error);
-        return null;
-      }
-      
-      if (data) {
-        const normalized = normalizeForSQLite(tableName, data);
-        await insertOrReplace(tableName, normalized);
-        console.log(`💾 Updated ${tableName} record: ${params.id}`);
-      }
-      
-      return data ? [data] : [];
-    } else {
-      console.log(`📋 Fetching multiple records for ${tableName}...`);
-      const allData = await fetchAllRemoteDataWithPagination(
-        tableName, 
-        query, 
-        params.maxRecords || 10000
-      );
-      
-      console.log(`📥 Retrieved ${allData.length} records from Supabase for ${tableName}`);
-      
-      if (allData.length > 0) {
-        await processBulkInsert(tableName, allData);
-        console.log(`💾 Synced ${allData.length} ${tableName} records locally`);
-      }
-      
-      return allData;
-    }
-  } catch (error) {
-    console.error(`❌ Remote fetch failed for ${tableName}:`, error);
-    return [];
-  }
-};
-
-// Separate function to apply filters to Supabase query
-function applyFilters(query, filters) {
-  if (Array.isArray(filters)) {
-    // Handle OR conditions
-    const orConditions = filters.map(filterGroup => {
-      if (typeof filterGroup === 'string') {
-        return filterGroup;
-      } else if (typeof filterGroup === 'object' && !filterGroup.op) {
-        const conditions = [];
-        Object.entries(filterGroup).forEach(([key, filter]) => {
-          if (typeof filter === 'object' && filter.op) {
-            const { op, value } = filter;
-            switch (op.toLowerCase()) {
-              case "=": conditions.push(`${key}.eq.${value}`); break;
-              case "!=": conditions.push(`${key}.neq.${value}`); break;
-              case ">": conditions.push(`${key}.gt.${value}`); break;
-              case ">=": conditions.push(`${key}.gte.${value}`); break;
-              case "<": conditions.push(`${key}.lt.${value}`); break;
-              case "<=": conditions.push(`${key}.lte.${value}`); break;
-              case "like": conditions.push(`${key}.like.%${value}%`); break;
-              case "ilike": conditions.push(`${key}.ilike.%${value}%`); break;
-              case "in": 
-                if (Array.isArray(value)) {
-                  conditions.push(`${key}.in.(${value.join(',')})`);
-                }
-                break;
-              default: break;
-            }
-          } else {
-            conditions.push(`${key}.eq.${filter}`);
-          }
-        });
-        return conditions.join(',');
-      }
-      return null;
-    }).filter(Boolean);
-    
-    if (orConditions.length > 0) {
-      query = query.or(orConditions.join(','));
-    }
-  } else if (typeof filters === 'object') {
-    Object.entries(filters).forEach(([key, filter]) => {
-      if (key === '$or' && Array.isArray(filter)) {
-        const orConditions = filter.map(filterGroup => {
-          if (typeof filterGroup === 'object') {
-            const conditions = [];
-            Object.entries(filterGroup).forEach(([subKey, subFilter]) => {
-              if (typeof subFilter === 'object' && subFilter.op) {
-                const { op, value } = subFilter;
-                switch (op.toLowerCase()) {
-                  case "=": conditions.push(`${subKey}.eq.${value}`); break;
-                  case "!=": conditions.push(`${subKey}.neq.${value}`); break;
-                  case ">": conditions.push(`${subKey}.gt.${value}`); break;
-                  case ">=": conditions.push(`${subKey}.gte.${value}`); break;
-                  case "<": conditions.push(`${subKey}.lt.${value}`); break;
-                  case "<=": conditions.push(`${subKey}.lte.${value}`); break;
-                  case "like": conditions.push(`${subKey}.like.%${value}%`); break;
-                  case "ilike": conditions.push(`${subKey}.ilike.%${value}%`); break;
-                  case "in": 
-                    if (Array.isArray(value)) {
-                      conditions.push(`${subKey}.in.(${value.join(',')})`);
-                    }
-                    break;
-                  default: break;
-                }
-              } else {
-                conditions.push(`${subKey}.eq.${subFilter}`);
-              }
-            });
-            return conditions.join(',');
-          }
-          return filterGroup;
-        }).filter(Boolean);
-        
-        if (orConditions.length > 0) {
-          query = query.or(orConditions.join(','));
-        }
-      } else {
-        if (typeof filter !== "object" || !filter.op) {
-          query = query.eq(key, filter);
-        } else {
-          const { op, value } = filter;
-          switch (op.toLowerCase()) {
-            case "=": query = query.eq(key, value); break;
-            case "!=": query = query.neq(key, value); break;
-            case ">": query = query.gt(key, value); break;
-            case ">=": query = query.gte(key, value); break;
-            case "<": query = query.lt(key, value); break;
-            case "<=": query = query.lte(key, value); break;
-            case "like": query = query.like(key, `%${value}%`); break;
-            case "ilike": query = query.ilike(key, `%${value}%`); break;
-            case "in": 
-              if (Array.isArray(value) && value.length > 0) {
-                query = query.in(key, value);
-              }
-              break;
-            default: break;
-          }
-        }
-      }
-    });
-  }
-  return query;
-}
-
-// Also update the localGet function to be more defensive:
-// export async function localGet(tableName, id) {
-//   const cacheKey = getCacheKey(tableName, 'get', { id });
-//   const cached = getCache(cacheKey);
-//   if (cached) return cached;
-
-//   // Always try local first for offline-first approach
-//   const resData = await DatabaseService.executeQuery(
-//     `SELECT * FROM ${tableName} WHERE id = ? LIMIT 1`,
-//     [id]
-//   );
-  
-//   if (resData.rows && resData.rows.length > 0) {
-//     const row = resData.rows[0];
-    
-//     // Parse JSON fields based on table schema
-//     const tableSchema = schema[tableName];
-//     if (tableSchema) {
-//       for (const col in tableSchema) {
-//         if (tableSchema[col] === "json" && row[col]) {
-//           try {
-//             row[col] = parseJsonText(row[col]);
-//           } catch (e) {
-//             console.warn(`Error parsing JSON for ${tableName}.${col}:`, e);
-//           }
-//         }
-//       }
-//     }
-
-//     setCache(cacheKey, row);
-//     return row;
-//   }
-
-//   // If not found locally and online, try remote
-//   if (SupabaseService.isConnected()) {
-//     try {
-//       const remoteData = await fetchRemoteData(tableName, 'get', { id });
-//       if (remoteData && remoteData.length > 0) {
-//         setCache(cacheKey, remoteData[0]);
-//         return remoteData[0];
-//       }
-//     } catch (error) {
-//       console.warn(`Error fetching remote data for ${tableName} id ${id}:`, error);
-//     }
-//   }
-
-//   return null;
-// }
-
 
 export const saveUserToLocal = async (user) => {
   try {
+    // Normalize user data for SQLite storage
     const normalizedUser = normalizeForSQLite('users', user);
+    
+    // Prepare data for insertion/update
     const columns = Object.keys(normalizedUser);
     const placeholders = columns.map(() => '?').join(', ');
     const values = columns.map(col => normalizedUser[col]);
 
+    // Use INSERT OR REPLACE to handle both new and existing users
     await DatabaseService.executeQuery(
       `INSERT OR REPLACE INTO users (${columns.join(', ')}) VALUES (${placeholders})`,
       values
@@ -564,13 +170,10 @@ export const saveUserToLocal = async (user) => {
 
     console.log('✅ User saved to local database:', user.id);
     
-    // Also save upline users if they exist (async)
+    // Also save upline users if they exist
     if (user.uplines?.length) {
-      saveUsersToLocal(user.uplines).catch(console.error);
+      await saveUsersToLocal(user.uplines);
     }
-    
-    // Clear user-related cache
-    clearCacheForTable('users');
     
     return user;
   } catch (error) {
@@ -580,15 +183,17 @@ export const saveUserToLocal = async (user) => {
 };
 
 export const saveLocalUser = async (user) => {
-  await saveUserToLocal(user);
-};
+            await saveUserToLocal(user)
+}
 
 export const fetchUserFromLocal = async (email) => {
   try {
+    // Fetch main user using DatabaseService
     const result = await DatabaseService.executeQuery(
       `SELECT * FROM users WHERE email = ? LIMIT 1`,
       [email]
     );
+
 
     if (!result.rows || result.rows.length === 0) {
       return null;
@@ -620,10 +225,6 @@ export const fetchUsersByIds = async (userIds) => {
     return [];
   }
 
-  const cacheKey = getCacheKey('users', 'fetchUsersByIds', { userIds });
-  const cached = getCache(cacheKey);
-  if (cached) return cached;
-
   try {
     const placeholders = userIds.map(() => '?').join(',');
     const result = await DatabaseService.executeQuery(
@@ -635,21 +236,19 @@ export const fetchUsersByIds = async (userIds) => {
       return [];
     }
 
-    const users = result.rows.map(user => ({
+    // Parse JSON fields for each user
+    return result.rows.map(user => ({
       ...user,
       configuration: parseJsonText(user.configuration),
       uplines: parseJsonText(user.uplines)
     }));
-
-    setCache(cacheKey, users);
-    return users;
   } catch (error) {
     console.error('Error fetching users by IDs:', error);
     return [];
   }
 };
 
-// ---------- DATA NORMALIZATION ----------
+// ✅ Converts JSON fields before storing into SQLite (TEXT)
 export function toJsonText(obj) {
   try {
     return obj ? JSON.stringify(obj) : null;
@@ -658,6 +257,7 @@ export function toJsonText(obj) {
   }
 }
 
+// ✅ Parse back JSON fields from SQLite string
 export function parseJsonText(str) {
   if (str === null || str === undefined) return null;
   try {
@@ -667,9 +267,40 @@ export function parseJsonText(str) {
   }
 }
 
+// ✅ Timestamps: always ISO 8601
 export function nowISO() {
-  return new Date().toISOString();
+   return new Date().toISOString();
 }
+
+// ✅ Normalize row from SQLite -> JS object for Supabase
+
+// // ✅ normalize single value
+// export function normalizeValue(type, value, target = "supabase") {
+//   if (value === null || value === undefined) return null;
+
+//   switch (type) {
+//     case "boolean":
+//       return target === "sqlite" ? (value ? 1 : 0) : Boolean(value);
+
+//     case "json":
+//       return target === "sqlite"
+//         ? JSON.stringify(value ?? [])
+//         : typeof value === "string"
+//           ? JSON.parse(value)
+//           : value;
+
+//     case "integer":
+//       return Number(value);
+
+//     case "timestamp":
+//       return new Date(value).toISOString();
+
+//     case "uuid":
+//     case "text":
+//     default:
+//       return String(value);
+//   }
+// }
 
 export function normalizeForSupabase(table, row) {
   const tableSchema = schema[table];
@@ -677,16 +308,37 @@ export function normalizeForSupabase(table, row) {
 
   const normalized = {};
   for (const col in tableSchema) {
-    if (row[col] !== undefined) {
-      normalized[col] = normalizeValue(tableSchema[col], row[col], "supabase");
-    }
+      if(row[col] != undefined){
+        normalized[col] = normalizeValue(tableSchema[col], row[col], "supabase");
+       }
   }
 
+  // timestamps fallback
   return normalized;
 }
 
+// // ✅ Normalize row for SQLite (from Supabase)
+// export function normalizeForSQLite(table, remoteRow) {
+//   const tableSchema = schema[table];
+//   if (!tableSchema) throw new Error(`Unknown table: ${table}`);
+
+//   const normalized = {};
+//   for (const col in tableSchema) {
+//     normalized[col] = normalizeValue(tableSchema[col], remoteRow[col], "sqlite");
+//   }
+
+//   // timestamps fallback
+//   normalized.created_at = normalized.created_at || moment().tz("Asia/Manila").toISOString();
+//   normalized.updated_at = normalized.updated_at || moment().tz("Asia/Manila").toISOString();
+//   return normalized;
+// }
+
+
+// Enhanced normalization with validation
 export function normalizeForSQLite(table, remoteRow) {
   if (!remoteRow) {
+console.log(remoteRow, table, 'ERROR remote row')
+  
     console.error(`❌ Cannot normalize null/undefined row for ${table}`);
     return {};
   }
@@ -694,31 +346,39 @@ export function normalizeForSQLite(table, remoteRow) {
   const tableSchema = schema[table];
   if (!tableSchema) {
     console.error(`❌ Unknown table schema: ${table}`);
-    return remoteRow;
+    return remoteRow; // Return as-is if no schema
   }
 
   const normalized = {};
   for (const col in tableSchema) {
     try {
-      if (remoteRow[col] !== undefined) {
+      if(remoteRow[col] != undefined){
         normalized[col] = normalizeValue(tableSchema[col], remoteRow[col], "sqlite");
       }
     } catch (error) {
       console.warn(`⚠️ Normalization error for ${table}.${col}:`, error);
-      normalized[col] = remoteRow[col];
+      normalized[col] = remoteRow[col]; // Fallback to original value
     }
   }
 
   // Ensure required fields
+  
   if (!normalized.id && remoteRow.id) {
     normalized.id = remoteRow.id;
   }
+  
+  
 
   return normalized;
 }
 
+// Enhanced value normalization with debugging
 export function normalizeValue(type, value, target = "supabase") {
+  // Log normalization for debugging
+  const shouldLog = false; // Set to true for debugging
+  
   if (value === null || value === undefined) {
+    if (shouldLog) console.log(`🔄 Normalize ${type}: null/undefined -> null`);
     return null;
   }
 
@@ -727,38 +387,45 @@ export function normalizeValue(type, value, target = "supabase") {
   switch (type) {
     case "boolean":
       result = target === "sqlite" ? (value ? 1 : 0) : Boolean(value);
+      if (shouldLog) console.log(`🔄 Normalize boolean: ${value} -> ${result}`);
       break;
 
     case "json":
       if (target === "sqlite") {
         result = JSON.stringify(value ?? []);
+        if (shouldLog) console.log(`🔄 Normalize json to sqlite:`, value, '->', result);
       } else {
         result = typeof value === "string" ? JSON.parse(value) : value;
+        if (shouldLog) console.log(`🔄 Normalize json from sqlite:`, value, '->', result);
       }
       break;
 
     case "numeric":
-    case "integer":
       result = Number(value);
+      if (shouldLog) console.log(`🔄 Normalize integer: ${value} -> ${result}`);
       break;
 
     case "timestamp":
-      if (target === "sqlite") {
-        const date = new Date(value);
-        result = date.toISOString();
-      } else {
-        result = new Date(value);
-      }
+        if (target === "sqlite") {
+    const date = new Date(value);
+      result = date.toISOString();
+      if (shouldLog) console.log(`🔄 Normalize timestamp (UTC): ${value} -> ${result}`);
+        } else {
+          result = new Date(value);
+        }
       break;
 
+    case "uuid":
     case "text":
     default:
       result = String(value);
+      if (shouldLog) console.log(`🔄 Normalize text: ${value} -> ${result}`);
       break;
   }
 
   return result;
 }
+
 
 // ---------- OPTIMIZED CRUD OPERATIONS ----------
 async function localInsert(tableName, recordData) {
@@ -961,7 +628,9 @@ async function localQuery(tableName, query = {}, is_online = false) {
   return rows;
 }
 
-// ---------- OPTIMIZED API FOR WATER DISTRIBUTION SYSTEM ----------
+
+
+// CRUD wrappers for each table (you can call these from your components)
 export const api = {
   // users
   createUser: async (user) => localInsert('users', { ...user }),
@@ -1006,8 +675,16 @@ export const api = {
   listCashflow: async (params) => localQuery('cashflow', params),
 };
 
+export async function deleteDB(){
+    SQLite.deleteDatabase({ name: DB_NAME, location: 'default' })
+  .then(() => console.log('✅ Database deleted'))
+  .catch(err => console.log('❌ Error deleting DB:', err));
 
-// ---------- UTILITY FUNCTIONS ----------
+
+};
+
+
+
 function buildWhereClause(filters = {}) {
   const whereClauses = [];
   const values = [];
@@ -1019,9 +696,9 @@ function buildWhereClause(filters = {}) {
     if (typeof filter !== "object" || !filter.op) {
       if (filter === null) {
         whereClauses.push(`${key} IS NULL`);
-      } else if (typeof filter === 'boolean') { 
-        whereClauses.push(`${key} = ?`);
-        values.push(filter ? 1 : 0);
+      } else if(typeof filter === 'boolean') { 
+             whereClauses.push(`${key} = ?`);
+             values.push(filter ? 1 : 0);
       } else {
         whereClauses.push(`${key} = ?`);
         values.push(filter);
@@ -1041,7 +718,8 @@ function buildWhereClause(filters = {}) {
         break;
 
       case "between":
-        whereClauses.push(`${key} BETWEEN ? AND ?`);
+        // Ensure date format is YYYY-MM-DD (safe for SQLite)
+         whereClauses.push(`${key} BETWEEN ? AND ?`);
         values.push(filter.from, filter.to);
         break;
 
@@ -1056,7 +734,7 @@ function buildWhereClause(filters = {}) {
           whereClauses.push(`${key} IN (${placeholders})`);
           values.push(...filter.value);
         } else {
-          whereClauses.push("1=0");
+          whereClauses.push("1=0"); // empty IN → no results
         }
         break;
 
@@ -1067,40 +745,12 @@ function buildWhereClause(filters = {}) {
       case "notnull":
         whereClauses.push(`${key} IS NOT NULL`);
         break;
-
-      case "contains":
-        whereClauses.push(`${key} LIKE ?`);
-        values.push(`%${filter.value}%`);
-        break;
-
-      /**
-       * ✅ NEW CASE:
-       * Filters JSON column (e.g. "batches") that contains an object with "batch_id"
-       * Works in SQLite by using LIKE.
-       * Works in Postgres by using `::text LIKE`.
-       */
-
-       
-      case "json_contains_batch":
-        whereClauses.push(`(${key} LIKE ? OR json_extract(${key}, '$[*].batch_id') LIKE ?)`);
-        values.push(`%${filter.value}%`, `%${filter.value}%`);
-        break;
-        
-          case "json_array_contains":
-            if (Array.isArray(filter.value)) {
-              // For array of values, check if ANY of the values exist in JSON array
-              const orConditions = filter.value.map(value => {
-                values.push(`%"${value}"%`);
-                return `json_extract(${key}, '$') LIKE ?`;
-              });
-              whereClauses.push(`(${orConditions.join(' OR ')})`);
-            } else {
-              // For single value - find if this specific string exists in JSON array
-              whereClauses.push(`json_extract(${key}, '$') LIKE ?`);
-              values.push(`%"${filter.value}"%`);
-            }
-            break;
-
+        case "contains":
+          // For arrays stored as JSON string, e.g. '["apple","banana"]'
+          // Use LIKE with wildcards to match inside
+          whereClauses.push(`${key} LIKE ?`);
+          values.push(`%${filter.value}%`);
+          break;
       default:
         throw new Error(`Unsupported operator: ${filter.op}`);
     }
@@ -1108,109 +758,75 @@ function buildWhereClause(filters = {}) {
 
   const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
   return { whereSql, values };
-}
+};
 
 export async function getAllLocalIds(table) {
-  const cacheKey = getCacheKey(table, 'getAllLocalIds');
-  const cached = getCache(cacheKey);
-  if (cached) return cached;
-
-  const res = await DatabaseService.executeQuery(
-    `SELECT id FROM ${table} ORDER BY updated_at ASC`
-  );
-  
+  const res = await DatabaseService.executeQuery(`SELECT id FROM ${table} ORDER BY updated_at ASC;`);
   const ids = [];
   if (res && res.rows) {
     for (let i = 0; i < res.rows.length; i++) {
       ids.push(res.rows[i].id);
     }
   }
-
-  setCache(cacheKey, ids);
   return ids;
 }
 
 export async function insertOrReplace(table, row) {
   const cols = Object.keys(row);
   const placeholders = cols.map(() => '?').join(', ');
-  const sql = `INSERT OR REPLACE INTO ${table} (${cols.join(', ')}) VALUES (${placeholders})`;
+  const sql = `INSERT OR REPLACE INTO ${table} (${cols.join(', ')}) VALUES (${placeholders});`;
   const values = cols.map((c) => row[c]);
   await DatabaseService.executeQuery(sql, values);
-  
-  // Clear cache for this table
-  clearCacheForTable(table);
-}
+};
 
 export async function clearAllStorage() {
   try {
+  
+     const key = `${LAST_PULLED_KEY}:bettings`;
+
+  
     await AsyncStorage.clear();
-    queryCache.clear();
-    console.log("✅ AsyncStorage and cache cleared");
+    console.log("✅ AsyncStorage cleared");
   } catch (e) {
     console.error("❌ Failed to clear AsyncStorage", e);
   }
-}
+};
 
-// ---------- OPTIMIZED BULK OPERATIONS ----------
+
+// // Bulk data processing
 const processBulkInsert = async (tableName, records) => {
   if (records.length === 0) return 0;
 
   const batchSize = 100;
   let totalInserted = 0;
 
-  // Use transaction for better performance
-  await DatabaseService.executeQuery('BEGIN TRANSACTION');
+  for (let i = 0; i < records.length; i += batchSize) {
+    const batch = records.slice(i, i + batchSize);
+        const columns = Object.keys(normalizeForSQLite(tableName, records[0]));
+    const placeholders = batch.map(() => `(${columns.map(() => '?').join(', ')})`).join(', ');
+    const values = batch.flatMap(record => {
+      const normalized = normalizeForSQLite(tableName, record);
+      return columns.map(col => normalized[col]);
+    });
 
-  try {
-    for (let i = 0; i < records.length; i += batchSize) {
-      const batch = records.slice(i, i + batchSize);
-      const columns = Object.keys(normalizeForSQLite(tableName, records[0]));
-      const placeholders = batch.map(() => `(${columns.map(() => '?').join(', ')})`).join(', ');
-      const values = batch.flatMap(record => {
-        const normalized = normalizeForSQLite(tableName, record);
-        return columns.map(col => normalized[col]);
-      });
 
-      await DatabaseService.executeQuery(
-        `INSERT OR REPLACE INTO ${tableName} (${columns.join(', ')}) VALUES ${placeholders}`,
-        values
-      );
+  // console.log(columns, values, 'INSERTINGGGG')
 
-      totalInserted += batch.length;
-    }
+    await DatabaseService.executeQuery(
+      `INSERT OR REPLACE INTO ${tableName} (${columns.join(', ')}) VALUES ${placeholders}`,
+      values
+    );
 
-    await DatabaseService.executeQuery('COMMIT');
-    console.log(`💾 Bulk inserted ${totalInserted} ${tableName} records`);
-    
-    // Clear cache for this table
-    clearCacheForTable(tableName);
-    
-    return totalInserted;
-  } catch (error) {
-    await DatabaseService.executeQuery('ROLLBACK');
-    throw error;
+    totalInserted += batch.length;
   }
+
+  console.log(`💾 Bulk inserted ${totalInserted} ${tableName} records`);
+  return totalInserted;
 };
 
-// ---------- PRELOAD ESSENTIAL DATA ----------
-async function preloadEssentialData(userId) {
-  if (!userId) return;
 
-  try {
-    // Preload frequently used data in background
-    const preloadPromises = [
-      getActiveBranches().catch(() => []),
-      getActiveBatches().catch(() => []),
-    ];
 
-    await Promise.allSettled(preloadPromises);
-    console.log('✅ Essential data preloaded for offline use');
-  } catch (error) {
-    console.warn('⚠️ Preload essential data failed:', error);
-  }
-}
-
-// ---------- REMOTE DATA SYNC ----------
+// Enhanced remote query with better error handling and progress tracking
 const fetchAllRemoteDataWithPagination = async (tableName, baseQuery, maxRecords = 50000) => {
   const allData = [];
   let page = 0;
@@ -1218,7 +834,7 @@ const fetchAllRemoteDataWithPagination = async (tableName, baseQuery, maxRecords
   let hasMore = true;
   let totalFetched = 0;
 
-  console.log(`🌐 Starting remote fetch for ${tableName}...`);
+  console.log(`🌐 Starting remote fetch for ${tableName}...`, baseQuery);
 
   while (hasMore && allData.length < maxRecords) {
     try {
@@ -1227,11 +843,12 @@ const fetchAllRemoteDataWithPagination = async (tableName, baseQuery, maxRecords
 
       console.log(`📄 Fetching ${tableName} page ${page + 1} (records ${from}-${to})...`);
 
-      const { data, error } = await baseQuery.range(from, to);
+      const { data, error, count } = await baseQuery.range(from, to);
       
       if (error) {
-        console.error(`❌ Error fetching ${tableName} page ${page + 1}:`, error);
+        console.error(`ss❌ Error fetching ${tableName} page ${page + 1}:`, error, baseQuery, maxRecords);
         
+        // If it's a rate limit error, wait and retry
         if (error.code === 'PGRST204' || error.status === 429) {
           console.log('⏳ Rate limit hit, waiting 2 seconds...');
           await new Promise(resolve => setTimeout(resolve, 2000));
@@ -1257,6 +874,7 @@ const fetchAllRemoteDataWithPagination = async (tableName, baseQuery, maxRecords
         console.log(`🏁 No more data for ${tableName}`);
       }
 
+      // Rate limiting protection
       await new Promise(resolve => setTimeout(resolve, 100));
       
     } catch (error) {
@@ -1269,366 +887,358 @@ const fetchAllRemoteDataWithPagination = async (tableName, baseQuery, maxRecords
   return allData;
 };
 
-// const fetchRemoteData = async (tableName, operation, params = {}) => {
-//   let query = supabase.from(tableName).select('*');
+// Enhanced background sync with transaction support
+const syncRemoteDataInBackground = async (tableName, operation, params = {}) => {
+  // Use requestAnimationFrame for better background execution
   
-//   // Apply filters for query operations
-//   if (operation === 'query' && params.filters) {
-//     const applyFilters = (query, filters) => {
-//       if (Array.isArray(filters)) {
-//         // Handle OR conditions - array of filter groups
-//         const orConditions = filters.map(filterGroup => {
-//           if (typeof filterGroup === 'string') {
-//             return filterGroup; // Direct filter string
-//           } else if (typeof filterGroup === 'object' && !filterGroup.op) {
-//             // Build filter string from object with multiple AND conditions
-//             const conditions = [];
-//             Object.entries(filterGroup).forEach(([key, filter]) => {
-//               if (typeof filter === 'object' && filter.op) {
-//                 const { op, value } = filter;
-//                 switch (op.toLowerCase()) {
-//                   case "=": conditions.push(`${key}.eq.${value}`); break;
-//                   case "!=": conditions.push(`${key}.neq.${value}`); break;
-//                   case ">": conditions.push(`${key}.gt.${value}`); break;
-//                   case ">=": conditions.push(`${key}.gte.${value}`); break;
-//                   case "<": conditions.push(`${key}.lt.${value}`); break;
-//                   case "<=": conditions.push(`${key}.lte.${value}`); break;
-//                   case "like": conditions.push(`${key}.like.%${value}%`); break;
-//                   case "ilike": conditions.push(`${key}.ilike.%${value}%`); break;
-//                   case "in": 
-//                     if (Array.isArray(value)) {
-//                       conditions.push(`${key}.in.(${value.join(',')})`);
-//                     }
-//                     break;
-//                   case "between":
-//                     if (filter.from !== undefined && filter.to !== undefined) {
-//                       conditions.push(`${key}.gte.${filter.from},${key}.lte.${filter.to}`);
-//                     }
-//                     break;
-//                   case "is":
-//                     if (value === null) conditions.push(`${key}.is.null`);
-//                     else if (value === true || value === false) conditions.push(`${key}.is.${value}`);
-//                     break;
-//                 }
-//               } else {
-//                 // Simple equality
-//                 conditions.push(`${key}.eq.${filter}`);
-//               }
-//             });
-//             return conditions.join(',');
-//           }
-//           return null;
-//         }).filter(Boolean);
-        
-//         if (orConditions.length > 0) {
-//           query = query.or(orConditions.join(','));
-//         }
-//       } else if (typeof filters === 'object') {
-//         // Handle AND conditions and logical operators
-//         Object.entries(filters).forEach(([key, filter]) => {
-//           if (key === '$or' && Array.isArray(filter)) {
-//             // Handle OR operator
-//             const orConditions = filter.map(filterGroup => {
-//               if (typeof filterGroup === 'object') {
-//                 const conditions = [];
-//                 Object.entries(filterGroup).forEach(([subKey, subFilter]) => {
-//                   if (typeof subFilter === 'object' && subFilter.op) {
-//                     const { op, value } = subFilter;
-//                     switch (op.toLowerCase()) {
-//                       case "=": conditions.push(`${subKey}.eq.${value}`); break;
-//                       case "!=": conditions.push(`${subKey}.neq.${value}`); break;
-//                       case ">": conditions.push(`${subKey}.gt.${value}`); break;
-//                       case ">=": conditions.push(`${subKey}.gte.${value}`); break;
-//                       case "<": conditions.push(`${subKey}.lt.${value}`); break;
-//                       case "<=": conditions.push(`${subKey}.lte.${value}`); break;
-//                       case "like": conditions.push(`${subKey}.like.%${value}%`); break;
-//                       case "ilike": conditions.push(`${subKey}.ilike.%${value}%`); break;
-//                       case "in": 
-//                         if (Array.isArray(value)) {
-//                           conditions.push(`${subKey}.in.(${value.join(',')})`);
-//                         }
-//                         break;
-//                       case "between":
-//                         if (subFilter.from !== undefined && subFilter.to !== undefined) {
-//                           conditions.push(`${subKey}.gte.${subFilter.from},${subKey}.lte.${subFilter.to}`);
-//                         }
-//                         break;
-//                       case "is":
-//                         if (value === null) conditions.push(`${subKey}.is.null`);
-//                         else if (value === true || value === false) conditions.push(`${subKey}.is.${value}`);
-//                         break;
-//                     }
-//                   } else {
-//                     conditions.push(`${subKey}.eq.${subFilter}`);
-//                   }
-//                 });
-//                 return conditions.join(',');
-//               }
-//               return filterGroup;
-//             }).filter(Boolean);
+  requestAnimationFrame(async () => {
+    try {
+      console.log(`🔄 Starting background sync for ${tableName} (${operation})...`);
+      
+
+      let query = supabase.from(tableName).select('*');
+      
+      // Apply filters for query operations
+      if (operation === 'query' && params.filters) {
+        Object.entries(params.filters).forEach(([key, filter]) => {
+          if (typeof filter !== "object" || !filter.op) {
+            // Simple equality filter
+            query = query.eq(key, filter);
+          } else {
+            switch (filter.op.toLowerCase()) {
+              case "=": 
+                query = query.eq(key, filter.value); 
+                break;
+              case "!=": 
+              case "<>": 
+                query = query.neq(key, filter.value); 
+                break;
+              case ">": 
+                query = query.gt(key, filter.value); 
+                break;
+              case ">=": 
+                query = query.gte(key, filter.value); 
+                break;
+              case "<": 
+                query = query.lt(key, filter.value); 
+                break;
+              case "<=": 
+                query = query.lte(key, filter.value); 
+                break;
+              case "like": 
+                query = query.like(key, `%${filter.value}%`); 
+                break;
+              case "ilike": 
+                query = query.ilike(key, `%${filter.value}%`); 
+                break;
+              case "in": 
+                if (Array.isArray(filter.value) && filter.value.length > 0) {
+                  query = query.in(key, filter.value);
+                } else {
+                  console.warn(`⚠️ Empty array provided for IN filter on ${key}`);
+                }
+                break;
+              case "not.in": 
+                if (Array.isArray(filter.value) && filter.value.length > 0) {
+                  query = query.not.in(key, filter.value);
+                }
+                break;
+              case "contains": 
+                  // Handle array contains - value should be one of the array elements
+               if (Array.isArray(filter.value)) {
+                query = query.filter(key, 'cs', JSON.stringify(filter.value));
+              } else {
+                query = query.filter(key, 'cs', JSON.stringify([filter.value]));
+              }
+              break;
+              case "contained": 
+                // Array is contained by column (opposite of contains)
+                query = query.containedBy(key, filter.value);
+                break;
+              case "overlap": 
+                // Arrays have overlapping elements
+                query = query.overlap(key, filter.value);
+                break;
+              case "between": 
+                if (filter.from !== undefined && filter.to !== undefined) {
+                  query = query.gte(key, filter.from).lte(key, filter.to);
+                } else {
+                  console.warn(`⚠️ Between filter requires 'from' and 'to' properties`);
+                }
+                break;
+              case "is": 
+                if (filter.value === null) {
+                  query = query.is(key, null);
+                } else if (filter.value === true || filter.value === false) {
+                  query = query.is(key, filter.value);
+                }
+                break;
+              case "is.not": 
+                if (filter.value === null) {
+                  query = query.not.is(key, null);
+                }
+                break;
+              case "textsearch": 
+                // Full text search
+                query = query.textSearch(key, filter.value);
+                break;
+              case "match": 
+                // Match against multiple fields
+                if (typeof filter.value === 'object') {
+                  Object.entries(filter.value).forEach(([field, value]) => {
+                    query = query.eq(field, value);
+                  });
+                }
+                break;
+              default:
+                console.warn(`⚠️ Unsupported filter operator: ${filter.op}`);
+            }
+          }
+        });
+      }
+      
+      
+      
+      
+      
+      // Apply ordering
+      if (params.orderBy) {
+        const [column, order] = params.orderBy.split(' ');
+        query = query.order(column, { ascending: order?.toLowerCase() === 'asc' });
+        console.log(`🔽 Applying order: ${column} ${order}`);
+      } else {
+        query = query.order('created_at', { ascending: false });
+      }
+
+      // Start a transaction for better performance
+      // await DatabaseService.executeQuery('BEGIN TRANSACTION');
+      
+      try {
+        if (operation === 'get' && params.id) {
+          console.log(`🎯 Fetching single record: ${params.id}`);
+          const { data, error } = await query.eq('id', params.id).single();
+          
+          if (error) {
+            console.error(`❌ Error fetching ${tableName} record ${params.id}:`, error);
+          } else if (data) {
+            const normalized = normalizeForSQLite(tableName, data);
+            const columns = Object.keys(normalized);
+            const placeholders = columns.map(() => '?').join(', ');
+            const values = columns.map(col => normalized[col]);
             
-//             if (orConditions.length > 0) {
-//               query = query.or(orConditions.join(','));
-//             }
-//           } else if (key === '$and' && Array.isArray(filter)) {
-//             // Handle AND operator - apply all filters directly
-//             filter.forEach(filterGroup => {
-//               if (typeof filterGroup === 'object') {
-//                 Object.entries(filterGroup).forEach(([subKey, subFilter]) => {
-//                   if (typeof subFilter !== "object" || !subFilter.op) {
-//                     query = query.eq(subKey, subFilter);
-//                   } else {
-//                     const { op, value } = subFilter;
-//                     switch (op.toLowerCase()) {
-//                       case "=": query = query.eq(subKey, value); break;
-//                       case "!=": query = query.neq(subKey, value); break;
-//                       case ">": query = query.gt(subKey, value); break;
-//                       case ">=": query = query.gte(subKey, value); break;
-//                       case "<": query = query.lt(subKey, value); break;
-//                       case "<=": query = query.lte(subKey, value); break;
-//                       case "like": query = query.like(subKey, `%${value}%`); break;
-//                       case "ilike": query = query.ilike(subKey, `%${value}%`); break;
-//                       case "in": 
-//                         if (Array.isArray(value) && value.length > 0) {
-//                           query = query.in(subKey, value);
-//                         }
-//                         break;
-//                       case "between": 
-//                         if (subFilter.from !== undefined && subFilter.to !== undefined) {
-//                           query = query.gte(subKey, subFilter.from).lte(subKey, subFilter.to);
-//                         }
-//                         break;
-//                       case "is": 
-//                         if (value === null) {
-//                           query = query.is(subKey, null);
-//                         } else if (value === true || value === false) {
-//                           query = query.is(subKey, value);
-//                         }
-//                         break;
-//                       case "contains":
-//                         if (typeof value === 'string') {
-//                           query = query.contains(subKey, value);
-//                         } else if (Array.isArray(value)) {
-//                           query = query.contains(subKey, value);
-//                         }
-//                         break;
-//                       case "containedBy":
-//                         query = query.containedBy(subKey, value);
-//                         break;
-//                     }
-//                   }
-//                 });
-//               }
-//             });
-//           } else {
-//             // Regular filter (AND by default)
-//             if (typeof filter !== "object" || !filter.op) {
-//               query = query.eq(key, filter);
-//             } else {
-//               const { op, value } = filter;
-//               switch (op.toLowerCase()) {
-//                 case "=": query = query.eq(key, value); break;
-//                 case "!=": query = query.neq(key, value); break;
-//                 case ">": query = query.gt(key, value); break;
-//                 case ">=": query = query.gte(key, value); break;
-//                 case "<": query = query.lt(key, value); break;
-//                 case "<=": query = query.lte(key, value); break;
-//                 case "like": query = query.like(key, `%${value}%`); break;
-//                 case "ilike": query = query.ilike(key, `%${value}%`); break;
-//                 case "in": 
-//                   if (Array.isArray(value) && value.length > 0) {
-//                     query = query.in(key, value);
-//                   }
-//                   break;
-//                 case "between": 
-//                   if (filter.from !== undefined && filter.to !== undefined) {
-//                     query = query.gte(key, filter.from).lte(key, filter.to);
-//                   }
-//                   break;
-//                 case "is": 
-//                   if (value === null) {
-//                     query = query.is(key, null);
-//                   } else if (value === true || value === false) {
-//                     query = query.is(key, value);
-//                   }
-//                   break;
-//                 case "contains":
-//                   if (typeof value === 'string') {
-//                     query = query.contains(key, value);
-//                   } else if (Array.isArray(value)) {
-//                     query = query.contains(key, value);
-//                   }
-//                   break;
-//                 case "containedBy":
-//                   query = query.containedBy(key, value);
-//                   break;
-//               }
-//             }
-//           }
-//         });
-//       }
-//       return query;
-//     };
+            await DatabaseService.executeQuery(
+              `INSERT OR REPLACE INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`,
+              values
+            );
+            console.log(`💾 Background updated ${tableName} record: ${params.id}`);
+          }
+        } else {
+          // For query/list operations
+          console.log(`📋 Fetching multiple records for ${tableName}...`);
+          const allData = await fetchAllRemoteDataWithPagination(
+            tableName, 
+            query, 
+            params.maxRecords || 10000
+          );
+          
+          console.log(`📥 Retrieved ${allData.length} records from Supabase for ${tableName}`);
+          
+          if (allData.length > 0) {
+            const insertedCount = await processBulkInsert(tableName, allData);
+            console.log(`💾 Background sync: ${insertedCount}/${allData.length} ${tableName} records saved locally`);
+          } else {
+            console.log(`ℹ️ No data found for ${tableName} with current filters`);
+          }
+        }
+        
+        // await DatabaseService.executeQuery('COMMIT');
+        console.log(`✅ Background sync completed for ${tableName}`);
+        
+      } catch (error) {
+        // await DatabaseService.executeQuery('ROLLBACK');
+        console.error(`❌ Transaction failed for ${tableName}:`, error);
+        throw error;
+      }
+      
+    } catch (error) {
+      console.error(`❌ Background sync failed for ${tableName}:`, error);
+    }
+  });
+};
 
-//     query = applyFilters(query, params.filters);
-//   }
+
+const fetchRemoteData = async (tableName, operation, params = {}) => {
+  // Use requestAnimationFrame for better background execution
   
-//   // Apply ordering
-//   if (params.orderBy) {
-//     const [column, order] = params.orderBy.split(' ');
-//     query = query.order(column, { ascending: order?.toLowerCase() === 'asc' });
-//   } else {
-//     query = query.order('created_at', { ascending: false });
-//   }
 
-//   try {
-//     if (operation === 'get' && params.id) {
-//       console.log(`🎯 Fetching single record: ${params.id}`);
-//       const { data, error } = await query.eq('id', params.id).single();
+      let query = supabase.from(tableName).select('*');
       
-//       if (error) {
-//         console.error(`❌ Error fetching ${tableName} record ${params.id}:`, error);
-//         return null;
-//       }
+      // Apply filters for query operations
+      if (operation === 'query' && params.filters) {
+        Object.entries(params.filters).forEach(([key, filter]) => {
+          if (typeof filter !== "object" || !filter.op) {
+            // Simple equality filter
+            query = query.eq(key, filter);
+          } else {
+            switch (filter.op.toLowerCase()) {
+              case "=": 
+                query = query.eq(key, filter.value); 
+                break;
+              case "!=": 
+              case "<>": 
+                query = query.neq(key, filter.value); 
+                break;
+              case ">": 
+                query = query.gt(key, filter.value); 
+                break;
+              case ">=": 
+                query = query.gte(key, filter.value); 
+                break;
+              case "<": 
+                query = query.lt(key, filter.value); 
+                break;
+              case "<=": 
+                query = query.lte(key, filter.value); 
+                break;
+              case "like": 
+                query = query.like(key, `%${filter.value}%`); 
+                break;
+              case "ilike": 
+                query = query.ilike(key, `%${filter.value}%`); 
+                break;
+              case "in": 
+                if (Array.isArray(filter.value) && filter.value.length > 0) {
+                  query = query.in(key, filter.value);
+                } else {
+                  console.warn(`⚠️ Empty array provided for IN filter on ${key}`);
+                }
+                break;
+              case "not.in": 
+                if (Array.isArray(filter.value) && filter.value.length > 0) {
+                  query = query.not.in(key, filter.value);
+                }
+                break;
+              case "contains": 
+                  // Handle array contains - value should be one of the array elements
+               if (Array.isArray(filter.value)) {
+                query = query.filter(key, 'cs', JSON.stringify(filter.value));
+              } else {
+                query = query.filter(key, 'cs', JSON.stringify([filter.value]));
+              }
+              break;
+              case "contained": 
+                // Array is contained by column (opposite of contains)
+                query = query.containedBy(key, filter.value);
+                break;
+              case "overlap": 
+                // Arrays have overlapping elements
+                query = query.overlap(key, filter.value);
+                break;
+              case "between": 
+                if (filter.from !== undefined && filter.to !== undefined) {
+                  query = query.gte(key, filter.from).lte(key, filter.to);
+                } else {
+                  console.warn(`⚠️ Between filter requires 'from' and 'to' properties`);
+                }
+                break;
+              case "is": 
+                if (filter.value === null) {
+                  query = query.is(key, null);
+                } else if (filter.value === true || filter.value === false) {
+                  query = query.is(key, filter.value);
+                }
+                break;
+              case "is.not": 
+                if (filter.value === null) {
+                  query = query.not.is(key, null);
+                }
+                break;
+              case "textsearch": 
+                // Full text search
+                query = query.textSearch(key, filter.value);
+                break;
+              case "match": 
+                // Match against multiple fields
+                if (typeof filter.value === 'object') {
+                  Object.entries(filter.value).forEach(([field, value]) => {
+                    query = query.eq(field, value);
+                  });
+                }
+                break;
+              default:
+                console.warn(`⚠️ Unsupported filter operator: ${filter.op}`);
+            }
+          }
+        });
+      }
       
-//       if (data) {
-//         const normalized = normalizeForSQLite(tableName, data);
-//         await insertOrReplace(tableName, normalized);
-//         console.log(`💾 Updated ${tableName} record: ${params.id}`);
-//       }
       
-//       return data ? [data] : [];
-//     } else {
-//       console.log(`📋 Fetching multiple records for ${tableName}...`);
-//       const allData = await fetchAllRemoteDataWithPagination(
-//         tableName, 
-//         query, 
-//         params.maxRecords || 10000
-//       );
       
-//       console.log(`📥 Retrieved ${allData.length} records from Supabase for ${tableName}`);
       
-//       if (allData.length > 0) {
-//         await processBulkInsert(tableName, allData);
-//         console.log(`💾 Synced ${allData.length} ${tableName} records locally`);
-//       }
       
-//       return allData;
-//     }
-//   } catch (error) {
-//     console.error(`❌ Remote fetch failed for ${tableName}:`, error);
-//     return [];
-//   }
-// };
+      // Apply ordering
+      if (params.orderBy) {
+        const [column, order] = params.orderBy.split(' ');
+        query = query.order(column, { ascending: order?.toLowerCase() === 'asc' });
+        console.log(`🔽 Applying order: ${column} ${order}`);
+      } else {
+        query = query.order('created_at', { ascending: false });
+      }
 
-// ---------- BUSINESS LOGIC QUERIES ----------
-export async function getActiveBranches() {
-  const cacheKey = getCacheKey('branches', 'getActiveBranches');
-  const cached = getCache(cacheKey);
-  if (cached) return cached;
+      // Start a transaction for better performance
+      // await DatabaseService.executeQuery('BEGIN TRANSACTION');
+      
+      try {
+        if (operation === 'get' && params.id) {
+          console.log(`🎯 Fetching single record: ${params.id}`);
+          const { data, error } = await query.eq('id', params.id).single();
+          
+          if (error) {
+            console.error(`❌ Error fetching ${tableName} record ${params.id}:`, error);
+          } else if (data) {
+            const normalized = normalizeForSQLite(tableName, data);
+            const columns = Object.keys(normalized);
+            const placeholders = columns.map(() => '?').join(', ');
+            const values = columns.map(col => normalized[col]);
+            
+            await DatabaseService.executeQuery(
+              `INSERT OR REPLACE INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`,
+              values
+            );
+            console.log(`💾 Background updated ${tableName} record: ${params.id}`);
+          }
+          return data;
+        } else {
+          // For query/list operations
+          console.log(`📋 Fetching multiple records for ${tableName}...`);
+          const allData = await fetchAllRemoteDataWithPagination(
+            tableName, 
+            query, 
+            params.maxRecords || 10000
+          );
+          
+          console.log(`📥 Retrieved ${allData.length} records from Supabase for ${tableName}`);
+          
+          if (allData.length > 0) {
+            const insertedCount = await processBulkInsert(tableName, allData);
+            console.log(`💾 Background sync: ${insertedCount}/${allData.length} ${tableName} records saved locally`);
+          } else {
+            console.log(`ℹ️ No data found for ${tableName} with current filters`);
+          }
+          return allData
+        }
+        
+        // await DatabaseService.executeQuery('COMMIT');
+        // console.log(`✅ Background sync completed for ${tableName}`);
+        
+      } catch (error) {
+        // await DatabaseService.executeQuery('ROLLBACK');
+        console.error(`❌ Transaction failed for ${tableName}:`, error);
+        // throw error;
+        return null
+      }
+};
 
-  const result = await localQuery('branches', {
-    filters: {
-      is_deleted: false
-    },
-    orderBy: 'name ASC'
-  });
-
-  setCache(cacheKey, result);
-  return result;
-}
-
-export async function getAccountsByBranch(branchId) {
-  const cacheKey = getCacheKey('accounts', 'getAccountsByBranch', { branchId });
-  const cached = getCache(cacheKey);
-  if (cached) return cached;
-
-  const result = await localQuery('accounts', {
-    filters: {
-      branch_id: branchId,
-      is_deleted: false
-    },
-    orderBy: 'name ASC'
-  });
-
-  setCache(cacheKey, result);
-  return result;
-}
-
-export async function getActiveBatches() {
-  const cacheKey = getCacheKey('batches', 'getActiveBatches');
-  const cached = getCache(cacheKey);
-  if (cached) return cached;
-
-  const result = await localQuery('batches', {
-    filters: {
-      is_active: true,
-      is_deleted: false
-    },
-    orderBy: 'purchase_date DESC'
-  });
-
-  setCache(cacheKey, result);
-  return result;
-}
-
-export async function getOrdersByDateRange(startDate, endDate) {
-  const cacheKey = getCacheKey('orders', 'getOrdersByDateRange', { startDate, endDate });
-  const cached = getCache(cacheKey);
-  if (cached) return cached;
-
-  const result = await localQuery('orders', {
-    filters: {
-      order_date: { op: 'between', from: startDate, to: endDate },
-      is_deleted: false
-    },
-    orderBy: 'order_date DESC'
-  });
-
-  setCache(cacheKey, result);
-  return result;
-}
-
-export async function getUsersByRole(role) {
-  const cacheKey = getCacheKey('users', 'getUsersByRole', { role });
-  const cached = getCache(cacheKey);
-  if (cached) return cached;
-
-  const result = await localQuery('users', {
-    filters: {
-      role: role,
-      is_deleted: false,
-      is_activated: true
-    },
-    orderBy: 'first_name ASC'
-  });
-
-  setCache(cacheKey, result);
-  return result;
-}
-
-// ---------- DATABASE SETUP ----------
-export async function createTablesIfNotExists() {
-  try {
-    // The INITIAL_SCHEMA from your schema file will be executed by DatabaseService
-    console.log('✅ Database tables created/verified');
-  } catch (error) {
-    console.error('❌ Error creating tables:', error);
-    throw error;
-  }
-}
-
-// ---------- SYNC FUNCTIONS ----------
-export async function syncWithSupabase(userId) {
-  console.log('🔄 Starting background sync with Supabase...');
-  await SyncManager.sync();
-}
-
-export async function saveUsersToLocal(users) {
-  for (const user of users) {
-    await saveUserToLocal(user);
-  }
-}
 
 // Utility function to verify data was saved
 export const verifyLocalData = async (tableName, expectedCount) => {
@@ -1649,5 +1259,203 @@ export const verifyLocalData = async (tableName, expectedCount) => {
   }
 };
 
-// Export SyncManager for direct access if needed
-export { SyncManager };
+
+
+export async function fetchBettings({ includeAll, date, userNow, user }) {
+  // Convert to Philippine timezone (always consistent with app)
+  const startOfDay = moment(date).tz("Asia/Manila").startOf("day").toISOString();
+  const endOfDay = moment(date).tz("Asia/Manila").endOf("day").toISOString();
+
+  // Realm-like adjustment logic
+  let adjustedStart = startOfDay;
+  let adjustedEnd = endOfDay;
+
+  if (!includeAll && new Date(date) <= new Date(user?.lastSummary)) {
+    adjustedStart = moment().tz("Asia/Manila").add(1, "d").startOf("day").toISOString();
+    adjustedEnd = moment().tz("Asia/Manila").add(1, "d").endOf("day").toISOString();
+  }
+
+  // Filters
+  const filters = {
+    is_deleted: false,
+    input_type: "normal",
+    timestamp: { op: "between", from:  adjustedStart, to: adjustedEnd }
+  };
+
+  if (includeAll) {
+    // Match any uplines containing userNow
+    filters.uplines = { op: "contains", value: userNow };
+  } else {
+    filters.owner_id = userNow;
+  }
+
+  // Execute query via API
+  const items = await api.listBettings({
+    filters,
+    orderBy: "timestamp ASC",
+  });
+
+
+
+  return items;
+};
+
+export async function fetchWinningBettings({ date, user, includeAll = false }) {
+  const table = "bettings";
+  const userNow = user?.id ? String(user.id) : "";
+  const state = await NetInfo.fetch();
+
+  // Define start and end of day range
+  let startOfDay = moment(date).startOf("day").toISOString();
+  let endOfDay = moment(date).endOf("day").toISOString();
+
+  // Realm-like adjustment logic
+  if (!includeAll && new Date(date) <= new Date(user?.last_summary)) {
+    startOfDay = moment().add(1, "d").endOf("day").toISOString();
+    endOfDay = moment().add(1, "d").endOf("day").toISOString();
+  }
+
+  // =============================
+  // ONLINE (Supabase)
+  // =============================
+  if (state.isConnected) {
+    try {
+      let query = supabase
+        .from(table)
+        .select("*")
+        .eq("is_deleted", false)
+        .eq("input_type", "normal")
+        .gt("winning", 0)
+        .gte("timestamp", startOfDay)
+        .lt("timestamp", endOfDay)
+        .order("timestamp", { ascending: false });
+
+      // Apply user filter
+      if (includeAll) {
+        // filter bettings where uplines contain userNow
+        query = query.contains("uplines", [userNow]);
+      } else {
+        query = query.eq("owner_id", userNow);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      // ✅ Sync fetched data to local SQLite
+      for (const row of data) {
+        const normalized = normalizeForSQLite(table, row);
+        await insertOrReplace(table, normalized);
+      }
+
+      return data;
+    } catch (err) {
+      console.warn("⚠️ Supabase fetchWinningBettings failed, using local fallback:", err);
+    }
+  }
+
+  // =============================
+  // OFFLINE (SQLite)
+  // =============================
+  const params = [startOfDay, endOfDay];
+  let whereClause = `
+    WHERE is_deleted = 0 
+    AND input_type = 'normal'
+    AND winning > 0
+    AND timestamp >= ? 
+    AND timestamp < ?
+  `;
+
+  if (includeAll && userNow) {
+    whereClause += ` AND uplines LIKE '%' || ? || '%'`;
+    params.push(userNow);
+  } else if (userNow) {
+    whereClause += ` AND owner_id = ?`;
+    params.push(userNow);
+  }
+
+  const query = `SELECT * FROM ${table} ${whereClause} ORDER BY timestamp DESC;`;
+
+  const localRes = await DatabaseService.executeQuery(query, params);
+  const rows = [];
+  for (let i = 0; i < localRes.rows.length; i++) {
+    rows.push(localRes.rows.item(i));
+  }
+
+  return rows;
+}
+
+export async function getCurrentUser({ user, collector }) {
+  const userNow = user?.email ? user.email : collector ? collector : "";
+
+  return localQuery('users', {
+    filters: {
+      email: { op: '=', value: userNow },
+    },
+  });
+}
+
+/**
+ * 2️⃣ Get deleted users (excluding authenticated user)
+ * Realm: users.filtered('isDeleted == true && email != $0')
+ */
+export async function getDeletedUsers({ authenticatedUser }) {
+  return localQuery('users', {
+    filters: {
+      is_deleted: { op: '=', value: true },
+      email: { op: '!=', value: authenticatedUser },
+    },
+  });
+}
+
+/**
+ * 3️⃣ Get coordinators (excluding authenticated user)
+ * Realm: users.filtered('role == "coordinator" && isDeleted == false && email != $0')
+ */
+export async function getCoordinators({ authenticatedUser }) {
+  return localQuery('users', {
+    filters: {
+      role: { op: '=', value: 'coordinator' },
+      is_deleted: { op: '=', value: false },
+      email: { op: '!=', value: authenticatedUser },
+    },
+  });
+}
+
+
+
+
+/**
+ * 4️⃣ Get tellers (excluding authenticated user)
+ * Realm: users.filtered('role == "teller" && isDeleted == false && email != $0')
+ */
+export async function getTellers({ authenticatedUser }) {
+  return localQuery('users', {
+    filters: {
+      role: { op: '=', value: 'teller' },
+      is_deleted: { op: '=', value: false },
+      email: { op: '!=', value: authenticatedUser },
+    },
+  });
+}
+
+export async function getBettingByTicketNo(ticketNo) {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `SELECT * FROM bettings WHERE ticket_no = ? LIMIT 1;`,
+        [ticketNo],
+        (txObj, resultSet) => {
+          const rows = [];
+          for (let i = 0; i < resultSet.rows.length; i++) {
+            rows.push(resultSet.rows.item(i));
+          }
+          resolve(rows);
+        },
+        (txObj, error) => {
+          console.error('Error fetching betting by ticket_no:', error);
+          reject(error);
+        }
+      );
+    });
+  });
+}

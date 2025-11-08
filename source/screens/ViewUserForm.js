@@ -90,7 +90,6 @@ const ViewUserForm = ({ route, navigation }) => {
     dispatch({ type: SET_LOADING })
     let userToUpdate = realm.objectForPrimaryKey(Users, BSON.ObjectId(userConfig._id)); // search for a realm object with a primary key that is an objectId
 
-    console.log(values, "user to updateuser to updateuser to updateuser to updateuser to updateuser to update!")
     
     try {
       // if (userToUpdate) {
@@ -136,9 +135,6 @@ const ViewUserForm = ({ route, navigation }) => {
 
   }, [userConfig])
 
-  let maxCom = user ? user?.comRate - 5 : 0;
-  let isWin200 = getConfiguration(user, 'withWin200');
-  let printHeader = getConfiguration(user, 'printHeader')
 
   return (
     <SafeAreaView style={{ ...styles.wrapper }}>

@@ -70,7 +70,6 @@ let keyPad = [
 export default function TicketForm({ navigation }) {
     // const {  api, dataVersion } = useOfflineSync();
     const { collector, user, selectedUser } = useSelector(({ user }) => user);
-    const { masterCombinations } = useSelector(({ betting }) => betting);
     const { dataVersion } = useSelector(({ sync }) => sync);
     const dispatch = useDispatch()
     const [amountVal, setAmountVal] = useState('')
@@ -96,7 +95,7 @@ export default function TicketForm({ navigation }) {
     const [modalMessage, setModalMessage] = useState('');
     const [pendingBet, setPendingBet] = useState(null);
     const [draws, setDraws] = useState([])
-    const [own_user, setOwnUser] = useState(null);
+    const [own_user, setOwnUser] = useState(null)
     const [combinations, setCombinations] = useState([])
 
     const current = new Date();
@@ -303,6 +302,12 @@ console.log(comb, isSoldOut, item, 'ADD BET')
 
         await AsyncStorage.setItem('dateTimeNumber', currentDateTime);
     }
+    
+    
+    console.log()
+    
+    
+    
     // setLoading(false)
     const handleSubmit =  async (data) => {
         let gross = 0;
@@ -650,7 +655,8 @@ console.log(comb, isSoldOut, item, 'ADD BET')
     const initData = async () => {
 
     const { start_of_day, end_of_day } = getDayRange(new Date())
-    
+    let selectUser = await fetchUser(selectedUser?.email)
+
 
     let combs = await dispatch(fetchMasterCombinations());
         
@@ -663,7 +669,7 @@ console.log(comb, isSoldOut, item, 'ADD BET')
 
     
       
-
+    setOwnUser(selectUser)
     setDraws(localDraws)
     setCombinations(combs)
     } 
@@ -678,6 +684,7 @@ console.log(comb, isSoldOut, item, 'ADD BET')
     useEffect(() => {
     if(selectedUser?.id){
     initData();
+    
     }
     }, [selectedUser?.id, dataVersion]);
     
@@ -698,7 +705,7 @@ console.log(comb, isSoldOut, item, 'ADD BET')
 
     let curDraw = (draws.find(a => !a.combination) || ((hoursNow == 13 && minNow >= 55) || (hoursNow == 16 && minNow >= 55) || (hoursNow == 20 && minNow >= 55)));
     
-    console.log(comb, 'COMB')
+    console.log(comb, 'COMB', own_user)
 
 
 

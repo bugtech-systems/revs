@@ -23,6 +23,7 @@ const drawTimes = [
 
 
 const SoldOuts = ({ navigation }) => {
+  const { dataVersion } = useSelector(({ sync }) => sync);
   const { selectedUser, user } = useSelector(({ user }) => user);
   const { confirmationModal } = useSelector(({ ui }) => ui);
   const dispatch = useDispatch();
@@ -55,10 +56,12 @@ const SoldOuts = ({ navigation }) => {
   const fetchItems = useCallback(async () => {
     if (!ownUser) return;
     
-    const { start_of_day, end_of_day  } = getDayRange(startDate, endDate)
-
-    // Start and end of the day
+    // const { start_of_day, end_of_day  } = getDayRange(moment(startDate).subtract(10, 'h'), endDate)
+    const start_of_day = moment(startDate).startOf('day').toISOString();
+    const end_of_day = moment(endDate).endOf('day').toISOString();
     
+    // Start and end of the day
+    console.log(start_of_day, end_of_day, 'dattte')
   // console.log(start_of_day, end_of_day, 'date range')
     
     let filters = {
@@ -145,7 +148,6 @@ const SoldOuts = ({ navigation }) => {
     const card2pm = draws.find(a => a.game_time === '2pm');
     const card5pm = draws.find(a => a.game_time === '5pm');
     const card9pm = draws.find(a => a.game_time === '9pm');
-console.log(card2pm, card5pm, card2pm, 'ggddr')
 
     if (!card2pm && !card5pm && !card9pm) return '2pm';
     if (card2pm && !card5pm) return '5pm';
@@ -353,10 +355,11 @@ console.log(gameTime, 'GME')
       <TouchableOpacity
         onPress={handleSoldOut}
         style={{
-          position: 'absolute',
+          // position: 'absolute',
           bottom: 20,
-          left: SIZES.padding,
-          right: SIZES.padding,
+          // left: SIZES.padding,
+          // right: SIZES.padding,
+          margin: SIZES.padding,
           padding: 12,
           backgroundColor: COLORS.primary,
           borderRadius: 8,

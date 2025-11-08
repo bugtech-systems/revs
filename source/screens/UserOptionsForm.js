@@ -5,6 +5,7 @@ import SQLite from 'react-native-sqlite-storage'
 import { SET_LOADING, SET_USER_CONFIG, STOP_LOADING } from '../redux/actions/types'
 import supabase from '../utils/supabaseClient'
 import { COLORS, SIZES } from '../constants'
+import { fetchUserByEmail, updateUser } from '../redux/actions/user.actions'
 
 // 🔹 Default configuration template
 const DEFAULT_CONFIG = [
@@ -28,14 +29,30 @@ const DEFAULT_CONFIG = [
 
 const db = SQLite.openDatabase({ name: 'app.db', location: 'default' })
 
-const UserOptionsForm = () => {
+const UserOptionsForm = ({ navigation, route }) => {
+    const { email } = route?.params ? JSON.parse(route?.params) : {};
   const dispatch = useDispatch()
   const { selectedUser } = useSelector(({ user }) => user);
-  
+  const [userConfig, setUserConfig] = useState(null);
   const [mergedConfig, setMergedConfig] = useState([])
   
   let handleConfigs = async () => {
-  
+      let user = await dispatch(fetchUserByEmail(email))
+    if (user && user?.configuration) {
+      const userConfigMap = Object.fromEntries(
+        user.configuration.map(cfg => [cfg.title, cfg])
+      )
+      const merged = DEFAULT_CONFIG.map(def => ({
+        ...def,
+        ...(userConfigMap[def.title] || {}),
+      }))
+      setMergedConfig(merged)
+      setUserConfig(user)
+    } else {
+      setMergedConfig(DEFAULT_CONFIG)
+    }
+    
+    
   
   }
 
@@ -43,45 +60,26 @@ const UserOptionsForm = () => {
 
   // 🔹 Merge Supabase or SQLite configuration with defaults
   useEffect(() => {
-    if (userConfig?.configuration) {
-      const userConfigMap = Object.fromEntries(
-        userConfig.configuration.map(cfg => [cfg.title, cfg])
-      )
-      const merged = DEFAULT_CONFIG.map(def => ({
-        ...def,
-        ...(userConfigMap[def.title] || {}),
-      }))
-      setMergedConfig(merged)
-    } else {
-      setMergedConfig(DEFAULT_CONFIG)
-    }
-  }, [selectedUser])
+      if(email){
+        handleConfigs()
+      }
+  }, [email])
 
   // 🔹 Toggle Configuration Handler
   const handleConfiguration = async (type) => {
     dispatch({ type: SET_LOADING })
 
     try {
-      const configIndex = mergedConfig.findIndex(c => c.title === type)
-      const oldConfigs = [...mergedConfig]
+      const configIndex = userConfig?.configuration.findIndex(c => c.title === type)
+      const oldConfigs = [...userConfig?.configuration]
       const updatedConfig = { ...oldConfigs[configIndex], isCheck: !oldConfigs[configIndex].isCheck }
       oldConfigs[configIndex] = updatedConfig
 
       // 🔹 Update local SQLite
-      await updateLocalConfig(userConfig._id, type, updatedConfig.isCheck)
-
-      // 🔹 Update remote Supabase
-      await updateSupabaseConfig(userConfig._id, oldConfigs)
+     let newUser = await  dispatch(updateUser(userConfig.id, {configuration: oldConfigs}))
 
       // 🔹 Update Redux state
-      dispatch({
-        type: SET_USER_CONFIG,
-        payload: {
-          ...userConfig,
-          configuration: oldConfigs,
-        },
-      })
-
+      setUserConfig(newUser)
       setMergedConfig(oldConfigs)
     } catch (error) {
       console.error('Error updating configuration:', error)
@@ -91,45 +89,6 @@ const UserOptionsForm = () => {
     }
   }
 
-  // 🔹 Update SQLite (Offline)
-  const updateLocalConfig = (userId, type, isCheck) => {
-    return new Promise((resolve, reject) => {
-      db.transaction(tx => {
-        tx.executeSql(
-          'CREATE TABLE IF NOT EXISTS user_config (user_id TEXT PRIMARY KEY, configuration TEXT)',
-          [],
-        )
-        tx.executeSql(
-          'SELECT configuration FROM user_config WHERE user_id = ?',
-          [userId],
-          (_, results) => {
-            if (results.rows.length > 0) {
-              const existing = JSON.parse(results.rows.item(0).configuration)
-              const updated = existing.map(cfg =>
-                cfg.title === type ? { ...cfg, isCheck } : cfg
-              )
-              tx.executeSql(
-                'UPDATE user_config SET configuration = ? WHERE user_id = ?',
-                [JSON.stringify(updated), userId],
-                () => resolve(),
-                (_, err) => reject(err)
-              )
-            } else {
-              const newConfig = DEFAULT_CONFIG.map(cfg =>
-                cfg.title === type ? { ...cfg, isCheck } : cfg
-              )
-              tx.executeSql(
-                'INSERT INTO user_config (user_id, configuration) VALUES (?, ?)',
-                [userId, JSON.stringify(newConfig)],
-                () => resolve(),
-                (_, err) => reject(err)
-              )
-            }
-          },
-        )
-      })
-    })
-  }
 
   // 🔹 Update Supabase (Online)
   const updateSupabaseConfig = async (userId, configuration) => {
@@ -177,7 +136,7 @@ const UserOptionsForm = () => {
     </View>
   )
 
-  if (!userConfig) return null
+
 
   return (
     <SafeAreaView style={[styles.wrapper, { backgroundColor: COLORS.white }]}>
