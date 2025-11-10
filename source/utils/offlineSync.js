@@ -32,7 +32,7 @@ export const TABLES = [
 
 // Cache for frequently accessed data
 const queryCache = new Map();
-const CACHE_TTL = 3 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 2 * 60 * 1000; // 5 minutes
 
 // ---------- INIT ----------
 export async function init(userId) {
@@ -90,7 +90,10 @@ export function clearCacheForTable(tableName) {
 export const fetchUser = async (email) => {
   try {
 
-  
+  const cacheKey = getCacheKey('users', 'get', { email });
+  const cached = getCache(cacheKey);
+  if (cached) return cached;
+
   
   
   let user = null;
@@ -142,6 +145,8 @@ if(user){
     //   await syncRemoteDataInBackground('users', 'query', {filters: {email: email}});
     // }
   
+    
+    setCache(cacheKey, userWithUplines);
     return userWithUplines;
   } catch (err) {
     console.log('Supabase fetchUser error, falling back to local', err);

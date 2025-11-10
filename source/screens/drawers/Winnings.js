@@ -240,7 +240,7 @@ const Winnings = ({ navigation }) => {
     if (includeAll) {
       filters = {
         ...filters,
-        uplines: { op: "json_contains_batch", value: [String(selectedCollector.id)] },
+        uplines: { op: "contains", value: [selectedCollector.id] },
         timestamp: { op: "between", from: start_of_day, to: end_of_day },
         winning: {op: ">", value: 0},
         winning: {op: "!=", value: "0"}

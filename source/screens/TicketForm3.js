@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { StyleSheet, Text, Keyboard, View, ScrollView, TouchableOpacity, FlatList, TextInput, Image, Button, TouchableWithoutFeedback, Alert, Modal } from 'react-native'
+import { StyleSheet, Text, Keyboard, View, ScrollView, TouchableOpacity, FlatList, TextInput, Image, Button, TouchableWithoutFeedback, Alert, ActivityIndicator } from 'react-native'
 import moment, { tz } from 'moment-timezone';
 import { useSelector, useDispatch } from 'react-redux';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -9,6 +9,16 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, icons } from '../constants';
 import { api, fetchUser, normalizeValue, nowISO } from '../utils/offlineSync';
 import Geolocation from 'react-native-geolocation-service';
+
+
+const LoadingIndicator = ({ message = "Initializing App..." }) => {
+  return (
+    <View style={styles.activityContainer}>
+      <ActivityIndicator size="large" color="#007AFF" />
+      <Text style={styles.loadingText}>{message}</Text>
+    </View>
+  );
+};
 
 
 let keyPad = [
@@ -66,7 +76,7 @@ let keyPad = [
 export default function TicketForm3({ navigation, route }) {
   const ticketDetails = JSON.parse(route.params);
 
-  const { collector, user } = useSelector(({ user }) => user);
+  const { user } = useSelector(({ user }) => user);
   const [amountVal, setAmountVal] = useState('')
   const [time, setSelectedTime] = useState(ticketDetails?.game_time || "2pm")
   const [arrayBetting, setBetting] = useState([]);
@@ -90,8 +100,6 @@ export default function TicketForm3({ navigation, route }) {
   const [combinations, setCombinations] = useState([])
 
   const current = new Date();
-  const hoursNow = current.getHours();
-  const minNow = current.getMinutes();
 
    function getTimeRange() {
         const currentTime = new Date();
@@ -322,7 +330,7 @@ export default function TicketForm3({ navigation, route }) {
                             console.log(drawResult, 'DRAW RESULT')
                         return;
                         } */
-                if (collector == own_user?.email) {
+            /*     if (collector == own_user?.email) {
                     Geolocation.getCurrentPosition(
                        async (position) => {
                             let { coords } = position;
@@ -341,7 +349,7 @@ export default function TicketForm3({ navigation, route }) {
                         },
                         { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
                     );
-                }
+                } */
               
               
 
@@ -365,7 +373,8 @@ export default function TicketForm3({ navigation, route }) {
                         // winning: 0,
                         combinations: combinations,
                         commissions: newComms,
-                        uplines: newUplines,
+                        // uplines: newUplines,
+                        is_validated: null,
                         updated_at: new Date().toISOString()
                     }
                      
@@ -375,8 +384,7 @@ export default function TicketForm3({ navigation, route }) {
                     setBetting([]);
                     setDate(new Date());
                     console.log(updated, 'UPDATEDD')
-                    setDataVersion(dataVersion + 1);
-                    navigation.navigate('VoidScreen', JSON.stringify(updated))
+                    navigation.navigate('VoidScreen', JSON.stringify({...ticketDetails, ...updated}))
                 // })
             } else {
                 Alert.alert('No tickets to submit')
@@ -523,32 +531,31 @@ export default function TicketForm3({ navigation, route }) {
 
     const initData = async (id) => {
     
-    const { start_of_day, end_of_day } = getDayRange(new Date())
 
-                 await api.listUsers({
+     /*             await api.listUsers({
                           filters: {is_deleted: false}
-                      })
+                      }) */
       
      
       let own = await api.getUser(id);
       let selectUser = await fetchUser(own?.email)
-    console.log(selectUser, 'SELLEECT USER')
+    console.log(own, selectUser, 'SELLEECT USER')
      setOwnUser(selectUser)
 
     
-       let localDraws = await api.listDraws({
-       filters: { 
-        draw_date:  { 
-           op: "between",
-        from: start_of_day,
-        to: end_of_day,
-        }}
-      });
+      //  let localDraws = await api.listDraws({
+      //  filters: { 
+      //   draw_date:  { 
+      //      op: "between",
+      //   from: start_of_day,
+      //   to: end_of_day,
+      //   }}
+      // });
 
 
-    let localCombinations = await api.listMasterCombinations();
-    setDraws(localDraws)
-    setCombinations(localCombinations)
+    // let localCombinations = await api.listMasterCombinations();
+    // setDraws(localDraws)
+    // setCombinations(localCombinations)
     }
 
 
@@ -561,7 +568,9 @@ export default function TicketForm3({ navigation, route }) {
       let { combinations, game_time, owner_id } = ticketDetails;
         
       // setDate(new Date(ticketDetails.timestamp))
-      initData(owner_id)
+      
+        initData(owner_id)
+      
     
       if (combinations && combinations.length) {
         let newArr = combinations.map(item => {
@@ -570,11 +579,12 @@ export default function TicketForm3({ navigation, route }) {
         })
         setBetting(newArr)
         setSelectedTime(game_time)
-
+        setLoading(false);
       }
     } else {
       console.log(ticketDetails, 'TICKET2')
       setBetting([])
+      setLoading(false);
     }
     return () => {
       setLoading(false);
@@ -596,7 +606,15 @@ export default function TicketForm3({ navigation, route }) {
 
   let curDraw = false
 
-console.log(own_user, loading, 'statuss', ticketDetails.owner_id, ticketDetails.timestamp)
+console.log(own_user, loading, 'statuss', ticketDetails, ticketDetails.timestamp)
+
+
+
+
+  // if (loading) {
+  //   return <LoadingIndicator message="Loading..." />;
+  // }
+
 
   return (
     <SafeAreaProvider style={{ flexGrow: 1 }}>

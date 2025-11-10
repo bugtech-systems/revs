@@ -8,7 +8,7 @@ import icons from '../constants/icons';
 import { fixDateTimezone, formatNumber, getConfiguration, getDayRange, isDateGreater } from '../utils/helpers';
 import { fetchUserByEmail, updateUser } from '../redux/actions/user.actions';
 import { fetchBettings, fetchDraws } from '../redux/actions/bettingActions';
-import { SET_ACTIVE_USER } from '../redux/actions/types';
+import { SET_ACTIVE_USER, SET_COLLECTOR } from '../redux/actions/types';
 // import { useOffline } from '../context/OfflineProvider';
 // import { useOfflineSync } from '../context/OfflineSyncProvider';
 
@@ -76,7 +76,7 @@ const Dashboard = ({ navigation }) => {
   
   let init = async () => {
       
-      if (!collector) return;
+      if (!collector) return
 
 		
 	const { start_of_day, end_of_day  } = getDayRange(date)
@@ -129,14 +129,27 @@ let filters = {
   
       setBettings(localBettings);
   }
+  
+  const initUser = async () => {
+          let newUser = await dispatch(fetchUserByEmail(user?.email));
+          dispatch({type: SET_COLLECTOR, payload: newUser.email})
+          dispatch({type: SET_ACTIVE_USER, payload: newUser})
+  
+  
+  }
+  
+  
 
   useEffect(() => {
     request_notification_permission();
-  }, []);
+    if(user){
+    initUser();
+    }
+  }, [user?.id]);
   
   useEffect(() => {
    init();
-  }, [date, includeAll, selectedUser, collector, dataVersion]);
+  }, [date, includeAll, collector, dataVersion]);
 
   const renderHeader = () => (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>

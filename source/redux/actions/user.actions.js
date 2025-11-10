@@ -314,8 +314,8 @@ export const initializeAuth = () => async (dispatch) => {
       dispatch(setUser(userData));
       dispatch(setAuthenticated());
       dispatch(setLoading(false));
-      dispatch({type: SET_COLLECTOR, payload: userData.email})
-      dispatch({type: SET_ACTIVE_USER, payload: userData})
+      // dispatch({type: SET_COLLECTOR, payload: userData.email})
+      // dispatch({type: SET_ACTIVE_USER, payload: userData})
 
       console.log('User authenticated successfully');
       return userData;
