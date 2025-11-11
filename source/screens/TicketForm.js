@@ -222,14 +222,14 @@ export default function TicketForm({ navigation }) {
 
         let isSoldOut = false
         
-        if(comb){
-             isSoldOut = checkSoldOut(comb, combination, target, ramble);
-        }
+//         if(comb){
+//              isSoldOut = checkSoldOut(comb, combination, target, ramble);
+//         }
         
-console.log(comb, isSoldOut, item, 'ADD BET')
+// console.log(comb, isSoldOut, item, 'ADD BET')
         
 
-        if (isSoldOut) return;
+//         if (isSoldOut) return;
 
 
 
@@ -243,8 +243,8 @@ console.log(comb, isSoldOut, item, 'ADD BET')
             return;
         }
 
-        let totalS = comb?.straight_total + Number(amountTarget);
-        let totalR = comb?.ramble_total + Number(amountRamble);
+        // let totalS = comb?.straight_total + Number(amountTarget);
+        // let totalR = comb?.ramble_total + Number(amountRamble);
 
 
         if (((comb.length > 1 && comb.length < 300) && (!comb[0]?.straight_total && !comb[0]?.ramble_total))) {
@@ -304,7 +304,6 @@ console.log(comb, isSoldOut, item, 'ADD BET')
     }
     
     
-    console.log()
     
     
     
@@ -684,16 +683,9 @@ console.log(comb, isSoldOut, item, 'ADD BET')
     useEffect(() => {
     if(selectedUser?.id){
     initData();
-    
     }
     }, [selectedUser?.id, dataVersion]);
     
-
-    
-        
-
-
-
 
     
  
@@ -705,7 +697,6 @@ console.log(comb, isSoldOut, item, 'ADD BET')
 
     let curDraw = (draws.find(a => !a.combination) || ((hoursNow == 13 && minNow >= 55) || (hoursNow == 16 && minNow >= 55) || (hoursNow == 20 && minNow >= 55)));
     
-    console.log(comb, 'COMB', own_user)
 
 
 
