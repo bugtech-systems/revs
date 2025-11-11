@@ -9,6 +9,7 @@ import { fixDateTimezone, formatNumber, getConfiguration, getDayRange, isDateGre
 import { fetchUserByEmail, updateUser } from '../redux/actions/user.actions';
 import { fetchBettings, fetchDraws } from '../redux/actions/bettingActions';
 import { SET_ACTIVE_USER, SET_COLLECTOR } from '../redux/actions/types';
+import Config from 'react-native-config';
 // import { useOffline } from '../context/OfflineProvider';
 // import { useOfflineSync } from '../context/OfflineSyncProvider';
 
@@ -407,6 +408,12 @@ console.log(bettings, 'BETTINGS', selectedUser)
 					:
 					null
 					} 
+
+					<View style={{ justifyContent: 'flex-end', alignItems: 'center', marginBottom: SIZES.padding * 3 }}>
+									  <Text style={{ padding: 6, color: COLORS.secondaryTransparent2, fontSize: 12, fontWeight: '500', marginTop: 10 }}>
+										Current Version {Config.APP_VERSION}
+									  </Text>
+									</View>
 			</ScrollView>
 		</SafeAreaView>
   );

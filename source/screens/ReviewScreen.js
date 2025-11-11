@@ -219,6 +219,11 @@ console.log(ticketDetails, 'TICKET INFO')
         renderItem={renderBet}
         keyExtractor={(item, index) => index.toString()}
       />
+            {/* <TouchableOpacity onPress={() => navigation.navigate('ViewShot', { data: ticketDetails})}>
+              <Text>
+                View Shot
+              </Text>
+            </TouchableOpacity> */}
       <View style={styles.buttonRow}>
         {(user?.is_admin && !ticketDetails?.is_deleted) ?
           <TouchableOpacity

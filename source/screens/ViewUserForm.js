@@ -8,6 +8,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import LargeInput from '../components/LargeInput'
 import LinearGradient from 'react-native-linear-gradient'
 import { SET_LOADING, SET_USER_CONFIG, STOP_LOADING } from '../redux/actions/types'
+import { fetchUserByEmail, updateUser } from '../redux/actions/user.actions'
 
 
 
@@ -42,6 +43,33 @@ const ViewUserForm = ({ route, navigation }) => {
   // console.log(userConfig, "THE USER CAN BE CONFIG")
 
 
+  const fetchUserDetails = async () => {
+    try {
+
+      if (userDetails?.email) {
+        let fetchUser = await dispatch(fetchUserByEmail(userDetails.email))
+
+      setValues({
+        ...values,
+        first_name: fetchUser.first_name,
+        last_name: fetchUser.last_name,
+        device_id: fetchUser?.device_id,
+        mobile: fetchUser.mobile,
+        address: fetchUser.address,
+        username: String(fetchUser.email).split('@')[0],
+        password: fetchUser.password,
+        role: fetchUser.role,
+        commission: fetchUser.commission,
+        receipt_template: fetchUser?.receipt_template,
+        win_straight: getConfiguration(fetchUser, 'winStraight')?.value,
+        win200: getConfiguration(fetchUser, 'withWin200')?.value
+      })
+      }
+      
+    } catch (err) {
+      console.log(err)
+    }
+  }
 
 
 
@@ -86,49 +114,57 @@ const ViewUserForm = ({ route, navigation }) => {
   }
 
 
-  const handleSubmit = useCallback(async () => {
-    dispatch({ type: SET_LOADING })
-    let userToUpdate = realm.objectForPrimaryKey(Users, BSON.ObjectId(userConfig._id)); // search for a realm object with a primary key that is an objectId
+const handleSubmit = async () => {
+  try {
+    dispatch({ type: SET_LOADING });
 
-    
-    try {
-      // if (userToUpdate) {
-      //   await realm.write(async () => {
-      //     userToUpdate.first_name = values?.first_name;
-      //     userToUpdate.last_name = values?.last_name;
-      //     userToUpdate.mobile = values?.mobile;
-      //     userToUpdate.address = values?.address;
-      //     userToUpdate.role = String(values?.type).toLowerCase();
-      //     userToUpdate.receipt_template = values.receipt_template;
-      //   })
-      // }
-    } catch (error) {
-      console.log(error, 'Something went wrong.')
-      return;
+    // 1️⃣ Clone the current configuration
+    let currentConfigs = userConfig?.configuration || [];
+
+    // 2️⃣ Update or insert the winStraight config
+    let updatedConfigs = currentConfigs.map(cfg =>
+      cfg.title === 'winStraight'
+        ? { ...cfg, value: values.win_straight }
+        : cfg
+    );
+
+    // If not found, add it
+    if (!updatedConfigs.some(cfg => cfg.title === 'winStraight')) {
+      updatedConfigs.push({
+        title: 'winStraight',
+        label: 'Win Straight',
+        description: 'Winning straight multiplier',
+        value: values.win_straight,
+      });
     }
-    dispatch({ type: STOP_LOADING })
+
+    // 3️⃣ Include updated configuration in payload
+    const payload = {
+      ...values,
+      configuration: updatedConfigs,
+    };
+
+    // 4️⃣ Save to backend
+    let updatedUser = await dispatch(updateUser(userConfig.id, payload));
+
+    // 5️⃣ Update Redux and local state
+    dispatch({ type: SET_USER_CONFIG, payload: updatedUser });
+    setValues({ ...values, win_straight: values.win_straight });
+
+    console.log('✅ User updated:', updatedUser);
+  } catch (error) {
+    console.log(error, 'Something went wrong.');
+    Alert.alert('Error', 'Failed to update user.');
+  } finally {
+    dispatch({ type: STOP_LOADING });
     navigation.goBack();
-  }, [values])
+  }
+};
 
 
 
   useEffect(() => {
-
-    setValues({
-      ...values,
-      first_name: userDetails.first_name,
-      last_name: userDetails.last_name,
-      device_id: userDetails?.device_id,
-      mobile: userDetails.mobile,
-      address: userDetails.address,
-      username: String(userDetails.email).split('@')[0],
-      password: userDetails.password,
-      role: userDetails.role,
-      commission: userDetails.commission,
-      receipt_template: userDetails?.receipt_template,
-      win_straight: getConfiguration(userDetails, 'winStraight')?.value,
-      win200: getConfiguration(userDetails, 'withWin200')?.value
-    })
+    fetchUserDetails()
 
     dispatch({ type: STOP_LOADING })
 
@@ -273,10 +309,12 @@ const ViewUserForm = ({ route, navigation }) => {
 
         <View style={{ padding: 6, flexDirection: 'row', justifyContent: 'space-between' }}>
           <LargeInput
-            editable={false}
+            editable={true}
+            keyboardType={'numeric'}
             label={'Win Straight'}
-            onChangeText={handleChanges('winStraight')}
-            value={values.win_straight ? values.win_straight : '0'}
+            onChangeText={(text) => setValues(prev => ({ ...prev, win_straight: text }))}
+            value={values.win_straight}
+            placeholder={'0'}
             inputLength={'48%'}
           />
           <LargeInput
@@ -291,7 +329,7 @@ const ViewUserForm = ({ route, navigation }) => {
 
         <View style={{ padding: 6, flexDirection: 'row', justifyContent: 'space-between' }}>
           <SelectDropdown
-            data={[{ title: 'Samar' }, { title: 'Tacloban' }]}
+            data={[{ title: 'Samar' }, { title: 'Eastern Samar' }, { title: 'Tacloban' }]}
             defaultValue={
               values.receipt_template
                 ? { title: values.receipt_template } // If exists, set object with matching title

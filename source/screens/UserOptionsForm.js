@@ -66,28 +66,121 @@ const UserOptionsForm = ({ navigation, route }) => {
   }, [email])
 
   // 🔹 Toggle Configuration Handler
-  const handleConfiguration = async (type) => {
-    dispatch({ type: SET_LOADING })
+  // const handleConfiguration = async (type) => {
+  //   dispatch({ type: SET_LOADING })
 
-    try {
-      const configIndex = userConfig?.configuration.findIndex(c => c.title === type)
-      const oldConfigs = [...userConfig?.configuration]
-      const updatedConfig = { ...oldConfigs[configIndex], isCheck: !oldConfigs[configIndex].isCheck }
-      oldConfigs[configIndex] = updatedConfig
+  //   try {
+  //     const configIndex = userConfig?.configuration.findIndex(c => c.title === type)
+  //     const oldConfigs = [...userConfig?.configuration]
+  //     const updatedConfig = { ...oldConfigs[configIndex], isCheck: !oldConfigs[configIndex].isCheck }
+  //     oldConfigs[configIndex] = updatedConfig
 
-      // 🔹 Update local SQLite
-     let newUser = await  dispatch(updateUser(userConfig.id, {configuration: oldConfigs}))
+  //     // 🔹 Update local SQLite
+  //    let newUser = await  dispatch(updateUser(userConfig.id, {configuration: oldConfigs}))
 
-      // 🔹 Update Redux state
-      setUserConfig(newUser)
-      setMergedConfig(oldConfigs)
-    } catch (error) {
-      console.error('Error updating configuration:', error)
-      Alert.alert('Error', 'Failed to update configuration.')
-    } finally {
-      dispatch({ type: STOP_LOADING })
+  //     // 🔹 Update Redux state
+  //     setUserConfig(newUser)
+  //     setMergedConfig(oldConfigs)
+  //   } catch (error) {
+  //     console.error('Error updating configuration:', error)
+  //     Alert.alert('Error', 'Failed to update configuration.')
+  //   } finally {
+  //     dispatch({ type: STOP_LOADING })
+  //   }
+  // }
+
+//   const handleConfiguration = async (type) => {
+//   dispatch({ type: SET_LOADING });
+
+//   try {
+//     // Copy current configuration safely
+//     const currentConfigs = userConfig?.configuration || [];
+
+//     // Find if toggle exists in user configuration
+//     const configIndex = currentConfigs.findIndex(c => c.title === type);
+//     let updatedConfigs;
+
+//     if (configIndex !== -1) {
+//       // Update existing toggle
+//       updatedConfigs = currentConfigs.map((cfg, i) =>
+//         i === configIndex ? { ...cfg, isCheck: !cfg.isCheck } : cfg
+//       );
+//     } else {
+//       // Add new toggle if not in user configuration
+//       const defaultItem = DEFAULT_CONFIG.find(cfg => cfg.title === type);
+//       updatedConfigs = [...currentConfigs, { ...defaultItem, isCheck: true }];
+//     }
+
+//     // 🔹 Update in Redux and database
+//     const newUser = await dispatch(updateUser(userConfig.id, { configuration: updatedConfigs }));
+
+//     // 🔹 Merge full config with defaults (to keep all texts)
+//     const configMap = Object.fromEntries(updatedConfigs.map(c => [c.title, c]));
+//     const merged = DEFAULT_CONFIG.map(def => ({
+//       ...def,
+//       ...(configMap[def.title] || {}),
+//     }));
+
+//     // 🔹 Update local states
+//     setUserConfig(newUser);
+//     setMergedConfig(merged);
+//   } catch (error) {
+//     console.error('Error updating configuration:', error);
+//     Alert.alert('Error', 'Failed to update configuration.');
+//   } finally {
+//     dispatch({ type: STOP_LOADING });
+//   }
+// };
+
+const handleConfiguration = async (type) => {
+  // 🔹 Step 1: Update toggle locally for instant UI feedback
+  const updatedMerged = mergedConfig.map(cfg =>
+    cfg.title === type ? { ...cfg, isCheck: !cfg.isCheck } : cfg
+  );
+  setMergedConfig(updatedMerged);
+
+  // 🔹 Step 2: Merge with existing user configuration (keep old fields)
+  const existingConfigs = userConfig?.configuration || [];
+
+  // Map updatedMerged for easy lookup
+  const mergedMap = Object.fromEntries(updatedMerged.map(c => [c.title, c]));
+
+  // Combine old + updated configs to preserve all data
+  const finalConfigs = existingConfigs.map(cfg => ({
+    ...cfg,
+    ...(mergedMap[cfg.title] || {}), // overwrite updated ones
+  }));
+
+  // Add any missing configs that exist in mergedMerged but not in old config
+  DEFAULT_CONFIG.forEach(def => {
+    if (!finalConfigs.some(c => c.title === def.title)) {
+      finalConfigs.push(mergedMap[def.title] || def);
     }
+  });
+
+  try {
+    dispatch({ type: SET_LOADING });
+
+    // 🔹 Step 3: Update backend / local DB with full merged configuration
+    const newUser = await dispatch(
+      updateUser(userConfig.id, { configuration: finalConfigs })
+    );
+
+    // 🔹 Step 4: Update local userConfig for immediate consistency
+    setUserConfig(newUser);
+  } catch (error) {
+    console.error('Error updating configuration:', error);
+    Alert.alert('Error', 'Failed to update configuration.');
+
+    // 🔹 Revert toggle if update failed
+    const reverted = mergedConfig.map(cfg =>
+      cfg.title === type ? { ...cfg, isCheck: !cfg.isCheck } : cfg
+    );
+    setMergedConfig(reverted);
+  } finally {
+    dispatch({ type: STOP_LOADING });
   }
+};
 
 
   // 🔹 Update Supabase (Online)
@@ -104,14 +197,13 @@ const UserOptionsForm = ({ navigation, route }) => {
 
   const renderToggle = (label, description, type, isEnabled) => (
     <View key={type} style={{ ...styles.toggleRow, marginVertical: SIZES.padding }}>
-      <View style={{ flexGrow: 1, flexDirection: 'row', borderWidth: 1, width: '100%' }}>
+      <View style={{ flexGrow: 1, flexDirection: 'row', width: '100%' }}>
 				<View
 					style={{
 						flexDirection: 'column',
 						alignItems: 'flex-start',
 						justifyContent: 'flex-start',
 						width: '80%',
-						borderWidth: 1,
 					}}
 				>
 					<Text style={styles.toggleText}>{label}</Text>
@@ -180,7 +272,6 @@ const styles = StyleSheet.create({
     // justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 10,
-    borderWidth: 1,
 		width: '100%',
     padding: 4,
   },

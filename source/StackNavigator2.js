@@ -40,6 +40,7 @@ import SummaryReportUser from './screens/SummaryReportUser';
 import ViewUserForm from './screens/ViewUserForm';
 import UserOptionsForm from './screens/UserOptionsForm';
 import { WelcomeView } from './WelcomeView';
+import ViewShot from './screens/ViewShot';
 
 
 
@@ -173,6 +174,19 @@ console.log()
       <NavigationContainer>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Drawer" component={DrawerNavigation} />
+          <Stack.Screen
+            name="ViewShot"
+            component={ViewShot}
+            options={({ navigation, route }) => ({
+              headerTitle: '',
+              headerTitleStyle: { color: COLORS.white },
+              headerStyle: { backgroundColor: COLORS.secondary },
+              headerShown: true,
+              headerLeft: () => (
+                <CustomDrawerIcon route={route} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'View Ticket'} />
+              ),
+            })}
+          />
           <Stack.Screen
             name="ViewTicket"
             component={ReviewScreen}

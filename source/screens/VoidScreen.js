@@ -25,7 +25,6 @@ const VoidScreen = ({ route, navigation, onPress }) => {
   const { collector, user } = useSelector(({ user }) => user);
 
 
-
   function getTimeRange() {
     const currentTime = new Date();
     const currentHour = currentTime.getHours();
@@ -182,6 +181,8 @@ const VoidScreen = ({ route, navigation, onPress }) => {
         renderItem={renderBet}
         keyExtractor={(item, index) => index.toString()}
       /> 
+
+
       <View style={styles.buttonRow}>
         <TouchableOpacity
           disabled={disableCancelButton}

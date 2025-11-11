@@ -55,13 +55,15 @@ import RawbtApi,
 
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import moment from 'moment-timezone'
-import { getConfiguration } from '../utils/helpers'
+import { formatNumber, getConfiguration } from '../utils/helpers'
 import { COLORS, SIZES } from '../constants/theme';
 import { useDispatch, useSelector } from 'react-redux';
 import { SET_LOADING, STOP_LOADING } from '../redux/actions/types';
 import { DocumentDirectoryPath, downloadFile, writeFile, readDir, stat, readFile, unlink } from 'react-native-fs';
 import { BarcodeCreatorView, BarcodeFormat } from 'react-native-barcode-creator';
 import { useOffline } from '../context/OfflineProvider';
+import { fetchUserByEmail } from '../redux/actions/user.actions';
+import QRCode from 'react-native-qrcode-svg';
 
 
 // --------------------------------
@@ -78,14 +80,17 @@ export default function TestScreen({ data, isPrint, onPrint }) {
     const [rowValue, setRowValue] = useState([]);
     const dispatch = useDispatch();
     const [viewHeight, setViewHeight] = useState(0);
-
-
-
+	const [processedTicket, setProcessedTicket] = useState(null);
+	const [receiptTemplate, setReceiptTemplate] = useState('');
 
 
     let winStraight = getConfiguration(selectedUser, 'winStraight');
     let withWin200 = getConfiguration(selectedUser, 'withWin200');
 
+
+	// console.log(data, "THE DATA HERE!")
+
+	
     const showError = (error) => {
         Alert.alert('Print error', error, [
             {
@@ -146,7 +151,7 @@ export default function TestScreen({ data, isPrint, onPrint }) {
     //         let job = new RawBTPrintJob();
     //         let base64StringImage = await RawbtApi.getImageBase64String(loadImage);
     //         let base64String = await RawbtApi.getImageBase64String(uri);
-    //         if (printHeader.isCheck && String(selectedUser?.receiptTemplate).toLowerCase() != 'samar') {
+    //         if (printHeader.isCheck && String(selectedUser?.receipt_template).toLowerCase() != 'samar') {
     //             job.image(base64StringImage, new AttributesImage(ALIGNMENT_CENTER, 16));
     //         }
     //         job.image(base64String);
@@ -171,24 +176,37 @@ export default function TestScreen({ data, isPrint, onPrint }) {
     //             showError(err.message)
     //         })
     // }
+	const fetchUser = async () => {
+		let user = await dispatch(fetchUserByEmail(selectedUser?.email))
+
+		// console.log(selectedUser.receipt_template, "USERUSERUSERUSERUSERUSERUSERUSERUSERUSERUSERUSERUSERUSERUSERUSERUSERUSERUSERUSERUSERUSERUSERUSERUSERUSERUSERUSERUSERUSERUSERUSERUSERUSERUSER")
+		// console.log(user.receipt_template, "USER USER USER USER")
+		setReceiptTemplate(user?.receipt_template)
+	}
 
     const handlePrint = async () => {
         setPrintCount(prev => prev + 1);
         dispatch({ type: SET_LOADING });
 
         const tryCapture = async () => {
+
+
+			// console.log(selectedUser.email, "THE SELECTED INE NGAW")
+			
             try {
                 let printHeader = getConfiguration(selectedUser, 'printHeader');
                 const filePath = `${DocumentDirectoryPath}/bwlogo1.png`;
-                const loadImage = Image.resolveAssetSource({ uri: `https://sharewin.pro/apiv2/assets/bwlogo1.png` }).uri;
-
+                const taclobanLogo= Image.resolveAssetSource({ uri: `https://sharewin.pro/apiv2/assets/bwlogo1.png` }).uri;
+                const easternSamarLogo = Image.resolveAssetSource({ uri: `https://sharewin.pro/apiv2/assets/heritage_bw_logo.png` }).uri;
                 const uri = await viewShotRef.current.capture();
-                const base64StringImage = await RawbtApi.getImageBase64String(loadImage);
+                const base64StringImage = await RawbtApi.getImageBase64String(String(receiptTemplate).toLowerCase() == 'eastern samar' ? easternSamarLogo : taclobanLogo);
                 const base64String = await RawbtApi.getImageBase64String(uri);
 
+				const scale = String(receiptTemplate).toLowerCase() == 'eastern samar' ? 13 : 16;
+
                 let job = new RawBTPrintJob();
-                if (printHeader.isCheck && String(selectedUser?.receiptTemplate).toLowerCase() != 'samar') {
-                    job.image(base64StringImage, new AttributesImage(ALIGNMENT_CENTER, 16));
+                if (printHeader.isCheck && String(receiptTemplate).toLowerCase() != 'samar') {
+                    job.image(base64StringImage, new AttributesImage(ALIGNMENT_CENTER, scale));
                 }
                 job.image(base64String);
                 job.cut();
@@ -349,6 +367,46 @@ export default function TestScreen({ data, isPrint, onPrint }) {
     let totalAmount = 0;
 
 
+	  function separateCombinations(ticket) {
+    const separatedCombinations = ticket.combinations.flatMap((item) => {
+      const hasRamble = item.betType.includes("R");
+      const hasTarget = item.betType.includes("T");
+
+      const results = [];
+
+      if (hasRamble) {
+        results.push({
+          amount: item.rambleAmount ?? 0,
+          betType: "R",
+          combination: item.combination,
+          is_win_to: item.is_win_to,
+          rambleAmount: item.rambleAmount ?? 0,
+          targetAmount: 0,
+        });
+      }
+
+      if (hasTarget) {
+        results.push({
+          amount: item.targetAmount ?? 0,
+          betType: "T",
+          combination: item.combination,
+          is_win_to: item.is_win_to,
+          rambleAmount: 0,
+          targetAmount: item.targetAmount ?? 0,
+        });
+      }
+
+      return results;
+    });
+
+    return {
+      ...ticket,
+      combinations: separatedCombinations,
+    };
+  }
+
+
+	
     useEffect(() => {
         setRowValue(result)
         generator()
@@ -358,17 +416,34 @@ export default function TestScreen({ data, isPrint, onPrint }) {
         RawbtApi.init();
     }, [])
 
+	  // 🔹 Process and set ticket on mount
+  useEffect(() => {
+    // setTicket(data);
+	// console.log('CONSOLAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')
+	fetchUser()
+    const separated = separateCombinations(data);
+    setProcessedTicket(separated);
+  }, []);
 
-    console.log(data.combinations.length, 'THE VIEW HEIGHT')
+    // console.log(data.combinations.length, 'THE VIEW HEIGHT')
+
+	// console.log(data, "THE DATA")
+
+	// console.log(processedTicket, "THE processedTicket HERE!")
 
 
+	const betTotal = processedTicket?.combinations.reduce((n, { amount }) => n + amount, 0);
+	
+const heritageRefNo = moment().toDate();
+    const barcodeVal = `${"410-" + moment(heritageRefNo).format('YYMMDDHHMMSS')}`
+    
     return (
         <>
             <SafeAreaView style={styles.container}>
                 <View style={{ flex: 1, width: '100%' }}>
                     {
 
-                        String(user?.receiptTemplate).toLowerCase() == 'samar' ?
+                        String(receiptTemplate).toLowerCase() == 'samar' ?
                             <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 0.8 }} style={{ width: 300, flex: 1, position: 'absolute', alignItems: 'center', top: -8999, left: -9999 }}>
                                 <View
                                     style={{
@@ -581,7 +656,7 @@ export default function TestScreen({ data, isPrint, onPrint }) {
 
                             </ViewShot>
                             :
-
+String(receiptTemplate).toLowerCase() == 'tacloban' ?
                             <ViewShot
                                 ref={viewShotRef}
                                 options={{ format: 'webm', quality: 0.8, width: 600, height: viewHeight + (30 * data.combinations.length) }}
@@ -723,13 +798,289 @@ export default function TestScreen({ data, isPrint, onPrint }) {
                                     </View>
                                 </View>
                             </ViewShot>
+                            :
+                            <ViewShot
+                                ref={viewShotRef}
+                                options={{ format: 'webm', quality: 0.8, width: 600, height: viewHeight + (30 * processedTicket?.combinations.length) }}
+                                style={{
+                                    position: 'absolute',
+                                    top: -9999,
+                                    left: -9999,
+                                    alignItems: 'center',
+                                }}
+                            >
+                                <View
+                                    onLayout={(e) => {
+                                        const { height } = e.nativeEvent.layout;
+                                        setViewHeight(height);
+                                        //   setReadyToCapture(true); // layout is ready
+                                    }}
+                                    style={{ width: '100%', alignItems: 'center', 
+                                        height: processedTicket?.combinations.length > 2 ? 750 : 550,
+										width: 350
+                                     }}
+                                >
+                                    {/* <Text style={{ ...styles.fontStyles1, fontSize: 16, textAlign: 'center', fontWeight: 'normal', }}>
+                                        HERITAGE LOTTERY INC
+                                    </Text> */}
+									<View style={{ alignSelf: 'center', width: '100%'}}>
+                                    <Text style={{ ...styles.fontStyles2, textAlign: 'center', fontSize: 24, fontWeight: '200'}}>
+                                        HERITAGE LOTTERY INC
+                                    </Text>
+									</View>
+
+									
+									<View style={{ width: '100%', flexDirection: 'column', }}>
+										<View style={{ width: '100%', flexDirection: 'row' }}>
+											<View style={{ width: '25%', justifyContent: 'flex-end',}}>
+												<Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 24, fontWeight: '200' }}>
+													Ref No.
+												</Text>
+											</View>
+											<View style={{ width: '75%', justifyContent: 'flex-start',}}>
+												<Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 24, fontWeight: '200', paddingLeft: 4 }}>
+													{'410-' + moment(heritageRefNo).format('YYMMDDHHMMSS')}
+												</Text>
+											</View>
+											{/* <View style={{ width: '30%', justifyContent: 'flex-end'}}>
+												<Text style={{ ...styles.fontStyles2, fontSize: 11, fontWeight: '200' }}>
+													Draw
+												</Text>
+											</View>
+											<View style={{ width: '70%', justifyContent: 'flex-start',}}>
+												<Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 11, fontWeight: '200' }}>
+													{moment().format('MMM DD, YYYY ha')}
+												</Text>
+											</View>
+											<View style={{ width: '30%', justifyContent: 'flex-end'}}>
+												<Text style={{ ...styles.fontStyles2, fontSize: 11, fontWeight: '200' }}>
+													Agent
+												</Text>
+											</View>
+											<View style={{ width: '70%', justifyContent: 'flex-start',}}>
+												<Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 11, fontWeight: '200' }}>
+													{String(data.collector).toUpperCase()}
+												</Text>
+											</View>
+											<View style={{ width: '30%', justifyContent: 'flex-end'}}>
+												<Text style={{ ...styles.fontStyles2, fontSize: 11, fontWeight: '200' }}>
+													Agent#
+												</Text>
+											</View>
+											<View style={{ width: '70%', justifyContent: 'flex-start',}}>
+												<Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 11, fontWeight: '200' }}>
+													10 WS OUTLETCAT0008
+												</Text>
+											</View> */}
+										</View>
+										<View style={{ width: '100%', flexDirection: 'row' }}>
+											<View style={{ width: '25%', justifyContent: 'flex-end',}}>
+												<Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 24, fontWeight: '200' }}>
+													Draw
+												</Text>
+											</View>
+											<View style={{ width: '75%', justifyContent: 'flex-start',}}>
+												<Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 24, fontWeight: '200', paddingLeft: 4 }}>
+													{moment().format('MMM DD, YYYY ha')}
+												</Text>
+											</View>
+										</View>
+										<View style={{ width: '100%', flexDirection: 'row' }}>
+											<View style={{ width: '25%', justifyContent: 'flex-end',}}>
+												<Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 24, fontWeight: '200' }}>
+													Agent
+												</Text>
+											</View>
+											<View style={{ width: '75%', justifyContent: 'flex-start',}}>
+												<Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 24, fontWeight: '200', paddingLeft: 4 }}>
+													{String(selectedUser?.first_name).toUpperCase()}
+												</Text>
+											</View>
+										</View>
+										<View style={{ width: '100%', flexDirection: 'row' }}>
+											<View style={{ width: '25%', justifyContent: 'flex-end',}}>
+												<Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 24, fontWeight: '200' }}>
+													Agent#
+												</Text>
+											</View>
+											<View style={{ width: '75%', justifyContent: 'flex-start',}}>
+												<Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 24, fontWeight: '200', paddingLeft: 4 }}>
+													{String(selectedUser?.last_name).toUpperCase()}
+												</Text>
+											</View>
+										</View>
+
+									</View>
+
+
+
+
+
+
+                                    
+                                    {/* <View style={{ width: '100%', flexDirection: 'row', }}>
+                                    <Text style={{ ...styles.fontStyles2, fontSize: 12, fontWeight: '300' }}>
+                                            Ref No.
+                                        </Text>
+
+                                    <Text style={{ ...styles.fontStyles2, fontSize: 12, fontWeight: '300' }}>
+                                            {' 410-' + moment(heritageRefNo).format('YYMMDDHHMMSS')}
+                                        </Text>
+
+                                    </View> */}
+
+                                    {/* <Text style={{ ...styles.fontStyles2, fontSize: 12, fontWeight: '300' }}>
+                                        Draw {moment().format('MMM DD, YYYY ha')}
+                                    </Text>
+
+
+                                    <Text style={{ ...styles.fontStyles2, fontSize: 12, fontWeight: '300' }}>
+                                        Agent {String(data.collector).toUpperCase()}
+                                    </Text>
+
+                                    <Text style={{ ...styles.fontStyles2, fontSize: 12, fontWeight: '300' }}>
+                                        Agent# 10 WS OUTLET CAT0008
+                                    </Text> */}
+
+								<View style={{ marginTop: 10, flexDirection: 'column', borderBottomWidth: .2,  borderTopWidth: .2, borderColor: COLORS.black, width: '100%', paddingHorizontal: 8  }}>
+
+
+                                <View style={{  flexDirection: 'row',}}>
+                                    <View style={{ width: '25%',  justifyContent: 'center', }}>
+                                    <Text style={{ ...styles.fontStyles2, fontSize: 24, fontWeight: '200', textAlign: 'left' }}>
+                                            #Game
+                                        </Text>
+                                    </View>
+
+                                    {/* <View style={{ width: '25%', borderRightWidth: 1, alignItems: 'center', justifyContent: 'center' }}>
+                                        <Text style={{ ...styles.fontStyles1, fontSize: 24, fontWeight: '600', padding: 2 }}>
+                                            S
+                                        </Text>
+                                    </View> */}
+
+                                    <View style={{ width: '25%',  justifyContent: 'center', }}>
+                                    <Text style={{ ...styles.fontStyles2, fontSize: 24, fontWeight: '200' }}>
+                                            Nos
+                                        </Text>
+                                    </View>
+
+                                    <View style={{ width: '27%', justifyContent: 'center', }}>
+                                    <Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 24, fontWeight: '200' }}>
+                                            Amount
+                                        </Text>
+                                    </View>
+									<View style={{ width: '22%', justifyContent: 'center', }}>
+                                    <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 24, fontWeight: '200' }}>
+                                            Type
+                                        </Text>
+                                    </View>
+
+                                </View>
+
+								{
+									processedTicket?.combinations.map((item, index) => {
+										let game_number = index + 1;
+
+
+										return (
+											<View key={index} style={{ flexDirection: 'column', width: '100%' }}>
+												<View style={{ flexDirection: 'row'}}>
+													<View style={{ width: '25%',  justifyContent: 'center', }}>
+														<Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 21, fontWeight: '200' }}>
+															{game_number + '3D'}
+														</Text>
+													</View>
+													<View style={{ width: '25%',  justifyContent: 'center', }}>
+														<Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 25, fontWeight: '200' }}>
+															{item?.combination}
+														</Text>
+													</View>
+													<View style={{ width: '27%', justifyContent: 'center', }}>
+														<Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 25, fontWeight: '200' }}>
+															{item?.amount}
+														</Text>
+													</View>
+													<View style={{ width: '22%', justifyContent: 'center', }}>
+														<Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 25, fontWeight: '200' }}>
+															{item?.betType}
+														</Text>
+													</View>
+												</View>
+											</View>
+										)
+									})
+								}
+								</View>
+								<View style={{ width: '100%', alignItems: 'flex-start', justifyContent: 'flex-start', flexDirection: 'column'}}>
+									<Text style={{ ...styles.fontStyles2, textAlign: 'center', fontSize: 24, fontWeight: '200' }}>
+										Total: P {formatNumber(betTotal)}
+									</Text>
+									<Text style={{ ...styles.fontStyles2, textAlign: 'center', fontSize: 24, fontWeight: '200' }}>
+										Printed: {moment(heritageRefNo).format('MMM DD, YYYY HH:MM:SS')}
+									</Text>
+									<Text style={{ ...styles.fontStyles2, textAlign: 'center', paddingLeft: 20, fontSize: 24, fontWeight: '200' }}>
+										WARAY TICKET, WARAY DAOG
+									</Text>
+									<View style={{ width: '100%', flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'flex-start'}}>
+										<View 
+										// style={{ width: '40%', alignItems: 'center', justifyContent: 'center', padding: 20}}
+										style={{
+    width: 120,
+    height: 170,
+	paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'white',
+	marginRight: 6
+  }}
+										>
+										 {/* <BarcodeCreatorView
+												value={barcodeVal}
+												format={BarcodeFormat.QR}
+												foregroundColor="#000000"
+												background="#FFFFFF"
+												// style={{ width: 150, height: 200}}
+												style={{
+      width: 250,
+      height: 250,
+      resizeMode: 'contain', // ensures scaling without distortion
+    }}
+											  /> */}
+											        <QRCode
+        value={barcodeVal}
+        size={120}          // ✅ sets both width & height equally
+        backgroundColor="white"
+        color="black"
+        logoBackgroundColor="transparent"
+      />
+										</View>
+										<View style={{ width: '60%', flexDirection: 'column', marginTop: 10, alignItems: 'flex-start', justifyContent: 'flex-start' }}>
+											<Text style={{ ...styles.fontStyles2, fontSize: 24, fontWeight: '200' }}>
+												Alayon pag tago han
+												</Text>
+											<Text style={{ ...styles.fontStyles2, fontSize: 24, fontWeight: '200' }}>
+												iyo mga tickets para
+											</Text>
+											<Text style={{ ...styles.fontStyles2, fontSize: 24, fontWeight: '200' }}>
+												pag claim Han iyo daog.
+											</Text>
+										</View>
+
+									</View>
+								</View>
+                                </View>
+
+
+										
+								
+                            </ViewShot>
                     }
                     <View style={{ position: 'absolute', bottom: 0, flexDirection: 'row' }}>
                         <TouchableOpacity
                             //  onPress={() =>
                             // //  {
                             // // 	// console.log(data?.isPrint, "data?.isPrintdata?.isPrintdata?.isPrintdata?.isPrint")
-                            // // 	String(selectedUser?.receiptTemplate).toLowerCase() == 'samar' ?
+                            // // 	String(selectedUser?.receipt_template).toLowerCase() == 'samar' ?
                             // // 	samarPrint({
                             // // 		data: data,
                             // // 		gameTime: data?.gameTime,
@@ -811,6 +1162,6 @@ const styles = StyleSheet.create({
     fontStyles2: {
         fontWeight: 'bold',
         color: COLORS.black,
-        textAlign: 'center',
+        // textAlign: 'center',
     },
 });
