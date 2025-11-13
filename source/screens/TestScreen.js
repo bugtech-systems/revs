@@ -185,7 +185,7 @@ export default function TestScreen({ data, isPrint, onPrint }) {
 	}
 
     const handlePrint = async () => {
-        setPrintCount(prev => prev + 1);
+        // setPrintCount(prev => prev + 1);
         dispatch({ type: SET_LOADING });
 
         const tryCapture = async () => {
@@ -436,6 +436,9 @@ export default function TestScreen({ data, isPrint, onPrint }) {
 	
 const heritageRefNo = moment().toDate();
     const barcodeVal = `${"410-" + moment(heritageRefNo).format('YYMMDDHHMMSS')}`
+
+
+	console.log(data, 'pro')
     
     return (
         <>
@@ -824,7 +827,7 @@ String(receiptTemplate).toLowerCase() == 'tacloban' ?
                                         HERITAGE LOTTERY INC
                                     </Text> */}
 									<View style={{ alignSelf: 'center', width: '100%'}}>
-                                    <Text style={{ ...styles.fontStyles2, textAlign: 'center', fontSize: 24, fontWeight: '200'}}>
+                                    <Text style={{ ...styles.fontStyles2, textAlign: 'center', fontSize: 23, fontWeight: '200'}}>
                                         HERITAGE LOTTERY INC
                                     </Text>
 									</View>
@@ -833,12 +836,12 @@ String(receiptTemplate).toLowerCase() == 'tacloban' ?
 									<View style={{ width: '100%', flexDirection: 'column', }}>
 										<View style={{ width: '100%', flexDirection: 'row' }}>
 											<View style={{ width: '25%', justifyContent: 'flex-end',}}>
-												<Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 24, fontWeight: '200' }}>
+												<Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 23, fontWeight: '200' }}>
 													Ref No.
 												</Text>
 											</View>
 											<View style={{ width: '75%', justifyContent: 'flex-start',}}>
-												<Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 24, fontWeight: '200', paddingLeft: 4 }}>
+												<Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 23, fontWeight: '200', paddingLeft: 4 }}>
 													{'410-' + moment(heritageRefNo).format('YYMMDDHHMMSS')}
 												</Text>
 											</View>
@@ -875,36 +878,36 @@ String(receiptTemplate).toLowerCase() == 'tacloban' ?
 										</View>
 										<View style={{ width: '100%', flexDirection: 'row' }}>
 											<View style={{ width: '25%', justifyContent: 'flex-end',}}>
-												<Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 24, fontWeight: '200' }}>
+												<Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 23, fontWeight: '200' }}>
 													Draw
 												</Text>
 											</View>
 											<View style={{ width: '75%', justifyContent: 'flex-start',}}>
-												<Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 24, fontWeight: '200', paddingLeft: 4 }}>
-													{moment().format('MMM DD, YYYY ha')}
+												<Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 23, fontWeight: '200', paddingLeft: 4 }}>
+													{moment().format('MMM DD, YYYY') + ' ' + data?.game_time}
 												</Text>
 											</View>
 										</View>
 										<View style={{ width: '100%', flexDirection: 'row' }}>
 											<View style={{ width: '25%', justifyContent: 'flex-end',}}>
-												<Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 24, fontWeight: '200' }}>
+												<Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 23, fontWeight: '200' }}>
 													Agent
 												</Text>
 											</View>
 											<View style={{ width: '75%', justifyContent: 'flex-start',}}>
-												<Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 24, fontWeight: '200', paddingLeft: 4 }}>
+												<Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 23, fontWeight: '200', paddingLeft: 4 }}>
 													{String(selectedUser?.first_name).toUpperCase()}
 												</Text>
 											</View>
 										</View>
 										<View style={{ width: '100%', flexDirection: 'row' }}>
 											<View style={{ width: '25%', justifyContent: 'flex-end',}}>
-												<Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 24, fontWeight: '200' }}>
+												<Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 23, fontWeight: '200' }}>
 													Agent#
 												</Text>
 											</View>
 											<View style={{ width: '75%', justifyContent: 'flex-start',}}>
-												<Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 24, fontWeight: '200', paddingLeft: 4 }}>
+												<Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 23, fontWeight: '200', paddingLeft: 4 }}>
 													{String(selectedUser?.last_name).toUpperCase()}
 												</Text>
 											</View>
@@ -947,7 +950,7 @@ String(receiptTemplate).toLowerCase() == 'tacloban' ?
 
                                 <View style={{  flexDirection: 'row',}}>
                                     <View style={{ width: '25%',  justifyContent: 'center', }}>
-                                    <Text style={{ ...styles.fontStyles2, fontSize: 24, fontWeight: '200', textAlign: 'left' }}>
+                                    <Text style={{ ...styles.fontStyles2, fontSize: 23, fontWeight: '200', textAlign: 'left' }}>
                                             #Game
                                         </Text>
                                     </View>
@@ -959,18 +962,18 @@ String(receiptTemplate).toLowerCase() == 'tacloban' ?
                                     </View> */}
 
                                     <View style={{ width: '25%',  justifyContent: 'center', }}>
-                                    <Text style={{ ...styles.fontStyles2, fontSize: 24, fontWeight: '200' }}>
+                                    <Text style={{ ...styles.fontStyles2, fontSize: 23, fontWeight: '200' }}>
                                             Nos
                                         </Text>
                                     </View>
 
                                     <View style={{ width: '27%', justifyContent: 'center', }}>
-                                    <Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 24, fontWeight: '200' }}>
+                                    <Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 23, fontWeight: '200' }}>
                                             Amount
                                         </Text>
                                     </View>
 									<View style={{ width: '22%', justifyContent: 'center', }}>
-                                    <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 24, fontWeight: '200' }}>
+                                    <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 23, fontWeight: '200' }}>
                                             Type
                                         </Text>
                                     </View>
@@ -986,22 +989,22 @@ String(receiptTemplate).toLowerCase() == 'tacloban' ?
 											<View key={index} style={{ flexDirection: 'column', width: '100%' }}>
 												<View style={{ flexDirection: 'row'}}>
 													<View style={{ width: '25%',  justifyContent: 'center', }}>
-														<Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 21, fontWeight: '200' }}>
+														<Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 20, fontWeight: '200' }}>
 															{game_number + '3D'}
 														</Text>
 													</View>
 													<View style={{ width: '25%',  justifyContent: 'center', }}>
-														<Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 25, fontWeight: '200' }}>
+														<Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 24, fontWeight: '200' }}>
 															{item?.combination}
 														</Text>
 													</View>
 													<View style={{ width: '27%', justifyContent: 'center', }}>
-														<Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 25, fontWeight: '200' }}>
+														<Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 24, fontWeight: '200' }}>
 															{item?.amount}
 														</Text>
 													</View>
 													<View style={{ width: '22%', justifyContent: 'center', }}>
-														<Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 25, fontWeight: '200' }}>
+														<Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 24, fontWeight: '200' }}>
 															{item?.betType}
 														</Text>
 													</View>
@@ -1012,13 +1015,13 @@ String(receiptTemplate).toLowerCase() == 'tacloban' ?
 								}
 								</View>
 								<View style={{ width: '100%', alignItems: 'flex-start', justifyContent: 'flex-start', flexDirection: 'column'}}>
-									<Text style={{ ...styles.fontStyles2, textAlign: 'center', fontSize: 24, fontWeight: '200' }}>
+									<Text style={{ ...styles.fontStyles2, textAlign: 'center', fontSize: 23, fontWeight: '200' }}>
 										Total: P {formatNumber(betTotal)}
 									</Text>
-									<Text style={{ ...styles.fontStyles2, textAlign: 'center', fontSize: 24, fontWeight: '200' }}>
+									<Text style={{ ...styles.fontStyles2, textAlign: 'center', fontSize: 23, fontWeight: '200' }}>
 										Printed: {moment(heritageRefNo).format('MMM DD, YYYY HH:MM:SS')}
 									</Text>
-									<Text style={{ ...styles.fontStyles2, textAlign: 'center', paddingLeft: 20, fontSize: 24, fontWeight: '200' }}>
+									<Text style={{ ...styles.fontStyles2, textAlign: 'center', paddingLeft: 20, fontSize: 23, fontWeight: '200' }}>
 										WARAY TICKET, WARAY DAOG
 									</Text>
 									<View style={{ width: '100%', flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'flex-start'}}>
@@ -1055,13 +1058,13 @@ String(receiptTemplate).toLowerCase() == 'tacloban' ?
       />
 										</View>
 										<View style={{ width: '60%', flexDirection: 'column', marginTop: 10, alignItems: 'flex-start', justifyContent: 'flex-start' }}>
-											<Text style={{ ...styles.fontStyles2, fontSize: 24, fontWeight: '200' }}>
-												Alayon pag tago han
+											<Text style={{ ...styles.fontStyles2, fontSize: 22, fontWeight: '200' }}>
+												Alayun pagtago han 
 												</Text>
-											<Text style={{ ...styles.fontStyles2, fontSize: 24, fontWeight: '200' }}>
+											<Text style={{ ...styles.fontStyles2, fontSize: 22, fontWeight: '200' }}>
 												iyo mga tickets para
 											</Text>
-											<Text style={{ ...styles.fontStyles2, fontSize: 24, fontWeight: '200' }}>
+											<Text style={{ ...styles.fontStyles2, fontSize: 22, fontWeight: '200' }}>
 												pag claim Han iyo daog.
 											</Text>
 										</View>
