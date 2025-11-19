@@ -22,9 +22,9 @@ const SummaryReport = ({ navigation }) => {
   // const [user, setUser] = useState(null);
   const [items, setItems] = useState([]);
   const ownUser = selectedUser?.id ? selectedUser?.id : user?.id
-  const isWin200 = useMemo(() => getConfiguration(user, 'withWin200')?.isCheck, [selectedUser]);
-  const win200Value = useMemo(() => getConfiguration(user, 'withWin200')?.value, [selectedUser]);
-  const winStraightValue = useMemo(() => getConfiguration(user, 'winStraight')?.value, [selectedUser]);
+  const isWin200 = useMemo(() => getConfiguration(selectedUser, 'withWin200')?.isCheck, [selectedUser]);
+  const win200Value = useMemo(() => getConfiguration(selectedUser, 'withWin200')?.value, [selectedUser]);
+  const winStraightValue = useMemo(() => getConfiguration(selectedUser, 'winStraight')?.value, [selectedUser]);
   const com_rate = selectedUser?.com_rate || 0;
 
   // Fetch bettings from SQLite

@@ -325,12 +325,16 @@ export default function TicketForm3({ navigation, route }) {
                 let netTotal = gross - netComs;
 
 
+      //  await api.updateUser(user?.id, {
+      //                           coordinates: `${coords.latitude}|${coords.longitude}`
+      //                       })
+
 
                 /* 		if(drawResult){
                             console.log(drawResult, 'DRAW RESULT')
                         return;
                         } */
-            /*     if (collector == own_user?.email) {
+              //  if (collector == own_user?.email) {
                     Geolocation.getCurrentPosition(
                        async (position) => {
                             let { coords } = position;
@@ -338,10 +342,9 @@ export default function TicketForm3({ navigation, route }) {
                             // realm.write(async () => {
                             //     selectedUser.coordinates = `${coords.latitude}|${coords.longitude}`;
                             // })
-                            await api.updateUser(own_user?.id, {
+                            await api.updateUser(user?.id, { ...user,
                                 coordinates: `${coords.latitude}|${coords.longitude}`
                             })
-
                         },
                         error => {
                             // See error code charts below.
@@ -349,7 +352,7 @@ export default function TicketForm3({ navigation, route }) {
                         },
                         { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
                     );
-                } */
+                // }
               
               
 

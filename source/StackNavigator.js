@@ -16,7 +16,7 @@ import Winnings from './screens/drawers/Winnings';
 import Transactions from './screens/drawers/Transactions';
 import SettingsScreen from './screens/drawers/SettingsScreen';
 import CustomDrawerIcon from './components/CustomDrawerIcon';
-import { getConfiguration } from './utils/helpers';
+import { getConfiguration, getDayRange } from './utils/helpers';
 import CashFlow from './screens/drawers/CashFlow';
 import CancelledTickets from './screens/drawers/CancelledTickets';
 import Inbox from './screens/drawers/Inbox';
@@ -40,6 +40,9 @@ import ViewUserForm from './screens/ViewUserForm';
 import UserOptionsForm from './screens/UserOptionsForm';
 import { WelcomeView } from './WelcomeView';
 import ViewShot from './screens/ViewShot';
+import moment from 'moment-timezone';
+import { fetchDraws } from './redux/actions/bettingActions';
+import MapScreen from './screens/MapScreen';
 
 
 
@@ -49,6 +52,86 @@ const Drawer = createDrawerNavigator();
 const DrawerNavigation = () => {
   const { user, collector, selectedUser } = useSelector(state => state.user);
   const curUser = selectedUser ? selectedUser : user;
+
+    const [draws, setDraws] = useState([]);
+  const [latestDraw, setLatestDraw] = useState(null);
+  const dispatch = useDispatch();
+
+  const fetchDrawItems = async () => {
+  try {
+    // 1. Compute date range
+    let endDate = moment().tz("Asia/Manila").subtract(1, 'days');
+    let startDate = moment().tz("Asia/Manila").subtract(7, "days");
+
+      const { start_of_day, end_of_day  } = getDayRange( startDate, endDate)
+
+      console.log(start_of_day, end_of_day, "start_of_day, end_of_daystart_of_day, end_of_day")
+    
+
+    // 2. Fetch all draws within range
+        let localDraws = await dispatch(fetchDraws({ 
+          draw_date:  { 
+            op: "between",
+            from: start_of_day,
+            to: end_of_day,
+          }
+        }));
+
+    // 3. Parse into proper format
+    const parsedDraws = localDraws.map(draw => ({
+      ...draw,
+      draw_date: new Date(draw.draw_date),
+      game_time: draw.game_time,        // IMPORTANT: must be present
+      combination: draw.combination,
+      is_win_to: draw.is_win_to
+    }));
+
+    setDraws(parsedDraws);
+
+    // ---------------------------
+    // 4. GROUP BY DATE
+    // ---------------------------
+    const groupsByDate = parsedDraws.reduce((acc, draw) => {
+      const dateKey = moment(draw.draw_date).format("YYYY-MM-DD");
+      if (!acc[dateKey]) acc[dateKey] = [];
+      acc[dateKey].push(draw);
+      return acc;
+    }, {});
+
+    // ---------------------------
+    // 5. FIND LATEST COMPLETED DRAW DAY (2PM, 5PM, 9PM)
+    // ---------------------------
+    const sortedDates = Object.keys(groupsByDate).sort().reverse(); // latest first
+
+    let latestCompleted = null;
+
+    for (const date of sortedDates) {
+      const items = groupsByDate[date];
+
+      const has2pm = items.some(d => d.game_time === "2pm");
+      const has5pm = items.some(d => d.game_time === "5pm");
+      const has9pm = items.some(d => d.game_time === "9pm");
+
+      if (has2pm && has5pm && has9pm) {
+        latestCompleted = {
+          date,
+          draws: items
+        };
+        break;
+      }
+    }
+
+    // 6. Save latest completed draw
+    if (latestCompleted) {
+      setLatestDraw(latestCompleted); // <-- You add this state
+    } else {
+      setLatestDraw(null);
+    }
+
+  } catch (err) {
+    console.error("Error fetching draws:", err);
+  }
+};
 
 
   const generateDrawerScreenOptions = (label, icon, headerTitle, navigation) => ({
@@ -61,7 +144,34 @@ const DrawerNavigation = () => {
     headerLeft: () => (
       <CustomDrawerIcon route={null} navigation={navigation} navType={'drawer'} selectedUser={selectedUser} headerTitle={headerTitle} />
     ),
-    headerRight: () => <View></View>,
+    // headerRight: () => <View></View>,
+    headerRight: () => {
+      
+      return (
+        String(headerTitle).toLowerCase() == 'results' &&
+        <TouchableOpacity
+          onPress={() => navigation.navigate('ViewTip', {
+                      resultDate: latestDraw?.date,
+
+          })}
+          // onPress={() => console.log(latestDraw, "LATLAT")}
+          style={{
+            marginRight: 20,
+            width: 30,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text
+            style={{
+              fontWeight: 'bold',
+              fontSize: 15,
+              color: COLORS.primary
+            }}>
+              Tip
+          </Text>
+        </TouchableOpacity>)
+    },
     drawerIcon: ({ focused }) => (
       <View style={{ paddingHorizontal: 20 }}>
         <Image source={icon} style={{ width: 20, height: 20, tintColor: focused ? COLORS.white : COLORS.secondary }} />
@@ -69,6 +179,10 @@ const DrawerNavigation = () => {
     ),
   });
 
+    useEffect(() => {
+    fetchDrawItems()
+
+  }, [])
 
   return (
     <Drawer.Navigator screenOptions={{ drawerType: 'slide', overlayColor: 'rgba(138, 133, 133, 0.59)', swipeEdgeWidth: 100 }}>
@@ -193,6 +307,11 @@ const StackNavigates = () => {
               ),
             })}
           />
+          			<Stack.Screen
+				name="MapScreen"
+				component={MapScreen}
+				options={{ headerShown: false }}
+			/>
           <Stack.Screen
             name="Receipt"
             component={Receipt}

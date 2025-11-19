@@ -572,6 +572,10 @@ export async function localGet(tableName, id) {
 }
 
 async function localQuery(tableName, query = {}, is_online = false) {
+
+
+  console.log(query, "THE QUERY QUERYHAN")
+  
   const cacheKey = getCacheKey(tableName, 'query', query);
   const cached = getCache(cacheKey);
   // console.log(cacheKey, cached, 'CHACEHHE')
@@ -1264,6 +1268,28 @@ export const verifyLocalData = async (tableName, expectedCount) => {
   }
 };
 
+export const fetchUsers = async ( filter, is_online = false) => {
+  try {
+    const filters = {
+      ...filter,
+      is_deleted: false
+    };
+
+    const users = await api.listUsers({
+      filters,
+      orderBy: "created_at DESC",
+    }, is_online);
+
+    // Filter users that contain a valid coordinates format "lat|lng"
+    return users.filter(u => 
+      typeof u.coordinates === "string" && u.coordinates.includes("|")
+    );
+
+  } catch (error) {
+    console.error("❌ Error fetching users with coordinates:", error);
+    return [];
+  }
+};
 
 
 export async function fetchBettings({ includeAll, date, userNow, user }) {
@@ -1464,3 +1490,4 @@ export async function getBettingByTicketNo(ticketNo) {
     });
   });
 }
+

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -34,7 +34,7 @@ const SettingsScreen = ({ navigation }) => {
   const dispatch = useDispatch();
 
 
-  const { user, collector } = useSelector(({ user }) => user);
+  const { user, collector, selectedUser } = useSelector(({ user }) => user);
   const { confirmationModal } = useSelector(({ ui }) => ui);
   // const [loading, setLoading] = useState(false);
   const [usersList, setUsersList] = useState([]);
@@ -46,7 +46,8 @@ const SettingsScreen = ({ navigation }) => {
   const [userToUpdate, setUserToUpdate] = useState(null);
   const apkUrl = Config.APK_URL;
   const selUser = user;
-
+  
+  
   // --- Load local users first (offline-first) ---
   const loadUsers = async () => {
 
@@ -155,9 +156,11 @@ const SettingsScreen = ({ navigation }) => {
     dispatch({ type: SET_ACTIVE_USER, payload: user });
   };
 
-  const ableToViewDeletedUsers = getConfiguration(selUser, 'deletedUsers')?.isCheck;
-  const ableToViewAppUsers = getConfiguration(selUser, 'appUsers')?.isCheck;
-  const ableToViewMap = getConfiguration(selUser, 'mapUsers')?.isCheck;
+    const isWin200 = useMemo(() => getConfiguration(selectedUser, 'withWin200')?.isCheck, [selectedUser]);
+
+  const ableToViewDeletedUsers = useMemo(() =>  getConfiguration(selUser, 'deletedUsers')?.isCheck, [selUser]);
+  const ableToViewAppUsers = useMemo(() => getConfiguration(selUser, 'appUsers')?.isCheck, [selUser]);
+  const ableToViewMap = useMemo(() =>  getConfiguration(selUser, 'mapUsers')?.isCheck, [selUser]);
 
 
 
@@ -586,12 +589,12 @@ const SettingsScreen = ({ navigation }) => {
           }
           <View style={{ flex: 1, justifyContent: 'flex-end' }}>
 
-            {selUser && (selUser.role == 'coordinator' && selUser.is_admin && ableToViewMap) &&
+            {selUser.is_admin && ableToViewMap ?
               <>
                 <Text style={{ padding: 6, color: COLORS.primary, fontSize: 12, fontWeight: '500', marginTop: 10 }}>
                   Preferences
                 </Text>
-                {/* <TouchableOpacity
+                <TouchableOpacity
                   style={{
                     paddingVertical: 1,
                     marginVertical: SIZES.padding / 2,
@@ -632,8 +635,10 @@ const SettingsScreen = ({ navigation }) => {
                     source={icons.go}
                     style={{ height: 15, width: 15, tintColor: COLORS.black900 }}
                   />
-                </TouchableOpacity> */}
+                </TouchableOpacity>
               </>
+              :
+              null
             }
 
             {/* <Text style={{ padding: 6, color: COLORS.primary, fontSize: 12, fontWeight: '500', marginTop: 10 }}>

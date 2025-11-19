@@ -41,6 +41,7 @@ import ViewUserForm from './screens/ViewUserForm';
 import UserOptionsForm from './screens/UserOptionsForm';
 import { WelcomeView } from './WelcomeView';
 import ViewShot from './screens/ViewShot';
+import MapScreen from './screens/MapScreen';
 
 
 
@@ -237,6 +238,19 @@ console.log()
           <Stack.Screen
             name="Winning Ticket"
             component={ViewTicket}
+            options={({ navigation }) => ({
+              headerTitle: '',
+              headerTitleStyle: { color: COLORS.black, fontWeight: 'bold' },
+              headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
+              headerShown: true,
+              headerLeft: () => (
+                <CustomDrawerIcon route={null} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'Winning Ticket'} />
+              ),
+            })}
+          />
+          <Stack.Screen
+            name="MapScreen"
+            component={MapScreen}
             options={({ navigation }) => ({
               headerTitle: '',
               headerTitleStyle: { color: COLORS.black, fontWeight: 'bold' },

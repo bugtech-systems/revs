@@ -4,27 +4,55 @@ import moment from 'moment-timezone';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { COLORS } from '../../constants';
 import { api } from '../../utils/offlineSync';
+import { fetchDraws } from '../../redux/actions/bettingActions';
+import { useDispatch } from 'react-redux';
+import { getDayRange } from '../../utils/helpers';
 
 
 export default function Results2({ navigation }) {
+  const dispatch = useDispatch();
   const [refreshing, setRefreshing] = React.useState(false);
   const [draws, setDraws] = useState([]);
   const [winningDigits, setWinningDigits] = useState(new Set());
 
-    const fetchDraws = async () => {
+    const fetchDrawItems = async () => {
       try {
-        const results = await api.listDraws({
-            limit: 300,
-            orderBy: 'draw_date DESC'
+
+    // 1️⃣ Create ISO timezone-safe dates for Supabase
+    const endDate = moment()
+      .tz("Asia/Manila")
+      // .format("YYYY-MM-DDTHH:mm:ssZ");
+
+    const startDate = moment()
+      .tz("Asia/Manila")
+      .subtract(21, "days")
+      // .format("YYYY-MM-DDTHH:mm:ssZ");
+
+            const { start_of_day, end_of_day  } = getDayRange( startDate, endDate)
+      
+      
+
+        let localDraws = await dispatch(fetchDraws({ 
+          draw_date:  { 
+            op: "between",
+            from: start_of_day,
+            to: end_of_day,
+          }
+        }));
+              
+        
+        // const results = await api.listDraws({
+        //     limit: 10,
+        //     orderBy: 'draw_date DESC'
             
-        })
+        // })
       
         // Get all draws ordered by draw_date DESC
         // const results2 = await executeSql('SELECT * FROM draws ORDER BY draw_date DESC', []);
         // const drawsArray = results.rows._array;
 
         // Convert draw_date string/timestamp to Date object
-        const parsedDraws = results.map(draw => ({
+        const parsedDraws = localDraws.map(draw => ({
           ...draw,
           draw_date: new Date(draw.draw_date),
           combination: draw.combination, // assuming combination column exists
@@ -47,7 +75,6 @@ export default function Results2({ navigation }) {
         // // Get all winning combinations
         // const results = await executeSql('SELECT * FROM combinations WHERE isWinTo = 1', []);
         // const combos = results.rows._array;
-  console.log(results, 'RESULTS')
         // Store digits as Set for fast lookup
         setWinningDigits(new Set(results.map(c => String(c.digit))));
       } catch (err) {
@@ -63,7 +90,7 @@ export default function Results2({ navigation }) {
     // setLoading(true);
     setTimeout(() => {
       // load();
-      fetchDraws()
+      fetchDrawItems()
       fetchWinningDigits();
 
           setRefreshing(false);
@@ -74,7 +101,7 @@ export default function Results2({ navigation }) {
 
   // Fetch draws from SQLite
   useEffect(() => {
-    fetchDraws();
+    fetchDrawItems();
     fetchWinningDigits();
   }, []);
 
@@ -161,7 +188,7 @@ export default function Results2({ navigation }) {
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                   }
         ListEmptyComponent={
-          <View style={{ padding: 8, alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ flex: 1, padding: 8, alignItems: 'center', justifyContent: 'center', width: '100%' }}>
             <Text style={{ textAlign: 'center', fontSize: 14, color: COLORS.gray600, fontWeight: '500' }}>
               No records found.
             </Text>
@@ -184,7 +211,7 @@ export default function Results2({ navigation }) {
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
-    alignItems: 'flex-start',
+    // alignItems: 'flex-start',
     justifyContent: 'flex-start',
     padding: 10,
     backgroundColor: COLORS.gray300,
