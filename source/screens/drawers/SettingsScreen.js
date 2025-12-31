@@ -26,7 +26,8 @@ import {
 } from '../../redux/actions/types';
 import { useScreenSize, getConfiguration } from '../../utils/helpers';
 import { api, clearAllStorage, deleteDB, forceSync } from '../../utils/offlineSync';
-import { fetchUserByEmail, signOut } from '../../redux/actions/user.actions';
+import { fetchUserByEmail, signOut, updateUser} from '../../redux/actions/user.actions';
+import Icon from 'react-native-vector-icons/Ionicons';
 
 
 const SettingsScreen = ({ navigation }) => {
@@ -95,30 +96,207 @@ const SettingsScreen = ({ navigation }) => {
     navigation.navigate('View User', JSON.stringify(val));
   };
 
-  const handleReactivateUser = async user => {
-    // Offline-first: update SQLite first
-    const updatedUsers = usersList.map(u =>
-      u.id === user.id
+  // const handleReactivateUser = async user => {
+
+  //   let fetchUserdata = await dispatch(fetchUserByEmail(user?.email));
+
+  //   if (!fetchUserdata) return;
+    
+    
+  //   // Offline-first: update SQLite first
+  //   const updatedUsers = usersList.map(u =>
+  //     u.id === user.id
+  //       ? {
+  //         ...u,
+  //         is_deleted:
+  //           user.actionType === 'reactivate'
+  //             ? false
+  //             : user.actionType === 'deactivate'
+  //               ? true
+  //               : u.is_deleted,
+  //       }
+  //       : u
+  //   );
+  //   setUsersList(updatedUsers);
+  //   // await saveLocalUsers(updatedUsers);
+
+  //   await api.updateUser(user.id, { ...user, is_deleted: user.actionType === 'reactivate' ? false : user.actionType === 'deactivate' ? true : user.is_deleted, device_id: user.actionType === 'revoke session' ? null : user.device_id });
+  //   // Online sync
+  //   // await supabase.from('users').update({
+  //   //   is_deleted: user.actionType === 'reactivate' ? false : user.actionType === 'deactivate' ? true : user.is_deleted,
+  //   // }).eq('id', user.id);
+  // };
+
+// const handleReactivateUser = async (selectedUser) => {
+  
+//   let fetchUserdata = await dispatch(fetchUserByEmail(selectedUser?.email));
+//   if (!fetchUserdata) return;
+
+//   // Update main user list locally
+//   const updatedUsers = usersList.map(u =>
+//     u.id === selectedUser.id
+//       ? {
+//           ...u,
+//           is_deleted:
+//             selectedUser.actionType == 'reactivate'
+//               ? false
+//               : selectedUser.actionType == 'deactivate'
+//               ? true
+//               : u.is_deleted,
+//           device_id:
+//             selectedUser.actionType == 'revoke'
+//               ? 'revoke'
+//               : u.device_id,
+//         }
+//       : u
+//   );
+
+//   setUsersList(updatedUsers);
+
+//   // Update SQLite
+//   let actionUpdate = await dispatch(updateUser(
+//     selectedUser.id,
+//     {
+//       ...selectedUser,
+//       is_deleted:
+//         selectedUser.actionType == 'reactivate'
+//           ? false
+//           : selectedUser.actionType == 'deactivate'
+//           ? true
+//           : selectedUser.is_deleted,
+//       device_id:
+//         selectedUser.actionType == 'revoke'
+//           ? 'revoke'
+//           : selectedUser.device_id,
+//     }
+//   ));
+
+//   // FIX: use authenticated user email
+//   const authenticatedEmail = selUser?.email || collector;
+
+//   // Refresh Lists
+//   setDeletedUsers(
+//     updatedUsers.filter(
+//       (u) => u.is_deleted && u.email !== authenticatedEmail
+//     )
+//   );
+
+//   setUsersCoord(
+//     updatedUsers.filter(
+//       (u) =>
+//         u.role === 'coordinator' &&
+//         !u.is_deleted &&
+//         u.email !== authenticatedEmail
+//     )
+//   );
+
+//   setTellersCoord(
+//     updatedUsers.filter(
+//       (u) =>
+//         u.role === 'teller' &&
+//         !u.is_deleted &&
+//         u.email !== authenticatedEmail
+//     )
+//   );
+// };
+
+
+const handleReactivateUser = async (selectedUser) => {
+  try {
+    // 🔄 Always fetch latest user data
+    const freshUser = await dispatch(
+      fetchUserByEmail(selectedUser?.email)
+    );
+
+    if (!freshUser) return;
+
+    const isRevoke = selectedUser.actionType === 'revoke';
+    const isReactivate = selectedUser.actionType === 'reactivate';
+    const isDeactivate = selectedUser.actionType === 'deactivate';
+
+    // ======================================================
+    // 🧠 Build updated user object
+    // ======================================================
+    const updatedUserPayload = {
+      ...freshUser,
+      is_deleted: isReactivate
+        ? false
+        : isDeactivate
+        ? true
+        : freshUser.is_deleted,
+
+      // 🔥 REVOKE → CLEAR ALL LOGIN DEVICES
+      login_devices: isRevoke ? [] : freshUser.login_devices,
+    };
+
+    // ======================================================
+    // 🧠 Update users list in UI
+    // ======================================================
+    const updatedUsers = usersList.map((u) =>
+      u.id === freshUser.id
         ? {
-          ...u,
-          is_deleted:
-            user.actionType === 'reactivate'
-              ? false
-              : user.actionType === 'deactivate'
-                ? true
-                : u.is_deleted,
-        }
+            ...u,
+            is_deleted: updatedUserPayload.is_deleted,
+            login_devices: updatedUserPayload.login_devices,
+          }
         : u
     );
-    // setUsersList(updatedUsers);
-    // await saveLocalUsers(updatedUsers);
 
-    // Online sync
-    // await supabase.from('users').update({
-    //   is_deleted: user.actionType === 'reactivate' ? false : user.actionType === 'deactivate' ? true : user.is_deleted,
-    // }).eq('id', user.id);
-  };
+    setUsersList(updatedUsers);
 
+    // ======================================================
+    // 💾 Persist to DB
+    // ======================================================
+    await dispatch(
+      updateUser(freshUser.id, updatedUserPayload)
+    );
+
+    // ======================================================
+    // 🔄 Refresh filtered lists
+    // ======================================================
+    const authenticatedEmail = selUser?.email || collector;
+
+    setDeletedUsers(
+      updatedUsers.filter(
+        (u) => u.is_deleted && u.email !== authenticatedEmail
+      )
+    );
+
+    setUsersCoord(
+      updatedUsers.filter(
+        (u) =>
+          u.role === 'coordinator' &&
+          !u.is_deleted &&
+          u.email !== authenticatedEmail
+      )
+    );
+
+    setTellersCoord(
+      updatedUsers.filter(
+        (u) =>
+          u.role === 'teller' &&
+          !u.is_deleted &&
+          u.email !== authenticatedEmail
+      )
+    );
+
+    // ======================================================
+    // ✅ Feedback
+    // ======================================================
+    if (isRevoke) {
+      Alert.alert(
+        'Devices Revoked',
+        'All registered devices for this user have been removed.'
+      );
+    }
+
+  } catch (error) {
+    console.log('User action failed:', error);
+    Alert.alert('Error', 'Failed to update user.');
+  }
+};
+
+  
 
   // Sign out the logged in user and then navigates to the welcome screen
  const handleSignOut = useCallback(async () => {
@@ -194,7 +372,7 @@ const SettingsScreen = ({ navigation }) => {
           }}
         />
 
-        {selUser && (selUser.role == 'coordinator' && selUser.is_admin) &&
+        {selUser && (selUser?.role == 'coordinator' && selUser?.is_admin) &&
 
           <View style={{ padding: 10, backgroundColor: '#f1f1f1' }}>
 
@@ -222,7 +400,7 @@ const SettingsScreen = ({ navigation }) => {
 
         <View style={{ flex: 1, padding: 10, }}>
 
-          {selUser && (selUser.role == 'coordinator' && (selUser.is_admin || ableToViewAppUsers)) &&
+          {selUser && (selUser?.role == 'coordinator' && (selUser?.is_admin || ableToViewAppUsers)) &&
             <>
               <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Text style={{ padding: 6, color: COLORS.primary, fontSize: 12, fontWeight: '500' }}>
@@ -295,6 +473,7 @@ const SettingsScreen = ({ navigation }) => {
                         let displayName = String(list.email).split('@')[0];
                         const backgroundColor = index % 2 === 0 ? '#ffff' : COLORS.gray200;
 
+
                         return (
                           <Animated.View
                             key={index}
@@ -324,14 +503,14 @@ const SettingsScreen = ({ navigation }) => {
                               </Text>
                             </TouchableOpacity>
                             {
-                              selUser && (selUser.role == 'coordinator' && selUser.is_admin && collector !== list.email) ?
+                              selUser && (selUser?.role == 'coordinator' && selUser?.is_admin && collector !== list.email) ?
                                 <View style={{ width: '20%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-evenly' }}>
                                   <TouchableOpacity
-                                    style={{ alignItems: 'center', justifyContent: 'center', width: '10%', opacity: list?.deviceId ? 1 : .5 }}
-                                    disabled={list?.deviceId ? false : true}
+                                    style={{ alignItems: 'center', justifyContent: 'center', width: '10%', opacity: list?.login_devices.length > 0 ? 1 : .5 }}
+                                    disabled={list?.login_devices.length > 0 ? false : true}
                                     onPress={() => {
                                       dispatch({ type: OPEN_CONFIRMATION_MODAL, payload: 'update_user' });
-                                      setUserToUpdate({ ...list, actionType: 'revoke session' });
+                                      setUserToUpdate({ ...list, actionType: 'revoke' });
                                     }}
                                   >
                                     <Image
@@ -450,14 +629,14 @@ const SettingsScreen = ({ navigation }) => {
                               </Text>
                             </TouchableOpacity>
                             {
-                              selUser && (selUser.role == 'coordinator' && selUser.is_admin) ?
+                              selUser && (selUser?.role == 'coordinator' && selUser?.is_admin) ?
                                 <View style={{ width: '20%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-evenly' }}>
                                   <TouchableOpacity
-                                    style={{ alignItems: 'center', justifyContent: 'center', width: '10%', opacity: list?.deviceId ? 1 : .5 }}
-                                    disabled={list?.deviceId ? false : true}
+                                    style={{ alignItems: 'center', justifyContent: 'center', width: '10%', opacity: list?.login_devices.length > 0 ? 1 : .5}}
+                                    disabled={list?.login_devices.length > 0 ? false : true}
                                     onPress={() => {
                                       dispatch({ type: OPEN_CONFIRMATION_MODAL, payload: 'update_user' });
-                                      setUserToUpdate({ ...list, actionType: 'revoke session' });
+                                      setUserToUpdate({ ...list, actionType: 'revoke' });
                                     }}
                                   >
                                     <Image
@@ -540,9 +719,6 @@ const SettingsScreen = ({ navigation }) => {
                         let displayName = String(list.email).split('@')[0];
                         const backgroundColor = index % 2 === 0 ? '#ffff' : COLORS.gray200;
 
-                        // console.log(list, 'LISTA HA DEETED')
-
-
                         return (
                           <Animated.View
                             key={index}
@@ -589,7 +765,7 @@ const SettingsScreen = ({ navigation }) => {
           }
           <View style={{ flex: 1, justifyContent: 'flex-end' }}>
 
-            {selUser.is_admin && ableToViewMap ?
+            {selUser?.is_admin && ableToViewMap ?
               <>
                 <Text style={{ padding: 6, color: COLORS.primary, fontSize: 12, fontWeight: '500', marginTop: 10 }}>
                   Preferences
@@ -739,6 +915,48 @@ const SettingsScreen = ({ navigation }) => {
             <Text style={{ padding: 6, color: COLORS.primary, fontSize: 12, fontWeight: '500', marginTop: 10 }}>
               Security
             </Text>
+            <TouchableOpacity
+              style={{
+                paddingVertical: 1,
+                marginVertical: SIZES.padding / 2,
+                backgroundColor: '#ffffff',
+                elevation: 1,
+                padding: 10,
+                paddingVertical: 14,
+                borderTopRightRadius: 12,
+                borderTopLeftRadius: 12,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+                borderBottomLeftRadius: 12,
+                borderColor: COLORS.gray200,
+                borderBottomRightRadius: 12,
+                borderWidth: 1,
+                // borderBottomWidth: 1,
+                borderBottomColor: COLORS.gray600
+              }} onPress={() => navigation.navigate('LoginDevices', {})}>
+
+              {/* <Image
+                source={icons.printer}
+                style={{
+                  height: 30,
+                  width: 30,
+                  tintColor: COLORS.secondary,
+                  resizeMode: 'contain',
+                }}
+              /> */}
+
+              <Icon
+                            name={'phone-portrait'}
+                            size={28}
+                            color={COLORS.secondary}
+                          />
+
+              <Text style={{ fontSize: 18, color: COLORS.secondary, fontWeight: 'bold', paddingHorizontal: 10 }}>
+                Login Devices
+              </Text>
+
+            </TouchableOpacity>
             <TouchableOpacity
               style={{
                 paddingVertical: 1,

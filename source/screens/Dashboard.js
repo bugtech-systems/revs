@@ -368,7 +368,7 @@ let filters = {
 
 
 
-console.log(bettings, 'BETTINGS', selectedUser)
+// console.log(bettings, 'BETTINGS', selectedUser)
   return (  
   	<SafeAreaView style={{ ...styles.wrapper }}>
 			<ScrollView style={{ width: '100%' }}>
@@ -398,8 +398,9 @@ console.log(bettings, 'BETTINGS', selectedUser)
 						testID="dateTimePicker"
 						value={date}
 						mode="date"
-						minimumDate={new Date(user?.is_admin && user?.last_summary ? null : user?.last_summary)}
-						// maximumDate={new Date(moment().toDate())}
+						// minimumDate={new Date(selectedUser?.is_admin && selectedUser?.last_summary ? null : selectedUser?.last_summary)}
+						minimumDate={new Date(selectedUser?.last_summary)}
+						maximumDate={new Date(moment().toDate())}
 						display="default"
 						onChange={onChange}
 						negativeButton={{ label: "Cancel", }}

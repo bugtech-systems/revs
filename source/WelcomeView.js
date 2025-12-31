@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect, useContext } from 'react';
+import React, { useCallback, useState, useEffect, useContext, useRef } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StyleSheet, Text, View, Alert, TouchableOpacity, Image } from 'react-native';
 import { Input } from '@rneui/base';
@@ -161,7 +161,8 @@ export function WelcomeView() {
       const fullEmail = String(email).trim() + '@collector.com';
       await dispatch(signIn(fullEmail, password));
       
-      Alert.alert('Success', 'Logged in successfully!');
+      // Alert.alert('Success', 'Logged in successfully!');
+      console.log('Success', 'Logged in successfully!');
       
       // Clear form on success
       setEmail('');
@@ -199,6 +200,10 @@ export function WelcomeView() {
   // Check if form is valid for enabling submit button
   const isFormValid = validateEmail(email).isValid && validatePassword(password).isValid;
 
+  // Refs for inputs can be added if needed for focus management
+const emailRef = useRef(null);
+const passwordRef = useRef(null);
+
   return (
     <SafeAreaProvider>
       <View style={styles.viewWrapper}>
@@ -211,6 +216,7 @@ export function WelcomeView() {
             <Text style={{ color: COLORS.black, fontSize: 12, fontWeight: '600' }}>USER ID</Text>
           </View>
           <Input
+            ref={emailRef}
             onChangeText={handleEmailChange}
             onBlur={handleEmailBlur}
             autoCapitalize="none"
@@ -226,6 +232,12 @@ export function WelcomeView() {
             errorStyle={styles.errorText}
             autoCorrect={false}
             spellCheck={false}
+            returnKeyType="next"
+            blurOnSubmit={false}
+            onSubmitEditing={() => {
+              passwordRef.current?.focus();
+            }}
+            // onKeyPress={(e) => console.log(e.target, "THE EVENT OF KEY PRESSS")}
           />
 
           {/* Password Input */}
@@ -233,6 +245,7 @@ export function WelcomeView() {
             <Text style={{ color: COLORS.black, fontSize: 12, fontWeight: '600' }}>PASSWORD</Text>
           </View>
           <Input
+            ref={passwordRef}
             onChangeText={handlePasswordChange}
             onBlur={handlePasswordBlur}
             autoCapitalize="none"
@@ -257,6 +270,9 @@ export function WelcomeView() {
             }
             autoCorrect={false}
             spellCheck={false}
+            returnKeyType="next"
+            blurOnSubmit={false}
+            onSubmitEditing={onPressSignIn}
           />
 
             {/* Submit Button */}
@@ -269,7 +285,7 @@ export function WelcomeView() {
               ]}
             >
               {loading && (
-                <Image 
+                <Image  
                   source={icons.loader} 
                   style={styles.loadingIcon} 
                 />

@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useEffect, useState, useContext, useCallback } from 'react';
 import { View, Text, Image, Alert, TouchableOpacity } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createDrawerNavigator } from '@react-navigation/drawer';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useSelector, useDispatch } from 'react-redux';
 import supabase from './utils/supabaseClient';
@@ -16,7 +16,7 @@ import Winnings from './screens/drawers/Winnings';
 import Transactions from './screens/drawers/Transactions';
 import SettingsScreen from './screens/drawers/SettingsScreen';
 import CustomDrawerIcon from './components/CustomDrawerIcon';
-import { getConfiguration, getDayRange } from './utils/helpers';
+import { getConfiguration, getDayRange, useDeviceCheck } from './utils/helpers';
 import CashFlow from './screens/drawers/CashFlow';
 import CancelledTickets from './screens/drawers/CancelledTickets';
 import Inbox from './screens/drawers/Inbox';
@@ -43,6 +43,11 @@ import ViewShot from './screens/ViewShot';
 import moment from 'moment-timezone';
 import { fetchDraws } from './redux/actions/bettingActions';
 import MapScreen from './screens/MapScreen';
+import { fetchUserByEmail, signOut, updateUser } from './redux/actions/user.actions';
+import DeviceInfo, { useDeviceName } from 'react-native-device-info';
+import { api } from './utils/offlineSync';
+import { verifyDeviceForUser } from './utils/deviceAuth';
+import LoginDevices from './screens/LoginDevices';
 
 
 
@@ -131,7 +136,7 @@ const DrawerNavigation = () => {
   } catch (err) {
     console.error("Error fetching draws:", err);
   }
-};
+  };
 
 
   const generateDrawerScreenOptions = (label, icon, headerTitle, navigation) => ({
@@ -255,11 +260,8 @@ const DrawerNavigation = () => {
 
 const StackNavigates = () => {
   const {  isAuthenticated,  batch_number, selectedUser, user } = useSelector(({ user }) => user);
+  const dispatch = useDispatch();
 
-
-
-  
-  // console.log(batchNo, batch, 'batchhh')
   return (
             <Stack.Navigator
                initialRouteName='Play'
@@ -304,6 +306,19 @@ const StackNavigates = () => {
               headerStyle: { backgroundColor: COLORS.secondary },
               headerLeft: () => (
                 <CustomDrawerIcon route={route} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'View Ticket'} />
+              ),
+            })}
+          />
+          <Stack.Screen
+            name="LoginDevices"
+            component={LoginDevices}
+            options={({ navigation, route }) => ({
+              headerShown: true,
+              headerTitle: '',
+              headerTitleStyle: { color: COLORS.white },
+              headerStyle: { backgroundColor: COLORS.secondary },
+              headerLeft: () => (
+                <CustomDrawerIcon route={route} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'Login Devices'} />
               ),
             })}
           />
@@ -464,9 +479,11 @@ const StackNavigates = () => {
 export const StackNavigator = () => {
   const { session } = useContext(SessionContext);
   const dispatch = useDispatch();
-  const { user } = useSelector(({ user }) => user);
+  const { user, isAuthenticated } = useSelector(({ user }) => user);
   const userRedux = useSelector(state => state.user.user);
   const [selectedUser, setUser] = useState(userRedux);
+	const { loading, result } = useDeviceName(); // { loading: true, result: "Becca's iPhone 6"}
+  const [deviceValidated, setDeviceValidated] = useState(false);
 
 
 
@@ -489,6 +506,57 @@ export const StackNavigator = () => {
   }, [session]);
 
 
+
+   // 🔥 DEVICE CHECK BEFORE ANYTHING LOADS
+  useEffect(() => {
+    const runDeviceCheck = async () => {
+      if (!isAuthenticated || !user) {
+        setDeviceValidated(true);
+        return;
+      }
+
+
+      const ok = await verifyDeviceForUser(dispatch, user);
+
+      if (ok) setDeviceValidated(true);
+      // if not ok → signOut already handled
+    };
+
+    runDeviceCheck();
+  }, [isAuthenticated, user]);
+
+    // ⬇️ INSERT REALTIME LISTENER HERE
+  // useEffect(() => {
+  //   if (!isAuthenticated || !user?.id) return;
+
+  //   const channel = supabase
+  //     .channel(`user-realtime-${user.id}`)
+  //     .on(
+  //       "postgres_changes",
+  //       {
+  //         event: "*",
+  //         schema: "public",
+  //         table: "users",
+  //         filter: `id=eq.${user.id}`,
+  //       },
+  //       async (payload) => {
+  //         console.log("Realtime Update:", payload);
+
+  //         dispatch({
+  //           type: SET_USER,
+  //           payload: payload.new,
+  //         });
+  //       }
+  //     )
+  //     .subscribe();
+
+  //   return () => {
+  //     supabase.removeChannel(channel);
+  //   };
+  // }, [isAuthenticated, user?.id]);
+
+  // 🔒 Prevent UI from rendering before device check is done
+  if (!deviceValidated) return null; 
 
   return (
     <SafeAreaProvider>

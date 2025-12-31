@@ -31,6 +31,10 @@ import {
 } from './redux/actions/user.actions';
 import { syncConfig } from './configs/syncConfig';
 import SyncManager from './services/SyncManager';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import RNFS from 'react-native-fs';
+
+import { downloadAndReplaceImage } from './utils/helpers';
 
 
 // Add this at the top of your App.js, before any components
@@ -39,6 +43,8 @@ LogBox.ignoreLogs([
   'Non-serializable values',
   'new NativeEventEmitter() was called with a non-null argument without the required',
 ]);
+
+
 
 
 // Loading Indicator Component
@@ -363,8 +369,56 @@ const AppWithProviders = () => {
   );
 };
 
+const IMAGES = [
+  {
+    url: "https://sharewin.pro/apiv2/assets/bwlogo1.png",
+    filename: "bwlogo1.png",
+  },
+  {
+    url: "https://sharewin.pro/apiv2/assets/heritage_bw_logo.png",
+    filename: "heritage_bw_logo.png",
+  }
+];
+
+
 // Root App Component
 export const App = () => {
+  const [localImages, setLocalImages] = useState([]);
+
+  useEffect(() => {
+    const initImages = async () => {
+    const alreadySaved = await AsyncStorage.getItem("images_saved");
+
+      if (alreadySaved === "true") {
+        console.log("Images already saved previously.");
+
+        // Load local paths
+        const savedPaths = IMAGES.map(img => 
+          `file://${RNFS.DocumentDirectoryPath}/${img.filename}`
+        );
+        setLocalImages(savedPaths);
+        return;
+      }
+
+      // First install: download images
+      let downloadedPaths = [];
+      for (const img of IMAGES) {
+        const localPath = await downloadAndReplaceImage(img.url, img.filename);
+        if (localPath) downloadedPaths.push("file://" + localPath);
+      }
+
+      // Save marker
+      await AsyncStorage.setItem("images_saved", "true");
+
+      setLocalImages(downloadedPaths);
+    };
+
+    initImages();
+  }, []);
+  
+
+  console.log(localImages, "<<====== THE LOCAL IMAGES SAVED TO LOCAL STORAGE")
+  
   return (
     <Provider store={store}>
       <AppWithProviders />

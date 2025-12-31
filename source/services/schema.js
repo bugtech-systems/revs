@@ -27,6 +27,7 @@ export const schema = {
     uplines: "json",
     created_at: "timestamp",
     updated_at: "timestamp",
+    login_devices: "json",
     // Sync columns
     _status: "text",
     _version: "numeric",
@@ -188,6 +189,7 @@ CREATE TABLE IF NOT EXISTS users (
   last_summary TIMESTAMP,
   configuration TEXT,
   uplines TEXT,
+  login_devices TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   _status TEXT DEFAULT 'synced',

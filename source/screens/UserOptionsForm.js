@@ -24,7 +24,8 @@ const DEFAULT_CONFIG = [
   { title: 'withWin200', label: 'With Win200', description: 'Enable WINTO tickets.', isCheck: false },
   { title: 'appUsers', label: 'Show Application Users', description: 'Grant access for all Users.', isCheck: false },
   { title: 'lastSummaryReport', label: 'Last Summary Report', description: 'Allows configuration of a user’s latest summary report.', isCheck: false },
-  { title: 'cashFlow', label: 'Cash Flow', description: 'Enable viewing of Cash Flow reports.', isCheck: false },
+  { title: 'allowedDevices', label: 'Allowed Devices', description: 'Number of devices allowed for this user.', isCheck: false },
+  // { title: 'cashFlow', label: 'Cash Flow', description: 'Enable viewing of Cash Flow reports.', isCheck: false },
 ]
 
 const db = SQLite.openDatabase({ name: 'app.db', location: 'default' })
@@ -251,7 +252,7 @@ const handleConfiguration = async (type) => {
        
           {mergedConfig
             .filter(cfg =>
-              !['ticketForm', 'printHeader', 'soldouts', 'updateTickets', 'hasMaxLimit', 'uploadTip'].includes(cfg.title)
+              !['ticketForm', 'printHeader', 'soldouts', 'updateTickets', 'hasMaxLimit', 'uploadTip', 'allowedDevices'].includes(cfg.title)
             )
             .map(cfg => {
               if (cfg.title === 'cashFlow' && !(userConfig?.role === 'coordinator' && userConfig?.is_admin)) return null

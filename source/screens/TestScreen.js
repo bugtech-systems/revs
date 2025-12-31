@@ -59,7 +59,7 @@ import { formatNumber, getConfiguration } from '../utils/helpers'
 import { COLORS, SIZES } from '../constants/theme';
 import { useDispatch, useSelector } from 'react-redux';
 import { SET_LOADING, STOP_LOADING } from '../redux/actions/types';
-import { DocumentDirectoryPath, downloadFile, writeFile, readDir, stat, readFile, unlink } from 'react-native-fs';
+import RNFS from 'react-native-fs';
 import { BarcodeCreatorView, BarcodeFormat } from 'react-native-barcode-creator';
 import { useOffline } from '../context/OfflineProvider';
 import { fetchUserByEmail } from '../redux/actions/user.actions';
@@ -157,11 +157,21 @@ export default function TestScreen({ data, isPrint, onPrint }) {
 
             try {
                 let printHeader = getConfiguration(selectedUser, 'printHeader');
-                const filePath = `${DocumentDirectoryPath}/bwlogo1.png`;
-                const taclobanLogo = Image.resolveAssetSource({ uri: `https://sharewin.pro/apiv2/assets/bwlogo1.png` }).uri;
-                const easternSamarLogo = Image.resolveAssetSource({ uri: `https://sharewin.pro/apiv2/assets/heritage_bw_logo.png` }).uri;
+                // const filePath = `${DocumentDirectoryPath}/bwlogo1.png`;
+                // const taclobanLogo = Image.resolveAssetSource({ uri: `https://sharewin.pro/apiv2/assets/bwlogo1.png` }).uri;
+                // const easternSamarLogo = Image.resolveAssetSource({ uri: `https://sharewin.pro/apiv2/assets/heritage_bw_logo.png` }).uri;
+                
+                 // LOCAL FILE PATHS — downloaded on first install
+                const taclobanLogo = `file://${RNFS.DocumentDirectoryPath}/bwlogo1.png`;
+                const easternSamarLogo = `file://${RNFS.DocumentDirectoryPath}/heritage_bw_logo.png`;
+
+                            // Choose image based on template
+                const selectedLogo = String(receiptTemplate).toLowerCase() === "eastern samar" ? easternSamarLogo : taclobanLogo;
+                
                 const uri = await viewShotRef.current.capture();
-                const base64StringImage = await RawbtApi.getImageBase64String(String(receiptTemplate).toLowerCase() == 'eastern samar' ? easternSamarLogo : taclobanLogo);
+                // const base64StringImage = await RawbtApi.getImageBase64String(String(receiptTemplate).toLowerCase() == 'eastern samar' ? easternSamarLogo : taclobanLogo);
+                
+                const base64StringImage = await RawbtApi.getImageBase64String(selectedLogo);
                 const base64String = await RawbtApi.getImageBase64String(uri);
 
                 const scale = String(receiptTemplate).toLowerCase() == 'eastern samar' ? 13 : 16;
@@ -254,7 +264,7 @@ export default function TestScreen({ data, isPrint, onPrint }) {
             agentCode = `${String(collectorDetails?.firstName).charAt(0).toUpperCase() + String(collectorDetails?.lastName).charAt(0).toUpperCase() + '-' + String(collectorDetails?.mobile).slice(-4)}`
 
             /* image */
-            const filePath = `${DocumentDirectoryPath}/bwlogo1.png`;
+            // const filePath = `${DocumentDirectoryPath}/bwlogo1.png`;
             // let loadImage = Image.resolveAssetSource({uri: `file://${filePath}`}).uri;
 
 
@@ -750,7 +760,7 @@ export default function TestScreen({ data, isPrint, onPrint }) {
                                 :
                                 <ViewShot
                                     ref={viewShotRef}
-                                    options={{ format: 'webm', quality: 0.8, width: 600, height: viewHeight }}
+                                    options={{ format: 'webm', quality: 0.8, width: 500, height: viewHeight }}
                                     style={{
                                         position: 'absolute',
                                         top: -9999,
@@ -762,19 +772,14 @@ export default function TestScreen({ data, isPrint, onPrint }) {
                                         onLayout={(e) => {
                                             const { height } = e.nativeEvent.layout;
                                             setViewHeight(height);
-                                            //   setReadyToCapture(true); // layout is ready
                                         }}
                                         style={{
                                             width: '100%', alignItems: 'center',
-                                            // height: processedTicket?.combinations.length > 2 ? 750 : 550,
-                                            width: 430
+                                            width: 450
                                         }}
                                     >
-                                        {/* <Text style={{ ...styles.fontStyles1, fontSize: 16, textAlign: 'center', fontWeight: 'normal', }}>
-                                        HERITAGE LOTTERY INC
-                                    </Text> */}
                                         <View style={{ alignSelf: 'center', width: '100%' }}>
-                                            <Text style={{ ...styles.fontStyles2, textAlign: 'center', fontSize: 28, fontWeight: '200' }}>
+                                            <Text style={{ ...styles.fontStyles2, textAlign: 'center', fontSize: 30, fontWeight: '200' }}>
                                                 HERITAGE LOTTERY INC.
                                             </Text>
                                         </View>
@@ -783,78 +788,48 @@ export default function TestScreen({ data, isPrint, onPrint }) {
                                         <View style={{ width: '100%', flexDirection: 'column', }}>
                                             <View style={{ width: '100%', flexDirection: 'row' }}>
                                                 <View style={{ width: '23%', justifyContent: 'flex-end', }}>
-                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 28, fontWeight: '200' }}>
+                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 30, fontWeight: '200' }}>
                                                         Ref No.
                                                     </Text>
                                                 </View>
                                                 <View style={{ width: '77%', paddingLeft: 8, justifyContent: 'flex-start', }}>
-                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 28, fontWeight: '200', paddingLeft: 4 }}>
+                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 30, fontWeight: '200', paddingLeft: 4 }}>
                                                         {'410-' + moment(heritageRefNo).format('YYMMDDHHMMSS')}
                                                     </Text>
                                                 </View>
-                                                {/* <View style={{ width: '30%', justifyContent: 'flex-end'}}>
-												<Text style={{ ...styles.fontStyles2, fontSize: 11, fontWeight: '200' }}>
-													Draw
-												</Text>
-											</View>
-											<View style={{ width: '70%', justifyContent: 'flex-start',}}>
-												<Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 11, fontWeight: '200' }}>
-													{moment().format('MMM DD, YYYY ha')}
-												</Text>
-											</View>
-											<View style={{ width: '30%', justifyContent: 'flex-end'}}>
-												<Text style={{ ...styles.fontStyles2, fontSize: 11, fontWeight: '200' }}>
-													Agent
-												</Text>
-											</View>
-											<View style={{ width: '70%', justifyContent: 'flex-start',}}>
-												<Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 11, fontWeight: '200' }}>
-													{String(data.collector).toUpperCase()}
-												</Text>
-											</View>
-											<View style={{ width: '30%', justifyContent: 'flex-end'}}>
-												<Text style={{ ...styles.fontStyles2, fontSize: 11, fontWeight: '200' }}>
-													Agent#
-												</Text>
-											</View>
-											<View style={{ width: '70%', justifyContent: 'flex-start',}}>
-												<Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 11, fontWeight: '200' }}>
-													10 WS OUTLETCAT0008
-												</Text>
-											</View> */}
                                             </View>
                                             <View style={{ width: '100%', flexDirection: 'row' }}>
                                                 <View style={{ width: '22%', justifyContent: 'flex-end', }}>
-                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 28, fontWeight: '200' }}>
+                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 30, fontWeight: '200' }}>
                                                         Draw
                                                     </Text>
                                                 </View>
                                                 <View style={{ width: '78%', paddingLeft: 8, justifyContent: 'flex-start', }}>
-                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 28, fontWeight: '200', paddingLeft: 4 }}>
+                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 30, fontWeight: '200', paddingLeft: 4 }}>
                                                         {moment().format('MMM DD, YYYY') + ' ' + data?.game_time}
                                                     </Text>
                                                 </View>
                                             </View>
                                             <View style={{ width: '100%', flexDirection: 'row' }}>
                                                 <View style={{ width: '22%', justifyContent: 'flex-end', }}>
-                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 28, fontWeight: '200' }}>
+                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 30, fontWeight: '200' }}>
                                                         Agent
                                                     </Text>
                                                 </View>
                                                 <View style={{ width: '78%', paddingLeft: 8, justifyContent: 'flex-start', }}>
-                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 28, fontWeight: '200', paddingLeft: 4 }}>
+                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 30, fontWeight: '200', paddingLeft: 4 }}>
                                                         {String(selectedUser?.first_name).toUpperCase()}
                                                     </Text>
                                                 </View>
                                             </View>
                                             <View style={{ width: '100%', flexDirection: 'row' }}>
                                                 <View style={{ width: '22%', justifyContent: 'flex-end', }}>
-                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 28, fontWeight: '200' }}>
+                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 30, fontWeight: '200' }}>
                                                         Agent#
                                                     </Text>
                                                 </View>
                                                 <View style={{ width: '78%', paddingLeft: 8, justifyContent: 'flex-start', }}>
-                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 28, fontWeight: '200', paddingLeft: 4 }}>
+                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 30, fontWeight: '200', paddingLeft: 4 }}>
                                                         {String(selectedUser?.last_name).toUpperCase()}
                                                         {/* 10-WS-OUTLET-CAT0008 */}
                                                     </Text>
@@ -862,43 +837,12 @@ export default function TestScreen({ data, isPrint, onPrint }) {
                                             </View>
 
                                         </View>
+                                        <View style={{ flexDirection: 'column', borderBottomWidth: .5, width: '100%', }}>
 
 
-
-
-
-
-
-                                        {/* <View style={{ width: '100%', flexDirection: 'row', }}>
-                                    <Text style={{ ...styles.fontStyles2, fontSize: 12, fontWeight: '300' }}>
-                                            Ref No.
-                                        </Text>
-
-                                    <Text style={{ ...styles.fontStyles2, fontSize: 12, fontWeight: '300' }}>
-                                            {' 410-' + moment(heritageRefNo).format('YYMMDDHHMMSS')}
-                                        </Text>
-
-                                    </View> */}
-
-                                        {/* <Text style={{ ...styles.fontStyles2, fontSize: 12, fontWeight: '300' }}>
-                                        Draw {moment().format('MMM DD, YYYY ha')}
-                                    </Text>
-
-
-                                    <Text style={{ ...styles.fontStyles2, fontSize: 12, fontWeight: '300' }}>
-                                        Agent {String(data.collector).toUpperCase()}
-                                    </Text>
-
-                                    <Text style={{ ...styles.fontStyles2, fontSize: 12, fontWeight: '300' }}>
-                                        Agent# 10 WS OUTLET CAT0008
-                                    </Text> */}
-
-                                        <View style={{ flexDirection: 'column', borderBottomWidth: .5, borderTopWidth: .5, borderColor: COLORS.black, width: '100%', paddingHorizontal: 8 }}>
-
-
-                                            <View style={{ flexDirection: 'row', }}>
+                                            <View style={{ flexDirection: 'row', borderTopWidth: .5, borderBottomWidth: .5, paddingHorizontal: 8, borderColor: COLORS.black}}>
                                                 <View style={{ width: '30%', justifyContent: 'center' }}>
-                                                    <Text style={{ ...styles.fontStyles2, fontSize: 28, fontWeight: '200', textAlign: 'left' }}>
+                                                    <Text style={{ ...styles.fontStyles2, fontSize: 30, fontWeight: '200', textAlign: 'left' }}>
                                                         #Game
                                                     </Text>
                                                 </View>
@@ -910,18 +854,18 @@ export default function TestScreen({ data, isPrint, onPrint }) {
                                     </View> */}
 
                                                 <View style={{ width: '20%', justifyContent: 'center', }}>
-                                                    <Text style={{ ...styles.fontStyles2, fontSize: 28, fontWeight: '200' }}>
+                                                    <Text style={{ ...styles.fontStyles2, fontSize: 30, fontWeight: '200' }}>
                                                         Nos
                                                     </Text>
                                                 </View>
 
                                                 <View style={{ width: '34%', justifyContent: 'center', }}>
-                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 28, fontWeight: '200' }}>
+                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 30, fontWeight: '200' }}>
                                                         {'Amount' + ' '}
                                                     </Text>
                                                 </View>
                                                 <View style={{ width: '16%', justifyContent: 'center', }}>
-                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 28, fontWeight: '200' }}>
+                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 30, fontWeight: '200' }}>
                                                         Type
                                                     </Text>
                                                 </View>
@@ -938,28 +882,28 @@ export default function TestScreen({ data, isPrint, onPrint }) {
                                                             <View style={{ flexDirection: 'row' }}>
                                                                 <View style={{ width: '30%', justifyContent: 'center', flexDirection: 'row', }}>
                                                                     <View style={{ width: '22%' }}>
-                                                                        <Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 20, fontWeight: '200' }}>
+                                                                        <Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 24, fontWeight: '200' }}>
                                                                             {game_number}
                                                                         </Text>
                                                                     </View>
                                                                     <View style={{ width: '78%', paddingLeft: 2 }}>
-                                                                        <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 20, fontWeight: '200' }}>
+                                                                        <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 24, fontWeight: '200' }}>
                                                                             3D
                                                                         </Text>
                                                                     </View>
                                                                 </View>
                                                                 <View style={{ width: '20%', justifyContent: 'center', }}>
-                                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 36, fontWeight: '200' }}>
+                                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 38, fontWeight: '200' }}>
                                                                         {item?.combination}
                                                                     </Text>
                                                                 </View>
                                                                 <View style={{ width: '34%', justifyContent: 'center', }}>
-                                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 36, fontWeight: '200' }}>
+                                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 38, fontWeight: '200' }}>
                                                                         {item?.amount}
                                                                     </Text>
                                                                 </View>
                                                                 <View style={{ width: '16%', justifyContent: 'center', }}>
-                                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 36, fontWeight: '200' }}>
+                                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 38, fontWeight: '200' }}>
                                                                         {item?.betType}
                                                                     </Text>
                                                                 </View>
@@ -971,32 +915,34 @@ export default function TestScreen({ data, isPrint, onPrint }) {
                                         </View>
                                         <View style={{ width: '100%', alignItems: 'flex-start', justifyContent: 'flex-start', flexDirection: 'column' }}>
                                             <View style={{ width: '100%', flexDirection: 'row' }}>
-                                                <View style={{ width: '22%' }}>
-                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 36, fontWeight: '200' }}>
+                                                <View style={{ width: '28%' }}>
+                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 38, fontWeight: '200' }}>
                                                         Total:
                                                     </Text>
                                                 </View>
-                                                <View style={{ width: '78%', paddingLeft: 10 }}>
-                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 36, fontWeight: '200' }}>
+                                                <View style={{ width: '72%', paddingLeft: 10 }}>
+                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 38, fontWeight: '200' }}>
                                                         P {formatNumber(betTotal)}
                                                     </Text>
                                                 </View>
                                             </View>
                                             <View style={{ width: '100%', flexDirection: 'row' }}>
-                                                <View style={{ width: '22%' }}>
-                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 28, fontWeight: '200' }}>
+                                                <View style={{ width: '28%' }}>
+                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 30, fontWeight: '200' }}>
                                                         Printed:
                                                     </Text>
                                                 </View>
-                                                <View style={{ width: '78%', paddingLeft: 10 }}>
-                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 28, fontWeight: '200' }}>
+                                                <View style={{ width: '72%', paddingLeft: 10 }}>
+                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 30, fontWeight: '200' }}>
                                                         {moment(heritageRefNo).format('MMM DD, YYYY HH:MM:SS')}
                                                     </Text>
                                                 </View>
                                             </View>
-                                            <Text style={{ ...styles.fontStyles2, textAlign: 'center', paddingLeft: 20, fontSize: 28, fontWeight: '200' }}>
-                                                WARAY TICKET, WARAY DAOG
-                                            </Text>
+                                            <View style={{ width: '100%', alignItems: 'center'}}>
+                                                <Text style={{ ...styles.fontStyles2, textAlign: 'center', fontSize: 26, fontWeight: '200' }}>
+                                                    WARAY TICKET, WARAY DAOG
+                                                </Text> 
+                                            </View>
                                             <View style={{ width: '100%', flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'flex-start' }}>
                                                 <View
                                                     // style={{ width: '40%', alignItems: 'center', justifyContent: 'center', padding: 20}}

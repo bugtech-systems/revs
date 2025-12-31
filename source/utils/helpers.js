@@ -2,10 +2,11 @@ import DeviceInfo from 'react-native-device-info';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import moment from 'moment-timezone';
 import RNFS from 'react-native-fs';
-import { Alert, Dimensions, Platform } from 'react-native';
+import { Alert, Dimensions, Platform, PermissionsAndroid } from 'react-native';
 import { useEffect, useState } from 'react';
 import 'react-native-get-random-values'; // polyfill for crypto.getRandomValues
 import { ObjectId } from 'bson';
+import Geolocation from 'react-native-geolocation-service';
 
 // import { Combinations } from '../Models';
 
@@ -320,3 +321,100 @@ export const generateTimestamp = () => {
 
   return `${year}${month}${day}${hours}${minutes}${seconds}`;
 }
+
+export const useDeviceCheck = () => {
+  const [deviceId, setDeviceId] = useState(null);
+
+  useEffect(() => {
+    const fetchId = async () => {
+      try {
+        const id = await DeviceInfo.getUniqueId();
+        setDeviceId(id);
+      } catch (err) {
+        console.log("Error getting device ID:", err);
+      }
+    };
+    fetchId();
+  }, []);
+
+  return deviceId;
+};
+
+  // ✅ Request permission (Android)
+  export const requestLocationPermission = async () => {
+    if (Platform.OS === "android") {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+      );
+
+      console.log(granted, "THE GRANT")
+      
+      return granted === PermissionsAndroid.RESULTS.GRANTED;
+    }
+    return true;
+  };
+
+// Function to get current location
+export const getCurrentLocation = async () => {
+  const hasPermission = await requestLocationPermission();
+  if (!hasPermission) {
+    Alert.alert('Location permission denied');
+    return null;
+  }
+
+  return new Promise((resolve, reject) => {
+    Geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        console.log('User position:', latitude, longitude);
+        resolve({ latitude, longitude });
+      },
+      (error) => {
+        console.log('Location error:', error.code, error.message);
+        reject(error);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+    );
+  });
+};
+
+export const downloadAndReplaceImage = async (url, filename) => {
+  try {
+    const savePath = `${RNFS.DocumentDirectoryPath}/${filename}`;
+
+    const exists = await RNFS.exists(savePath);
+    if (exists) {
+      console.log("File exists — deleting:", savePath);
+      await RNFS.unlink(savePath);
+    }
+
+    const result = await RNFS.downloadFile({
+      fromUrl: url,
+      toFile: savePath,
+    }).promise;
+
+    if (result.statusCode === 200) {
+      console.log("Image downloaded:", savePath);
+      return savePath;
+    } else {
+      throw new Error("Failed download: " + result.statusCode);
+    }
+  } catch (err) {
+    console.error("Error downloading image:", err);
+    return null;
+  }
+};
+
+export const getAllowedDevicesCount = (configurations = []) => {
+  const allowed = configurations.find(
+    (c) => c.title === 'allowedDevices'
+  );
+
+  // Default to 1 device if not configured
+  return allowed?.value ? Number(allowed.value) : 1;
+};
+
+export const normalizeDevices = (devices) => {
+  if (!Array.isArray(devices)) return [];
+  return devices.filter(d => d && d.is_deleted !== true);
+};

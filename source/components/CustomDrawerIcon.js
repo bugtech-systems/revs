@@ -89,7 +89,7 @@ const CustomDrawerIcon = ({ route, navigation, navType, headerTitle }) => {
             {displayName}
           </Text>
 
-          {(collector && user.email != collector) && (
+          {(collector && user?.email != collector) && (
             <Text style={{ fontSize: 13, fontWeight: 'bold', color: COLORS.primary }}>
               {' / ' + String(collector).split('@')[0].toUpperCase()}
             </Text>

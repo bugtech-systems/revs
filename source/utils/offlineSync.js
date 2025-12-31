@@ -574,7 +574,6 @@ export async function localGet(tableName, id) {
 async function localQuery(tableName, query = {}, is_online = false) {
 
 
-  console.log(query, "THE QUERY QUERYHAN")
   
   const cacheKey = getCacheKey(tableName, 'query', query);
   const cached = getCache(cacheKey);
@@ -1280,10 +1279,7 @@ export const fetchUsers = async ( filter, is_online = false) => {
       orderBy: "created_at DESC",
     }, is_online);
 
-    // Filter users that contain a valid coordinates format "lat|lng"
-    return users.filter(u => 
-      typeof u.coordinates === "string" && u.coordinates.includes("|")
-    );
+    return users;
 
   } catch (error) {
     console.error("❌ Error fetching users with coordinates:", error);

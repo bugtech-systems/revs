@@ -169,7 +169,7 @@ console.log(com_rate, 'COMM RATE', show)
           mode="date"
           display="calendar"
           onChange={(event, selectedDate) => onChangeDate(event, selectedDate)}
-          minimumDate={new Date(user?.last_summary)}
+          minimumDate={new Date(selectedUser?.last_summary)}
           maximumDate={new Date(moment().toDate())}
           negativeButton={{ label: "Cancel" }}
           neutralButton={{ label: "Clear" }}

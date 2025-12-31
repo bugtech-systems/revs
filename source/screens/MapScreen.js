@@ -43,7 +43,12 @@ const MapScreen = ({ navigation, route }) => {
       coordinates: { op: '!=', value: null },
     });
     console.log("Fetched map users:", mapUsers);
-    setUsers(mapUsers || []);                    // 🔥 critical fix
+
+    let validateCoordinates = mapUsers.filter(u => 
+      typeof u.coordinates === "string" && u.coordinates.includes("|")
+    );
+    
+    setUsers(validateCoordinates || []);
   };
 
 

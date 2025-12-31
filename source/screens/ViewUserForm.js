@@ -35,7 +35,9 @@ const ViewUserForm = ({ route, navigation }) => {
     role: '',
     commission: '',
     win_straight: '',
-    win200: ''
+    win200: '',
+    allowedDevices: '', // 👈 NEW (string for input)
+
   });
 
 
@@ -62,7 +64,8 @@ const ViewUserForm = ({ route, navigation }) => {
         commission: fetchUser.commission,
         receipt_template: fetchUser?.receipt_template,
         win_straight: getConfiguration(fetchUser, 'winStraight')?.value,
-        win200: getConfiguration(fetchUser, 'withWin200')?.value
+        win200: getConfiguration(fetchUser, 'withWin200')?.value,
+        allowedDevices: getConfiguration(fetchUser, 'allowedDevices')?.value,
       })
       }
       
@@ -121,12 +124,22 @@ const handleSubmit = async () => {
     // 1️⃣ Clone the current configuration
     let currentConfigs = userConfig?.configuration || [];
 
+    const allowedDevicesValue = Number(values.allowedDevices) || 1;
+
+
     // 2️⃣ Update or insert the winStraight config
-    let updatedConfigs = currentConfigs.map(cfg =>
-      cfg.title === 'winStraight'
-        ? { ...cfg, value: values.win_straight }
-        : cfg
-    );
+    // 3️⃣ Update configs
+    let updatedConfigs = currentConfigs.map(cfg => {
+      if (cfg.title === 'winStraight') {
+        return { ...cfg, value: values.win_straight };
+      }
+
+      if (cfg.title === 'allowedDevices') {
+        return { ...cfg, value: allowedDevicesValue };
+      }
+
+      return cfg;
+    });
 
     // If not found, add it
     if (!updatedConfigs.some(cfg => cfg.title === 'winStraight')) {
@@ -135,6 +148,16 @@ const handleSubmit = async () => {
         label: 'Win Straight',
         description: 'Winning straight multiplier',
         value: values.win_straight,
+      });
+    }
+
+        // 5️⃣ Insert allowedDevices if missing
+    if (!updatedConfigs.some(cfg => cfg.title === 'allowedDevices')) {
+      updatedConfigs.push({
+        title: 'allowedDevices',
+        label: 'Allowed Devices',
+        description: 'Maximum allowed login devices',
+        value: values.allowedDevices,
       });
     }
 
@@ -385,10 +408,10 @@ const handleSubmit = async () => {
             dropdownStyle={styles.dropdownMenuStyle}
           />
           <LargeInput
-            editable={false}
-            label={'Device ID'}
-            onChangeText={handleChanges('deviceId')}
-            value={String(values.deviceId ? values.deviceId : "T.B.A")}
+            editable={true}
+            label={'Allowed Devices'}
+            onChangeText={(text) => setValues(prev => ({ ...prev, allowedDevices: text }))}
+            value={String(values.allowedDevices)}
             inputLength={'48%'}
           />
         </View>

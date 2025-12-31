@@ -4,7 +4,7 @@ import { StyleSheet, Text, Keyboard, View, ScrollView, TouchableOpacity, FlatLis
 import moment from 'moment-timezone';
 import { useSelector, useDispatch } from 'react-redux';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import {  generateObjectId, getConfiguration, getDayRange, getWithWin200Config, updateDateTimeIfGreater } from '../utils/helpers';
+import {  generateObjectId, getConfiguration, getCurrentLocation, getDayRange, getWithWin200Config, updateDateTimeIfGreater } from '../utils/helpers';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Geolocation from 'react-native-geolocation-service';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -13,6 +13,7 @@ import ConfirmationModal from '../components/ConfirmationModal';
 // import { useOffline } from '../context/OfflineProvider';
 import {  fetchUser, api, nowISO } from '../utils/offlineSync';
 import { fetchDraws, fetchMasterCombinations } from '../redux/actions/bettingActions';
+import { updateUser } from '../redux/actions/user.actions';
 // import { useOfflineSync } from '../context/OfflineSyncProvider';
 
 
@@ -247,7 +248,7 @@ export default function TicketForm({ navigation }) {
         // let totalR = comb?.ramble_total + Number(amountRamble);
 
 
-        if (((comb.length > 1 && comb.length < 300) && (!comb[0]?.straight_total && !comb[0]?.ramble_total))) {
+        if (((comb?.length > 1 && comb?.length < 300) && (!comb[0]?.straight_total && !comb[0]?.ramble_total))) {
             Alert.alert(`Sold Out Combination!`)
             return;
         }
@@ -424,26 +425,26 @@ export default function TicketForm({ navigation }) {
                             console.log(drawResult, 'DRAW RESULT')
                         return;
                         } */
-                if (collector == user?.email) {
-                    Geolocation.getCurrentPosition(
-                       async (position) => {
-                            let { coords } = position;
-                            // setMarkerLocation({ ...position.coords });
-                            // realm.write(async () => {
-                            //     selectedUser.coordinates = `${coords.latitude}|${coords.longitude}`;
-                            // })
-                            await api.updateUser(user?.id, {
-                                coordinates: `${coords.latitude}|${coords.longitude}`
-                            })
+                // if (collector == user?.email) {
+                //    await Geolocation.getCurrentPosition(
+                //        async (position) => {
+                //             let { coords } = position;
+                //             // setMarkerLocation({ ...position.coords });
+                //             // realm.write(async () => {
+                //             //     selectedUser.coordinates = `${coords.latitude}|${coords.longitude}`;
+                //             // })
+                //             await dispatch(updateUser(user?.id, { ...user,
+                //                 coordinates: `${coords.latitude}|${coords.longitude}`
+                //             }))
 
-                        },
-                        error => {
-                            // See error code charts below.
-                            console.log(error.code, error.message, 'LOCATION ERROR');
-                        },
-                        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
-                    );
-                }
+                //         },
+                //         error => {
+                //             // See error code charts below.
+                //             console.log(error.code, error.message, 'LOCATION ERROR');
+                //         },
+                //         { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
+                //     );
+                // }
                 
                 
                         //  const fixedDate = new Date(date.getTime() + (8 * 60 * 60 * 1000));
@@ -685,10 +686,6 @@ export default function TicketForm({ navigation }) {
     initData();
     }
     }, [selectedUser?.id, dataVersion]);
-    
-
-    
- 
     
 
 

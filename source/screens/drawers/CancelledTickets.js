@@ -38,7 +38,7 @@ const CancelledTickets = ({ navigation }) => {
   const [filterTime, setFilterTime] = useState(drawTimes[0].name);
   const [includeAll, setIncludeAll] = useState(true);
   const [loading, setLoading] = useState(false);
-  const userNow = selectedUser ? selectedUser.id : user.id;
+  const userNow = selectedUser ? selectedUser?.id : user?.id;
 
   // const { start_of_day, end_of_day  } = getDayRange(date);
 

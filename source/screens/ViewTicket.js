@@ -90,7 +90,7 @@ console.log(ticketDetails, 'TICKET')
   return (
     <View style={styles.container}>
       <View style={styles.detailsContainer}>
-        <DetailRow label="Agent:" value={betting.collector} />
+        {/* <DetailRow label="Agent:" value={betting.collector} /> */}
         <DetailRow label="Ticket ID:" value={betting.ticket_no} />
         <DetailRow
           label="Bet Date/Time:"

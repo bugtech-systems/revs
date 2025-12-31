@@ -253,12 +253,12 @@ console.log(ticketDetails, 'TICKET INFO')
             </LinearGradient>
           </TouchableOpacity>
         }
-        {user?.is_admin ?
+        {/* {user?.is_admin ? */}
 
           <TouchableOpacity activeOpacity={.6} onPress={() => console.log('Reprint Not Available!')} style={{ width: '30%' }}>
-            <TestScreen data={ticketDetails} isPrint={false} onPrint={() => setIsPrint(true)} />
+            <TestScreen data={ticketDetails} isPrint={(ticketDetails.isPrint || isPrint)} onPrint={() => setIsPrint(true)} />
           </TouchableOpacity>
-          :
+          {/* :
           <TouchableOpacity activeOpacity={.6} onPress={() => Alert.alert('Reprint Not Available!')} style={{ width: '30%' }}>
             <LinearGradient colors={['#6599c3', '#3573a2', '#165894']} style={styles.linearGradientOk}>
               <Text style={styles.buttonTextOk}>
@@ -266,7 +266,7 @@ console.log(ticketDetails, 'TICKET INFO')
               </Text>
             </LinearGradient>
           </TouchableOpacity>
-        }
+        } */}
         {ticketDetails.is_deleted ?
           <TouchableOpacity activeOpacity={.6} disabled={!user?.is_admin} onPress={() => handleRestore(ticketDetails.id)} style={{ width: '30%' }}>
             <LinearGradient colors={['#6ddc59', '#39ad4a', '#217735']} style={styles.linearGradientOk}>

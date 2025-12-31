@@ -9,6 +9,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, icons } from '../constants';
 import { api, fetchUser, normalizeValue, nowISO } from '../utils/offlineSync';
 import Geolocation from 'react-native-geolocation-service';
+import { updateUser } from '../redux/actions/user.actions';
 
 
 const LoadingIndicator = ({ message = "Initializing App..." }) => {
@@ -335,16 +336,16 @@ export default function TicketForm3({ navigation, route }) {
                         return;
                         } */
               //  if (collector == own_user?.email) {
-                    Geolocation.getCurrentPosition(
+                    await Geolocation.getCurrentPosition(
                        async (position) => {
                             let { coords } = position;
                             // setMarkerLocation({ ...position.coords });
                             // realm.write(async () => {
                             //     selectedUser.coordinates = `${coords.latitude}|${coords.longitude}`;
                             // })
-                            await api.updateUser(user?.id, { ...user,
+                            await dispatch(updateUser(user?.id, { ...user,
                                 coordinates: `${coords.latitude}|${coords.longitude}`
-                            })
+                            }))
                         },
                         error => {
                             // See error code charts below.
