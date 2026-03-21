@@ -1,14 +1,33 @@
 import React from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet, Linking, BackHandler } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, StyleSheet, Linking, BackHandler, Platform, ToastAndroid, Alert } from 'react-native';
 import { COLORS, SIZES } from '../constants/theme';
+import Clipboard from '@react-native-community/clipboard';
 
 
 const UpdateModal = ({ visible, onClose, updateUrl, required }) => {
-  const handleUpdate = () => {
-    Linking.openURL(updateUrl);
-    // onClose(); // Close the modal after redirecting
-    BackHandler.exitApp(); // Exit the app so user can't return to it
-  };
+const handleUpdate = async () => {
+  try {
+    console.log(updateUrl, "THE URI");
+
+    // Copy to clipboard
+    Clipboard.setString(updateUrl);
+
+    if (Platform.OS === 'android') {
+      ToastAndroid.show("Link copied to clipboard", ToastAndroid.SHORT);
+    } else {
+      Alert.alert("Copied", "Link copied to clipboard");
+    }
+
+    // Open the URL
+    await Linking.openURL(updateUrl);
+
+    // Exit the app
+    BackHandler.exitApp();
+
+  } catch (error) {
+    console.log("Error handling update:", error);
+  }
+};
 
   const handleClose = () => {
     // onClose(); // Close the modal after redirecting

@@ -4,16 +4,18 @@ import { StyleSheet, Text, Keyboard, View, ScrollView, TouchableOpacity, FlatLis
 import moment from 'moment-timezone';
 import { useSelector, useDispatch } from 'react-redux';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import {  generateObjectId, getConfiguration, getCurrentLocation, getDayRange, getWithWin200Config, updateDateTimeIfGreater } from '../utils/helpers';
+import { generateObjectId, getConfiguration, getCurrentGeolocation, getCurrentLocation, getDayRange, getWithWin200Config, updateDateTimeIfGreater } from '../utils/helpers';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import Geolocation from 'react-native-geolocation-service';
+// import Geolocation from 'react-native-geolocation-service';
+import Geolocation from '@react-native-community/geolocation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, icons } from '../constants';
 import ConfirmationModal from '../components/ConfirmationModal';
 // import { useOffline } from '../context/OfflineProvider';
-import {  fetchUser, api, nowISO } from '../utils/offlineSync';
+import { fetchUser, api, nowISO } from '../utils/offlineSync';
 import { fetchDraws, fetchMasterCombinations } from '../redux/actions/bettingActions';
 import { updateUser } from '../redux/actions/user.actions';
+import supabase from '../utils/supabaseClient';
 // import { useOfflineSync } from '../context/OfflineSyncProvider';
 
 
@@ -98,12 +100,22 @@ export default function TicketForm({ navigation }) {
     const [draws, setDraws] = useState([])
     const [own_user, setOwnUser] = useState(null)
     const [combinations, setCombinations] = useState([])
+    const [cutoff, setCutoff] = useState(false);
+
+    const today = moment().tz('Asia/Manila').format("YYYY-MM-DD HH:mm:ss.SSS");
 
     const current = new Date();
     const hoursNow = current.getHours();
     const minNow = current.getMinutes();
-    
+
     let comb = combinations.find(a => a.digit == combinationString);
+
+    console.log(comb, "THE COMBIBIBIBIBI@")
+
+
+
+
+    console.log(today, "TODAY")
 
 
     // Reusable modal for sold out
@@ -113,40 +125,45 @@ export default function TicketForm({ navigation }) {
         setShowSoldOutBetModal(true);
     };
 
+    const checkSoldOut = ({ comb, combination, amountTarget, amountRamble }) => {
+        const hasMaxLimit = Boolean(
+            getConfiguration(user, 'hasMaxLimit')?.isCheck
+        );
 
-    const checkSoldOut =   (comb, combination, amountTarget, amountRamble ) => {
-        let hasMaxLimit = getConfiguration(selectedUser, 'hasMaxLimit').isCheck;
-        const straightMaxLimit = comb?.straight_max_limit ?? 0;
-        const rambleMaxLimit = comb?.ramble_max_limit ?? 0;
+        if (!hasMaxLimit || !comb) {
+            return false; // max limit enforcement disabled
+        }
 
-        const currentStraight = comb.straight_total ?? 0;
-        const currentRamble = comb.ramble_total ?? 0;
-
+        const straightMaxLimit = Number(comb.straight_max_limit) || 0;
+        const rambleMaxLimit = Number(comb.ramble_max_limit) || 0;
+        const currentStraight = Number(comb.straight_total) || 0;
+        const currentRamble = Number(comb.ramble_total) || 0;
         const straightBet = Number(amountTarget) || 0;
         const rambleBet = Number(amountRamble) || 0;
-
         const newStraightTotal = currentStraight + straightBet;
         const newRambleTotal = currentRamble + rambleBet;
+        const formattedCombination = combination?.split('').join('-');
 
-
-
-        // 🚨 Check if straight exceeds max limit
-        if (hasMaxLimit && straightMaxLimit != 0 &&  newStraightTotal > straightMaxLimit) {
-            const message = `${combination.split('').join('-')}`;
-            showSoldOutBetModalFn(message);
+        if (
+            straightMaxLimit > 0 &&
+            newStraightTotal > straightMaxLimit
+        ) {
+            showSoldOutBetModalFn(formattedCombination);
+            console.log("STRAIGHT MAX LIMIT REACHED STRAIGHT MAX LIMIT REACHED STRAIGHT MAX LIMIT REACHED")
             return true;
         }
 
-
-        // 🚨 Check if ramble exceeds max limit
-        if (hasMaxLimit && rambleMaxLimit != 0 && newRambleTotal > rambleMaxLimit) {
-            const message = `${combination.split('').join('-')}`;
-            showSoldOutBetModalFn(message);
+        // 🚨 RAMBLE max limit reached
+        if (
+            rambleMaxLimit > 0 &&
+            newRambleTotal > rambleMaxLimit
+        ) {
+            showSoldOutBetModalFn(formattedCombination);
             return true;
         }
 
         return false; // ✅ Passed validation
-    }
+    };
 
     const initializeGameTime = () => {
         let getGameTime = getTimeRange();
@@ -179,11 +196,11 @@ export default function TicketForm({ navigation }) {
             setSelectedTime('')
             // setGameTime('');
         }
-        
-        if(user.is_admin){
+
+        if (user.is_admin) {
             setIs2pmDisabled(false);
             setIs5pmDisabled(false);
-            setIs9pmDisabled(false);       
+            setIs9pmDisabled(false);
         }
     }
 
@@ -194,7 +211,7 @@ export default function TicketForm({ navigation }) {
         let card2pm = ((currentHour >= 13 && currentMins >= 55) || draws.filter(a => a.game_time == '2pm')[0]);
         let card5pm = ((currentHour >= 16 && currentMins >= 55) || draws.filter(a => a.game_time == '5pm')[0]);
         let card9pm = ((currentHour >= 20 && currentMins >= 55) || draws.filter(a => a.game_time == '9pm')[0]);
-        
+
 
 
         if (!card2pm && !card5pm && !card9pm) {
@@ -211,59 +228,46 @@ export default function TicketForm({ navigation }) {
 
     const handleBet = async (item) => {
         let { combination, amount, ramble, target } = item;
-         let checkIfWin200 = false;
-
-
+        let checkIfWin200 = false;
         // setBetting([]) // clear test state
         // search for a realm object with a primary key that is an objectId
         // itemComb[0].straight_total += 
-       
 
-    
+        if (cutoff) {
+            ToastAndroid.show('Please try again later.', ToastAndroid.SHORT);
+            return;
+        }
 
-        let isSoldOut = false
-        
-//         if(comb){
-//              isSoldOut = checkSoldOut(comb, combination, target, ramble);
-//         }
-        
-// console.log(comb, isSoldOut, item, 'ADD BET')
-        
-
-//         if (isSoldOut) return;
-
-
-
+        const isSoldOut = checkSoldOut({
+            comb: comb,
+            combination,
+            amountTarget,
+            amountRamble
+        });
+        if (isSoldOut) return;
         if ((!combination || combination.length < 3)) {
             setSelectedActive('combi')
             return;
         }
-
         if (selectedActive == 'combi' && combination.length == 3) {
             setSelectedActive('target')
             return;
         }
-
-        // let totalS = comb?.straight_total + Number(amountTarget);
-        // let totalR = comb?.ramble_total + Number(amountRamble);
-
-
+        let totalS = comb?.straight_total + Number(amountTarget);
+        let totalR = comb?.ramble_total + Number(amountRamble);
         if (((comb?.length > 1 && comb?.length < 300) && (!comb[0]?.straight_total && !comb[0]?.ramble_total))) {
             Alert.alert(`Sold Out Combination!`)
             return;
         }
-
         if (selectedActive == 'target' && !amountRamble) {
             setSelectedActive('ramble')
             return;
         }
-
         if (selectedActive == 'ramble' && (!amountTarget && !amountRamble)) {
             setSelectedActive('ramble')
             Alert.alert(`${!target && !ramble ? 'Please provide amount' : amountVal == 0 ? 'Plesae provide amount' : time == '' ? 'Please select time' : 'Something went wrong'}`)
             return;
         }
-
         let withWin200 = getConfiguration(selectedUser, 'withWin200').isCheck;
         if (checkIfWin200 && selectedActive != 'target') {
             // showToastWin200Bet();
@@ -273,19 +277,160 @@ export default function TicketForm({ navigation }) {
             });
             setShowWin200Modal(true);
             return;
-        } 
+        }
         if (amount != 0 || !combination) {
             setBetting(prevState => [...prevState, { ...item, is_win_to: withWin200 ? comb[0]?.is_win_to : false }]);
             setCombination('')
             setAmountRamble('')
             setAmountTarget('')
             setSelectedActive('combi')
+            await dispatch(fetchMasterCombinations({
+                digit: combination
+            })
+            ).then(async (res) => {
+                let comb = res.find(a => a.digit == combination);
+                let totalS = comb?.straight_total + Number(amountTarget);
+                let totalR = comb?.ramble_total + Number(amountRamble);
+                await api.updateMasterCombination(comb.id, {
+                    straight_total: Number(totalS),
+                    ramble_total: Number(totalR),
+                });
+            });
 
             return
         } else {
             Alert.alert(`${!target && !ramble ? 'Please provide amount' : amountVal == 0 ? 'Plesae provide amount' : time == '' ? 'Please select time' : 'Something went wrong'}`)
         }
     }
+
+    //    const handleBet = (item) => {
+    //     let { combination, amount, ramble, target } = item;
+    //     const selectedDigit = combination;
+    //     let checkIfWin200 = getWithWin200Config(realm, selectedDigit, users[0]);
+
+
+
+    //     // setBetting([]) // clear test state
+    //     // search for a realm object with a primary key that is an objectId
+    //     // itemComb[0].straightTotal += 
+    //     const currentTime = new Date();
+    //     const currentHour = currentTime.getHours();
+    //     const currentMins = currentTime.getMinutes();
+
+    //     console.log('combination:', combination, 'amount:', amount, 'ramble:', ramble, 'target:', target)
+
+    //     console.log(betType, "BET TYPE")
+
+    //     let straightTotalLimit = 0;
+    //     let rambleTotalLimit = 0;
+    //     let maxTotalLimit = 0;
+
+    //     const isSoldOut = checkSoldOut({
+    //         comb: comb[0],
+    //         combination,
+    //         amountTarget,
+    //         amountRamble
+    //     });
+
+    //     if (isSoldOut) return;
+
+
+    //     // if (!canProceedTarget || !canProceedRamble) {
+    //     //     return; // Block bet submission
+    //     // }
+
+
+    //     // console.log(currentTime, "THE TTIME")
+
+    //     // console.log(selectedActive, amountRamble, amountTarget, 'sss')
+
+    //     // if (target) {
+    //     //     straightTotalLimit = Number(comb.straightTotal) + Number(amount);
+    //     // } else {
+    //     //     rambleTotalLimit = Number(comb.rambleTotalLimit) + Number(amount);
+    //     // }
+
+
+
+    //     /* 	if((!combination && !amountRamble && !amountTarget)){
+    //             setSelectedTab('viewBets')
+    //             console.log('view betss')
+    //             return;
+    //         } 
+    //          */
+
+    //     if ((!combination || combination.length < 3)) {
+    //         setSelectedActive('combi')
+    //         return;
+    //     }
+
+    //     if (selectedActive == 'combi' && combination.length == 3) {
+    //         setSelectedActive('target')
+    //         return;
+    //     }
+
+    //     let totalS = comb[0]?.straightTotal + Number(amountTarget);
+    //     let totalR = comb[0]?.rambleTotal + Number(amountRamble);
+
+    //     // if((items[0] || (currentHour == 13 || currentHour == 16 || currentHour == 20) && currentMins > 40)){
+    //     // 	if(totalS > (comb[0]?.straightLimit * (comb[0].isWinTo ? 2 : 1))){
+    //     // 				let minTotal = (comb[0]?.straightLimit * (comb[0].isWinTo ? 2 : 1)) - comb[0]?.straightTotal
+    //     // 				let tryBet = minTotal > 5 ? `Try ₱${minTotal}` : '';
+    //     // 		Alert.alert(`Sold Out for Straight ${combination.split('').join('-')} \n ${tryBet}`)
+    //     // 	return 
+    //     // 	}
+
+    //     // 	if(totalR > (comb[0]?.rambleLimit * (comb[0].isWinTo ? 2 : 1))){
+    //     // 				let minTotal = (comb[0]?.rambleLimit * (comb[0].isWinTo ? 2 : 1)) - comb[0]?.rambleTotal
+    //     // 				let tryBet = minTotal > 5 ? `Try ₱${minTotal}` : '';
+    //     // 		Alert.alert(`Sold Out for Ramble ${combination.split('').join('-')} \n ${tryBet}`)
+    //     // 	return 
+    //     // 	}
+    //     // 	}
+
+    //     if (((combs.length > 1 && combs.length < 300) && (!comb[0]?.straightTotal && !comb[0]?.rambleTotal))) {
+    //         Alert.alert(`Sold Out Combination!`)
+    //         return;
+    //     }
+
+    //     if (selectedActive == 'target' && !amountRamble) {
+    //         setSelectedActive('ramble')
+    //         return;
+    //     }
+
+    //     console.log(amountTarget, amountRamble, 'amounts')
+    //     if (selectedActive == 'ramble' && (!amountTarget && !amountRamble)) {
+    //         setSelectedActive('ramble')
+    //         Alert.alert(`${!target && !ramble ? 'Please provide amount' : amountVal == 0 ? 'Plesae provide amount' : time == '' ? 'Please select time' : 'Something went wrong'}`)
+    //         return;
+    //     }
+
+    //     let withWin200 = getConfiguration(users[0], 'withWin200').isCheck;
+    //     if (checkIfWin200 && selectedActive != 'target') {
+    //         // showToastWin200Bet();
+    //         setPendingBet({
+    //             ...item,
+    //             isWinTo: withWin200 ? comb[0].isWinTo : false
+    //         });
+    //         setShowWin200Modal(true);
+    //         return;
+    //     }
+    //     if (amount != 0 || !combination) {
+    //         setBetting(prevState => [...prevState, { ...item, isWinTo: withWin200 ? comb[0].isWinTo : false }]);
+    //         setCombination('')
+    //         setAmountRamble('')
+    //         setAmountTarget('')
+    //         setSelectedActive('combi')
+    //         realm.write(() => {
+    //             comb[0].straightTotal = Number(totalS);
+    //             comb[0].rambleTotal = Number(totalR);
+    //         });
+    //         return
+    //     } else {
+    //         Alert.alert(`${!target && !ramble ? 'Please provide amount' : amountVal == 0 ? 'Plesae provide amount' : time == '' ? 'Please select time' : 'Something went wrong'}`)
+    //     }
+    // }
+
 
     function generateRandomId() {
         return Math.floor(100000 + Math.random() * 900000).toString();
@@ -303,13 +448,8 @@ export default function TicketForm({ navigation }) {
 
         await AsyncStorage.setItem('dateTimeNumber', currentDateTime);
     }
-    
-    
-    
-    
-    
-    // setLoading(false)
-    const handleSubmit =  async (data) => {
+
+    const handleSubmit = async (data) => {
         let gross = 0;
         let totalRamble = 0;
         let totalStraight = 0;
@@ -320,21 +460,22 @@ export default function TicketForm({ navigation }) {
             setLoading(true)
             let validDate = await updateDateTimeIfGreater();
             let selectUser = own_user;
-            
+
             console.log(validDate, 'VALIDATE')
-            if(!validDate){
-            	setLoading(false)
-            	Alert.alert('Set Timezone Properly!');
-            	return;
+            if (!validDate) {
+                setLoading(false)
+                Alert.alert('Set Timezone Properly!');
+                return;
             }
-            
+
             // console.log(selectUser, 'SELECTED USER')
-            
+
+
 
             if (data?.length > 0) {
                 let combinations = [];
 
-               data?.map(bet => {
+                data?.map(bet => {
 
                     totalAmount += Number(bet.amount)
                     gross += Number(bet.amount)
@@ -369,7 +510,7 @@ export default function TicketForm({ navigation }) {
                 uplines.sort((a, b) => a.user_level - b.user_level)
 
 
-            
+
 
                 uplines.forEach(line => {
                     newUps.push(line)
@@ -381,7 +522,7 @@ export default function TicketForm({ navigation }) {
                 newUps.push(selectUser)
                 newUplines.push(selectUser?.id);
                 console.log(selectUser.user_level, selectUser.first_name)
-                console.log(newUps.map(a => {return a.first_name}), 'UPLINES')
+                console.log(newUps.map(a => { return a.first_name }), 'UPLINES')
                 for (let i = 0; i < newUps.length; i++) {
                     let agentComAmnt = (newUps[i]?.com_rate / 100) * gross;
 
@@ -393,7 +534,7 @@ export default function TicketForm({ navigation }) {
                             referral: String(newUps[i].id),
                             rate: Number((comAmnt / gross) * 100).toFixed(2),
                             amount: Number(comAmnt).toFixed(2),
-                            first_name: newUps[i].first_name 
+                            first_name: newUps[i].first_name
                         })
                     } else {
                         commissions.push({
@@ -401,7 +542,7 @@ export default function TicketForm({ navigation }) {
                             referral: String(newUps[i].id),
                             rate: Number((agentComAmnt / gross) * 100).toFixed(2),
                             amount: Number(agentComAmnt).toFixed(2),
-                            first_name: newUps[i].first_name 
+                            first_name: newUps[i].first_name
                         })
                     }
                 }
@@ -416,72 +557,69 @@ export default function TicketForm({ navigation }) {
                 let netComs = newComms.reduce((n, { amount }) => n + amount, 0);
                 let netTotal = gross - netComs;
 
-                console.log(newComms, netComs, netTotal,'UPLINES')
-
-
-                // let drawResult = draws.find(a => a.gameTime == gameTime);
-
-                /* 		if(drawResult){
-                            console.log(drawResult, 'DRAW RESULT')
-                        return;
-                        } */
-                // if (collector == user?.email) {
-                //    await Geolocation.getCurrentPosition(
-                //        async (position) => {
-                //             let { coords } = position;
-                //             // setMarkerLocation({ ...position.coords });
-                //             // realm.write(async () => {
-                //             //     selectedUser.coordinates = `${coords.latitude}|${coords.longitude}`;
-                //             // })
-                //             await dispatch(updateUser(user?.id, { ...user,
-                //                 coordinates: `${coords.latitude}|${coords.longitude}`
-                //             }))
-
-                //         },
-                //         error => {
-                //             // See error code charts below.
-                //             console.log(error.code, error.message, 'LOCATION ERROR');
-                //         },
-                //         { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
-                //     );
-                // }
-                
-                
-                        //  const fixedDate = new Date(date.getTime() + (8 * 60 * 60 * 1000));
-
                 let newBet = {
-                        id: generateObjectId(),
-                        ramble: Number(totalRamble),
-                        straight: Number(totalStraight),
-                        is_complete: false,
-                        owner_id: String(selectedUser?.id),
-                        gross: Number(gross),
-                        net: Number(netTotal),
-                        ticket_no: `${generateTicketNumber()}`,
-                        collector: selectedUser.first_name,
-                        is_win_to: false,
-                        is_print: false,
-                        is_deleted: false,
-                        timestamp: new Date(date).toISOString(),
-                        game_time: time,
-                        print_copy: 0,
-                        input_type: 'normal',
-                        contact: selectedUser.mobile,
-                        winning: 0,
-                        combinations: combinations,
-                        commissions: newComms,
-                        uplines: newUplines,
-                        created_at: nowISO(),
-                        updated_at: nowISO()
-                    }
-                    // console.log('Navigate')
-                    // console.log(newBet, newComms, 'NEW BETTINGS')
-                    let bet = await api.createBetting(newBet)
-                    // setLoading(false)
-                    setSelectedTab('keypads')
-                    setBetting([]);
-                    setDate(new Date());
-                    navigation.navigate('VoidScreen', JSON.stringify(bet))
+                    id: generateObjectId(),
+                    ramble: Number(totalRamble),
+                    straight: Number(totalStraight),
+                    is_complete: false,
+                    owner_id: String(selectedUser?.id),
+                    gross: Number(gross),
+                    net: Number(netTotal),
+                    ticket_no: `${generateTicketNumber()}`,
+                    collector: selectedUser.first_name,
+                    is_win_to: false,
+                    is_print: false,
+                    is_deleted: false,
+                    timestamp: new Date(date).toISOString(),
+                    game_time: time,
+                    print_copy: 0,
+                    input_type: 'normal',
+                    contact: selectedUser.mobile,
+                    winning: 0,
+                    combinations: combinations,
+                    commissions: newComms,
+                    uplines: newUplines,
+                    created_at: nowISO(),
+                    updated_at: nowISO()
+                }
+                // console.log('Navigate')
+                // console.log(newBet, newComms, 'NEW BETTINGS')
+                let bet = await api.createBetting(newBet)
+
+                const userLoc = await getCurrentLocation();
+
+                // if (userLoc) {
+                //     await dispatch(updateUser(user?.id, { coordinates: `${userLoc.latitude}|${userLoc.longitude}`}))
+                // }
+
+                let updateUserLoc = await api.updateUser(user?.id, { ...user, coordinates: `${userLoc.latitude}|${userLoc.longitude}`})
+
+                // const updateUserLoc = await dispatch(updateUser(user?.id, { ...user, coordinates: `${userLoc.latitude}|${userLoc.longitude}`}))
+
+                console.log(updateUserLoc, "THE RESPONSE UPDATE")
+                 
+                
+
+                //             let userHasLocation = await getCurrentGeolocation()
+
+
+                //             console.log('gawas getCurrentGEO', userHasLocation)
+
+                // if (userHasLocation.coordinates) {
+                // const { coordinates } = userHasLocation;
+                // await dispatch(updateUser(user?.id, { ...user, coordinates: `${coordinates.latitude}|${coordinates.longitude}`}))
+                // } else {
+                //     return Alert.alert('Unable to get location. Please ensure location services are enabled and try again.');
+                // }
+
+
+
+
+                // setLoading(false)
+                setSelectedTab('keypads')
+                setBetting([]);
+                setDate(new Date());
+                navigation.navigate('VoidScreen', JSON.stringify(bet))
 
                 // })
             } else {
@@ -491,12 +629,11 @@ export default function TicketForm({ navigation }) {
             console.log(err, 'ERRRORR')
             return
         } finally {
-        setLoading(false)
+            setLoading(false)
         }
 
     }
-    
-    
+
     function removeItemByRamble(data) {
         let dataList = arrayBetting.filter(item => item?.id !== data.id);
         setBetting(dataList);
@@ -515,8 +652,6 @@ export default function TicketForm({ navigation }) {
         }
 
     };
-
-
 
     const renderButton = ({ name, value }) => {
 
@@ -651,52 +786,77 @@ export default function TicketForm({ navigation }) {
         setDate(currentDate);
     };
 
-
     const initData = async () => {
 
-    const { start_of_day, end_of_day } = getDayRange(new Date())
-    let selectUser = await fetchUser(selectedUser?.email)
+        const { start_of_day, end_of_day } = getDayRange(new Date())
+        let selectUser = await fetchUser(selectedUser?.email)
 
 
-    let combs = await dispatch(fetchMasterCombinations());
-        
-     let localDraws = await dispatch(fetchDraws({ 
-        draw_date:  { 
-           op: "between",
-	      from: start_of_day,
-	      to: end_of_day,
-        }}))
+        let combs = await dispatch(fetchMasterCombinations());
 
-    
-      
-    setOwnUser(selectUser)
-    setDraws(localDraws)
-    setCombinations(combs)
-    } 
+        let localDraws = await dispatch(fetchDraws({
+            draw_date: {
+                op: "between",
+                from: start_of_day,
+                to: end_of_day,
+            }
+        }))
 
-    
+
+
+        setOwnUser(selectUser)
+        setDraws(localDraws)
+        setCombinations(combs)
+    }
+
+
     useEffect(() => {
-    initializeGameTime();
+        initializeGameTime();
     }, [draws])
 
-    
+    useEffect(() => {
+        if (selectedUser?.id) {
+            initData();
+        }
+    }, [selectedUser?.id, dataVersion]);
 
     useEffect(() => {
-    if(selectedUser?.id){
-    initData();
-    }
-    }, [selectedUser?.id, dataVersion]);
-    
+        const channel = supabase
+            .channel('draws-realtime')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'draws',
+                    filter: `is_deleted=eq.false`
+                },
+                (payload) => {
+                    console.log('🚀 Draw updated:', payload)
+
+                    // Update your UI or redux state
+                    // fetchDraws()
+                    if (payload.eventType === 'INSERT' && !payload.new?.combination) {
+                        setCutoff(true)
+                        Alert.alert('Cutoff time reached. Please wait for the next draw.')
+                    } else if (payload.eventType === 'UPDATE' && payload.new?.combination) {
+                        setCutoff(false)
+                        Alert.alert('Combination for the current draw has been updated.')
+                    }
+                }
+            )
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(channel)
+        }
+
+    }, [])
 
 
     let total = arrayBetting.reduce((n, { amount }) => n + amount, 0)
     let closeDraw = (is2pmDisabled && is5pmDisabled && is9pmDisabled) ? true : false;
-
     let curDraw = (draws.find(a => !a.combination) || ((hoursNow == 13 && minNow >= 55) || (hoursNow == 16 && minNow >= 55) || (hoursNow == 20 && minNow >= 55)));
-    
-
-
-
 
     return (
         <SafeAreaProvider style={{ flexGrow: 1 }}>
@@ -741,17 +901,17 @@ export default function TicketForm({ navigation }) {
                             </Text>
                         </View>
                         <View style={{ flexDirection: 'row', width: '70%', justifyContent: 'space-around' }}>
-                            <TouchableOpacity disabled={(is2pmDisabled)} onPress={() =>  setSelectedTime('2pm')} style={{ width: '30%', borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: time == '2pm' ? '#f4b067' : is2pmDisabled == true ? '#ff807f' : COLORS.gray400, borderColor: time == '2pm' ? '#f4b067' : is2pmDisabled == true ? '#ff807f' : COLORS.gray400, opacity: arrayBetting.length && time !== '2pm' && !is2pmDisabled ? 0.2 : 1 }}>
+                            <TouchableOpacity disabled={(is2pmDisabled)} onPress={() => setSelectedTime('2pm')} style={{ width: '30%', borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: time == '2pm' ? '#f4b067' : is2pmDisabled == true ? '#ff807f' : COLORS.gray400, borderColor: time == '2pm' ? '#f4b067' : is2pmDisabled == true ? '#ff807f' : COLORS.gray400, opacity: arrayBetting.length && time !== '2pm' && !is2pmDisabled ? 0.2 : 1 }}>
                                 <Text style={{ color: is2pmDisabled ? COLORS.white : COLORS.black, fontWeight: '600', fontSize: 16, }}>
                                     2PM
                                 </Text>
                             </TouchableOpacity>
-                            <TouchableOpacity disabled={(is5pmDisabled)} onPress={() =>  setSelectedTime('5pm')} style={{ width: '30%', borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: time == '5pm' ? '#f4b067' : is5pmDisabled == true ? '#ff807f' : COLORS.gray400, borderColor: time == '5pm' ? '#f4b067' : is5pmDisabled == true ? '#ff807f' : COLORS.gray400, opacity: arrayBetting.length && time !== '5pm' && !is5pmDisabled ? 0.2 : 1 }}>
+                            <TouchableOpacity disabled={(is5pmDisabled)} onPress={() => setSelectedTime('5pm')} style={{ width: '30%', borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: time == '5pm' ? '#f4b067' : is5pmDisabled == true ? '#ff807f' : COLORS.gray400, borderColor: time == '5pm' ? '#f4b067' : is5pmDisabled == true ? '#ff807f' : COLORS.gray400, opacity: arrayBetting.length && time !== '5pm' && !is5pmDisabled ? 0.2 : 1 }}>
                                 <Text style={{ color: is5pmDisabled ? COLORS.white : COLORS.black, fontWeight: '600', fontSize: 16 }}>
                                     5PM
                                 </Text>
                             </TouchableOpacity>
-                            <TouchableOpacity disabled={(is9pmDisabled)} onPress={() =>  setSelectedTime('9pm')} style={{ width: '30%', borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: time == '9pm' ? '#f4b067' : is9pmDisabled == true ? '#ff807f' : COLORS.gray400, borderColor: time == '9pm' ? '#f4b067' : is9pmDisabled == true ? '#ff807f' : COLORS.gray400, opacity: arrayBetting.length && time !== '9pm' && !is9pmDisabled ? 0.2 : 1 }}>
+                            <TouchableOpacity disabled={(is9pmDisabled)} onPress={() => setSelectedTime('9pm')} style={{ width: '30%', borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: time == '9pm' ? '#f4b067' : is9pmDisabled == true ? '#ff807f' : COLORS.gray400, borderColor: time == '9pm' ? '#f4b067' : is9pmDisabled == true ? '#ff807f' : COLORS.gray400, opacity: arrayBetting.length && time !== '9pm' && !is9pmDisabled ? 0.2 : 1 }}>
                                 <Text style={{ color: is9pmDisabled ? COLORS.white : COLORS.black, fontWeight: '600', fontSize: 16 }}>
                                     9PM
                                 </Text>
@@ -1017,7 +1177,7 @@ export default function TicketForm({ navigation }) {
                                                     style={{ padding: 10, elevation: 6, borderRadius: 50, borderWidth: 1, backgroundColor: COLORS.darkgray, borderColor: '#4ba643', width: '90%', padding: 10, alignItems: 'center', justifyContent: 'center' }}>
                                                     <Text style={{ fontWeight: 'bold', fontSize: 22, color: COLORS.white }}>CUT-OFF</Text>
                                                 </TouchableOpacity>
-                                            
+
                                         }
                                     </View>
                                 </View>
@@ -1106,7 +1266,7 @@ export default function TicketForm({ navigation }) {
                 message={modalMessage}
                 messageStyles={{ fontSize: 20, fontWeight: 'bold', color: COLORS.black300, paddingBottom: 12 }}
                 buttonContainerStyle={{ justifyContent: 'center', alignItems: 'center', width: '100%' }}
-                butttonStyle={{ width: '100%',}}
+                butttonStyle={{ width: '100%', }}
                 butttonTextStyle={{ color: COLORS.white, fontWeight: '500', fontSize: 18 }}
                 onClose={() => {
                     setShowSoldOutBetModal(false);
@@ -1119,7 +1279,7 @@ export default function TicketForm({ navigation }) {
             <ConfirmationModal
                 visible={showWin200Modal}
                 title="HOT NUMBER"
-                titleStyles={{fontSize: 20, fontWeight: 'bold', color: COLORS.black900}}
+                titleStyles={{ fontSize: 20, fontWeight: 'bold', color: COLORS.black900 }}
                 message="Win 200/1 for this combination. Do you want to proceed?"
                 messageStyles={{ fontSize: 16, fontWeight: 'bold', color: COLORS.black300, }}
                 onClose={() => {

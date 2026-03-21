@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useContext, useCallback } from 'react';
-import { View, Text, Image, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, Image, Alert, TouchableOpacity, Platform } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
@@ -16,7 +16,7 @@ import Winnings from './screens/drawers/Winnings';
 import Transactions from './screens/drawers/Transactions';
 import SettingsScreen from './screens/drawers/SettingsScreen';
 import CustomDrawerIcon from './components/CustomDrawerIcon';
-import { getConfiguration, getDayRange, useDeviceCheck } from './utils/helpers';
+import { getConfiguration, getDayRange, requestLocationPermission, useDeviceCheck } from './utils/helpers';
 import CashFlow from './screens/drawers/CashFlow';
 import CancelledTickets from './screens/drawers/CancelledTickets';
 import Inbox from './screens/drawers/Inbox';
@@ -46,8 +46,14 @@ import MapScreen from './screens/MapScreen';
 import { fetchUserByEmail, signOut, updateUser } from './redux/actions/user.actions';
 import DeviceInfo, { useDeviceName } from 'react-native-device-info';
 import { api } from './utils/offlineSync';
-import { verifyDeviceForUser } from './utils/deviceAuth';
+import { verifyDeviceForUser, verifyRequiredPermissions } from './utils/deviceAuth';
 import LoginDevices from './screens/LoginDevices';
+import { SyncComponent } from './components/SyncComponent';
+import CombinationsScreen from './screens/Combinations';
+import UsersTree from './screens/UsersTree';
+import FormSheet from './screens/FormSheet';
+import { useNavigation } from '@react-navigation/native';
+import { PermissionsAndroid } from 'react-native';
 
 
 
@@ -153,7 +159,7 @@ const DrawerNavigation = () => {
     headerRight: () => {
       
       return (
-        String(headerTitle).toLowerCase() == 'results' &&
+        String(headerTitle).toLowerCase() == 'results' ?
         <TouchableOpacity
           onPress={() => navigation.navigate('ViewTip', {
                       resultDate: latestDraw?.date,
@@ -175,7 +181,13 @@ const DrawerNavigation = () => {
             }}>
               Tip
           </Text>
-        </TouchableOpacity>)
+        </TouchableOpacity>
+        :
+        String(headerTitle).toLowerCase() == 'dashboard' ?
+            <SyncComponent />
+            :
+            null
+        )
     },
     drawerIcon: ({ focused }) => (
       <View style={{ paddingHorizontal: 20 }}>
@@ -260,7 +272,60 @@ const DrawerNavigation = () => {
 
 const StackNavigates = () => {
   const {  isAuthenticated,  batch_number, selectedUser, user } = useSelector(({ user }) => user);
-  const dispatch = useDispatch();
+  // const dispatch = useDispatch();
+  // const navigation = useNavigation();
+
+
+  //         const requestLocationPermission = async () => {
+  //             try {
+  //                 if (Platform.OS === "android") {
+  //                     const granted = await PermissionsAndroid.request(
+  //                         PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+  //                         {
+  //                             title: "Location Permission Required",
+  //                             message:
+  //                                 "This app requires access to your location to function properly.",
+  //                             buttonNeutral: "Ask Me Later",
+  //                             buttonNegative: "Cancel",
+  //                             buttonPositive: "Allow",
+  //                         }
+  //                     );
+      
+  //                     if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+  //                         console.log("Location permission granted");
+  //                         setVisible(false);
+  //                     } else {
+  //                         console.log("Location permission denied");
+  //                     }
+  //                 }
+  //             } catch (err) {
+  //                 console.warn(err);
+  //             }
+  //         };
+
+  // const checkDevicePermissions = async() => {
+  //     const checkPermissions = await verifyRequiredPermissions();
+
+  //   try {
+
+  //     if(!checkPermissions.location_enabled) {
+  //       requestLocationPermission()      
+  //     }
+
+  //     return;
+
+  //   } catch (err) {
+  //     console.log(err, `Something wen't wrong`)
+  //   }
+  //   }
+
+
+  // useEffect(async () => {
+    
+  //   checkDevicePermissions()
+
+  // }, [isAuthenticated])
+  
 
   return (
             <Stack.Navigator
@@ -284,6 +349,20 @@ const StackNavigates = () => {
               ),
             })}
           />
+
+          <Stack.Screen
+        name="form-sheet"
+        component={FormSheet}
+        options={{
+          title: 'Permission Required',
+          presentation: "formSheet",
+          headerShown: false,
+          sheetAllowedDetents: [0.35, 1],
+          sheetCornerRadius: 28,
+        }}
+      />
+
+          
           <Stack.Screen
             name="ViewTicket"
             component={ReviewScreen}
@@ -294,6 +373,19 @@ const StackNavigates = () => {
               headerShown: true,
               headerLeft: () => (
                 <CustomDrawerIcon route={route} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'View Ticket'} />
+              ),
+            })}
+          />
+          <Stack.Screen
+            name="UsersTree"
+            component={UsersTree}
+            options={({ navigation, route }) => ({
+              headerTitle: '',
+              headerTitleStyle: { color: COLORS.white },
+              headerStyle: { backgroundColor: COLORS.secondary },
+              headerShown: true,
+              headerLeft: () => (
+                <CustomDrawerIcon route={route} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'Commissioners'} />
               ),
             })}
           />
@@ -340,13 +432,39 @@ const StackNavigates = () => {
                   style={{ padding: 10, alignItems: 'center', justifyContent: 'center', }}
                 >
                   <Image
-                    source={icons.back}
+                    source={icons.backHeader}
                     style={{
                       height: 20,
                       width: 20,
                       tintColor: COLORS.white
                     }} />
                 </TouchableOpacity>),
+            })}
+          />
+          <Stack.Screen
+            name="Combinations"
+            component={CombinationsScreen}
+            options={({ navigation }) => ({
+              headerShown: true,
+              title: '',
+              headerTitleStyle: { color: COLORS.black, fontWeight: 'bold' },
+              headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
+              // headerLeft: () => (
+              //   <TouchableOpacity
+              //     onPress={() => navigation.goBack()}
+              //     style={{ padding: 10, alignItems: 'center', justifyContent: 'center', }}
+              //   >
+              //     <Image
+              //       source={icons.backHeader}
+              //       style={{
+              //         height: 20,
+              //         width: 20,
+              //         tintColor: COLORS.white
+              //       }} />
+              //   </TouchableOpacity>),
+              headerLeft: () => (
+                <CustomDrawerIcon route={null} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'Combinations'} />
+              ),
             })}
           />
           <Stack.Screen
@@ -395,6 +513,7 @@ const StackNavigates = () => {
     				options={({ navigation }) => ({
     					headerStyle: { backgroundColor: '#fffff1', elevation: 6, borderBottomWidth: 1, shadowOpacity: .5, shadowColor: COLORS.black },
     					headerTitle: '',
+              headerShown: true,
     					headerLeft: () => (
     						<CustomDrawerIcon route={null} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'Summary Report'} />
     					),
@@ -476,7 +595,7 @@ const StackNavigates = () => {
 
 
 
-export const StackNavigator = () => {
+export const StackNavigator = (navigation) => {
   const { session } = useContext(SessionContext);
   const dispatch = useDispatch();
   const { user, isAuthenticated } = useSelector(({ user }) => user);
@@ -486,12 +605,17 @@ export const StackNavigator = () => {
   const [deviceValidated, setDeviceValidated] = useState(false);
 
 
-
   const notif = new NotifService(reg => console.log('Push registered', reg));
 
   useEffect(() => notif.createDefaultChannels(), []);
 
   useEffect(() => {
+
+
+
+
+    console.log(session, "THE SESYO@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@N")
+    
     if (session) {
       const fetchUser = async () => {
         const { data, error } = await supabase.from('users').select('*').eq('email', session.user.email).single();
@@ -516,47 +640,20 @@ export const StackNavigator = () => {
       }
 
 
-      const ok = await verifyDeviceForUser(dispatch, user);
+      const ok = await verifyDeviceForUser(dispatch, user, navigation);
 
       if (ok) setDeviceValidated(true);
       // if not ok → signOut already handled
     };
 
     runDeviceCheck();
+    requestLocationPermission();
   }, [isAuthenticated, user]);
-
-    // ⬇️ INSERT REALTIME LISTENER HERE
-  // useEffect(() => {
-  //   if (!isAuthenticated || !user?.id) return;
-
-  //   const channel = supabase
-  //     .channel(`user-realtime-${user.id}`)
-  //     .on(
-  //       "postgres_changes",
-  //       {
-  //         event: "*",
-  //         schema: "public",
-  //         table: "users",
-  //         filter: `id=eq.${user.id}`,
-  //       },
-  //       async (payload) => {
-  //         console.log("Realtime Update:", payload);
-
-  //         dispatch({
-  //           type: SET_USER,
-  //           payload: payload.new,
-  //         });
-  //       }
-  //     )
-  //     .subscribe();
-
-  //   return () => {
-  //     supabase.removeChannel(channel);
-  //   };
-  // }, [isAuthenticated, user?.id]);
 
   // 🔒 Prevent UI from rendering before device check is done
   if (!deviceValidated) return null; 
+
+
 
   return (
     <SafeAreaProvider>

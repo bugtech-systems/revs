@@ -35,6 +35,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import RNFS from 'react-native-fs';
 
 import { downloadAndReplaceImage } from './utils/helpers';
+import { SessionProvider } from './SessionProvider';
 
 
 // Add this at the top of your App.js, before any components
@@ -357,6 +358,7 @@ const AppContent = () => {
 // App Initialization Hierarchy
 const AppWithProviders = () => {
   return (
+    <SessionProvider>
         <DatabaseInitializer>
           <AuthInitializer>
             <AppStateManager>
@@ -366,16 +368,20 @@ const AppWithProviders = () => {
             </AppStateManager>
           </AuthInitializer>
         </DatabaseInitializer>
+    </SessionProvider>
+
   );
 };
 
 const IMAGES = [
   {
-    url: "https://sharewin.pro/apiv2/assets/bwlogo1.png",
+    // url: "https://sharewin.pro/apiv2/assets/bwlogo1.png",
+    url: "https://sviqeffsultqmyignrfi.supabase.co/storage/v1/object/public/revs/bwlogo1.png",
     filename: "bwlogo1.png",
   },
   {
-    url: "https://sharewin.pro/apiv2/assets/heritage_bw_logo.png",
+    // url: "https://sharewin.pro/apiv2/assets/heritage_bw_logo.png",
+    url: "https://sviqeffsultqmyignrfi.supabase.co/storage/v1/object/public/revs/heritage_bw_logo.png",
     filename: "heritage_bw_logo.png",
   }
 ];
@@ -385,38 +391,64 @@ const IMAGES = [
 export const App = () => {
   const [localImages, setLocalImages] = useState([]);
 
-  useEffect(() => {
-    const initImages = async () => {
-    const alreadySaved = await AsyncStorage.getItem("images_saved");
+  // useEffect(() => {
+  //   const initImages = async () => {
+  //   const alreadySaved = await AsyncStorage.getItem("images_saved");
 
-      if (alreadySaved === "true") {
-        console.log("Images already saved previously.");
+  //     if (alreadySaved === "true") {
+  //       console.log("Images already saved previously.");
 
-        // Load local paths
-        const savedPaths = IMAGES.map(img => 
-          `file://${RNFS.DocumentDirectoryPath}/${img.filename}`
-        );
-        setLocalImages(savedPaths);
-        return;
-      }
+  //       // Load local paths
+  //       const savedPaths = IMAGES.map(img => 
+  //         `file://${RNFS.DocumentDirectoryPath}/${img.filename}`
+  //       );
+  //       setLocalImages(savedPaths);
+  //       return;
+  //     }
 
-      // First install: download images
-      let downloadedPaths = [];
-      for (const img of IMAGES) {
-        const localPath = await downloadAndReplaceImage(img.url, img.filename);
-        if (localPath) downloadedPaths.push("file://" + localPath);
-      }
+  //     // First install: download images
+  //     let downloadedPaths = [];
+  //     for (const img of IMAGES) {
+  //       const localPath = await downloadAndReplaceImage(img.url, img.filename);
+  //       if (localPath) downloadedPaths.push("file://" + localPath);
+  //     }
 
-      // Save marker
-      await AsyncStorage.setItem("images_saved", "true");
+  //     // Save marker
+  //     await AsyncStorage.setItem("images_saved", "true");
 
-      setLocalImages(downloadedPaths);
-    };
+  //     setLocalImages(downloadedPaths);
+  //   };
 
-    initImages();
-  }, []);
+  //   initImages();
+  // }, []);
   
 
+  useEffect(() => {
+  const initImages = async () => {
+    let downloadedPaths: string[] = [];
+
+    for (const img of IMAGES) {
+      const localPath = `${RNFS.DocumentDirectoryPath}/${img.filename}`;
+
+      const exists = await RNFS.exists(localPath);
+
+      if (exists) {
+        downloadedPaths.push("file://" + localPath);
+      } else {
+        const newPath = await downloadAndReplaceImage(img.url, img.filename);
+        if (newPath) {
+          downloadedPaths.push("file://" + newPath);
+        }
+      }
+    }
+
+    setLocalImages(downloadedPaths);
+  };
+
+  initImages();
+}, []);
+  
+  
   console.log(localImages, "<<====== THE LOCAL IMAGES SAVED TO LOCAL STORAGE")
   
   return (

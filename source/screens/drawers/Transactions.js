@@ -1,4 +1,4 @@
-import { FlatList, Image, StyleSheet, Text, TextInput, Alert, TouchableOpacity, View, RefreshControl, Switch } from 'react-native'
+import { FlatList, Image, StyleSheet, Text, TextInput, Alert, TouchableOpacity, View, RefreshControl, Switch, Platform } from 'react-native'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import moment from 'moment-timezone'
 // import { realmContext } from '../RealmContext'
@@ -8,7 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { useSelector, useDispatch } from 'react-redux'
 import Animated, { BounceOutDown, FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { COLORS, icons } from '../../constants'
-import { formatNumberWithComma, getConfiguration, getDayRange } from '../../utils/helpers';
+import { formatNumberWithComma, getConfiguration, getDayRange, getTransactionDayRange } from '../../utils/helpers';
 import { fetchBettings } from '../../redux/actions/bettingActions';
 // import { useOffline } from '../../context/OfflineProvider';
 
@@ -56,6 +56,7 @@ const Transactions = ({ navigation }) => {
 
 
   const load = async () => {
+    // const { start_of_day, end_of_day  } = getTransactionDayRange(date)
     const { start_of_day, end_of_day  } = getDayRange(date)
     // Start and end of the day
     

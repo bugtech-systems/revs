@@ -14,6 +14,8 @@ import { api } from '../utils/offlineSync';
 
 const VoidScreen = ({ route, navigation, onPress }) => {
   const ticketDetails = JSON.parse(route.params);
+  const {navigate_screen} = JSON.parse(route.params);
+console.log(navigate_screen, 'ROUTE')
   // const { fetchUser, api, dataVersion } = useOffline();
   const dispatch = useDispatch();
   const [disableCancelButton, setDisableCancelButton] = useState(false);
@@ -209,7 +211,7 @@ const VoidScreen = ({ route, navigation, onPress }) => {
         <TouchableOpacity
           activeOpacity={.6}
           onPress={() => {
-            navigation.navigate('Play', {})
+            navigation.navigate(navigate_screen ?? 'Play', {})
             setConfirmTecket(null)
           }}
           style={{ elevation: 10, shadowRadius: SIZES.radius, borderRadius: SIZES.radius, width: '30%' }}

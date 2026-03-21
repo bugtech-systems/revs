@@ -618,7 +618,7 @@ export default function TestScreen({ data, isPrint, onPrint }) {
                             String(receiptTemplate).toLowerCase() == 'tacloban' ?
                                 <ViewShot
                                     ref={viewShotRef}
-                                    options={{ format: 'webm', quality: 0.8, width: 600, height: viewHeight + (30 * data.combinations.length) }}
+                                    options={{ format: 'webm', quality: 0.8, width: 500, height: viewHeight + (30 * data.combinations.length) }}
                                     style={{
                                         position: 'absolute',
                                         top: -9999,
@@ -641,7 +641,7 @@ export default function TestScreen({ data, isPrint, onPrint }) {
                                             setViewHeight(height);
                                             //   setReadyToCapture(true); // layout is ready
                                         }}
-                                        style={{ width: '100%', alignItems: 'center', height: data?.combinations.length > 2 ? 750 : 550 }}
+                                        style={{ width: 400, alignItems: 'center', height: data?.combinations.length > 2 ? 650 : 550 }}
                                     >
                                         {/* </View> */}
                                         {/* <View style={{ height: 500, width: '100%', flexDirection: 'column', alignItems: 'center' }}> */}
@@ -653,35 +653,35 @@ export default function TestScreen({ data, isPrint, onPrint }) {
 																				
 																			/>
 																		</View> */}
-                                        <Text style={{ ...styles.fontStyles1, fontSize: 32 }}>
+                                        <Text style={{ ...styles.fontStyles1, fontSize: 34 }}>
                                             OFFICIAL RECEIPT
                                         </Text>
                                         <View style={{ width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-evenly', paddingHorizontal: 6 }}>
-                                            <Text style={{ ...styles.fontStyles1, fontSize: 27, fontWeight: 'bold' }}>
+                                            <Text style={{ ...styles.fontStyles1, fontSize: 29, fontWeight: '600' }}>
                                                 TICKET #:
                                             </Text>
 
-                                            <Text style={{ ...styles.fontStyles1, fontSize: 27, fontWeight: 'bold' }}>
+                                            <Text style={{ ...styles.fontStyles1, fontSize: 29, fontWeight: '600' }}>
                                                 {data.ticket_no}
                                             </Text>
 
                                         </View>
 
-                                        <Text style={{ ...styles.fontStyles1, fontSize: 22, fontWeight: 'bold' }}>
+                                        <Text style={{ ...styles.fontStyles1, fontSize: 24, fontWeight: '600' }}>
                                             {moment().format('MMM DD, YYYY hh:mmA')}
                                         </Text>
 
 
-                                        <Text style={{ ...styles.fontStyles1, marginTop: 10, fontSize: 22, fontWeight: 'bold' }}>
+                                        <Text style={{ ...styles.fontStyles1, marginTop: 10, fontSize: 24, fontWeight: '600' }}>
                                             Agent:{String(data.collector).toUpperCase()}
                                         </Text>
 
                                         <View style={{ marginTop: 10, width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4 }}>
-                                            <Text style={{ ...styles.fontStyles1, fontSize: 22, fontWeight: 'bold' }}>
+                                            <Text style={{ ...styles.fontStyles1, fontSize: 24, fontWeight: '600' }}>
                                                 Total: {total}
                                             </Text>
 
-                                            <Text style={{ ...styles.fontStyles1, fontSize: 22, fontWeight: 'bold' }}>
+                                            <Text style={{ ...styles.fontStyles1, fontSize: 24, fontWeight: '600' }}>
                                                 Game: 3D - {String(data.game_time).toUpperCase()}
                                             </Text>
 
@@ -725,7 +725,7 @@ export default function TestScreen({ data, isPrint, onPrint }) {
 
 
                                                 <View style={{ width: '25%', borderRightWidth: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 6 }}>
-                                                    <Text style={{ ...styles.fontStyles1, fontSize: 18, fontWeight: '600' }}>
+                                                    <Text style={{ ...styles.fontStyles1, fontSize: 24, fontWeight: '600' }}>
 
 
                                                         {resItem.straight != 0 ? resItem.straight : '-'}
@@ -733,13 +733,13 @@ export default function TestScreen({ data, isPrint, onPrint }) {
                                                 </View>
 
                                                 <View style={{ width: '25%', borderRightWidth: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 6 }}>
-                                                    <Text style={{ ...styles.fontStyles1, fontSize: 18, fontWeight: '600' }}>
+                                                    <Text style={{ ...styles.fontStyles1, fontSize: 24, fontWeight: '600' }}>
                                                         {resItem.ramble != 0 ? resItem.ramble : '-'}
                                                     </Text>
                                                 </View>
 
                                                 <View style={{ width: '25%', borderRightWidth: .5, alignItems: 'center', justifyContent: 'center', paddingVertical: 6 }}>
-                                                    <Text style={{ ...styles.fontStyles1, fontSize: 18, fontWeight: '600' }}>
+                                                    <Text style={{ ...styles.fontStyles1, fontSize: 24, fontWeight: '600' }}>
                                                         OK
                                                     </Text>
                                                 </View>
@@ -749,12 +749,12 @@ export default function TestScreen({ data, isPrint, onPrint }) {
                                         ))}
 
                                         {/* <PDF417BarcodeGenerator data={data.ticket_no}/> */}
-                                        <View style={{ width: '100%', alignItems: 'center', justifyContent: 'center' }}>
-                                            <BarcodeCreatorView value={`${data.ticket_no}`} format={BarcodeFormat.PDF417} width={350} height={120} foregroundColor={'#000000'} style={{ marginVertical: 10 }} />
-                                            <Text style={{ ...styles.fontStyles1, fontSize: 30 }}>
+                                        {/* <View style={{ alignItems: 'center', justifyContent: 'center' }}> */}
+                                            <BarcodeCreatorView value={`${data.ticket_no}`} format={BarcodeFormat.PDF417} foregroundColor={'#000000'} style={{ marginTop: 10, width: 450, height: 115 }} />
+                                            <Text style={{ ...styles.fontStyles1, fontSize: 27, fontWeight: '600' }}>
                                                 REF #: {data.ticket_no}
                                             </Text>
-                                        </View>
+                                        {/* </View> */}
                                     </View>
                                 </ViewShot>
                                 :
@@ -837,7 +837,7 @@ export default function TestScreen({ data, isPrint, onPrint }) {
                                             </View>
 
                                         </View>
-                                        <View style={{ flexDirection: 'column', borderBottomWidth: .5, width: '100%', }}>
+                                        <View style={{ flexDirection: 'column', borderBottomWidth: .5, paddingBottom: 6, width: '100%', }}>
 
 
                                             <View style={{ flexDirection: 'row', borderTopWidth: .5, borderBottomWidth: .5, paddingHorizontal: 8, borderColor: COLORS.black}}>
@@ -879,7 +879,7 @@ export default function TestScreen({ data, isPrint, onPrint }) {
 
                                                     return (
                                                         <View key={index} style={{ flexDirection: 'column', width: '100%' }}>
-                                                            <View style={{ flexDirection: 'row' }}>
+                                                            <View style={{ flexDirection: 'row', height: 42}}>
                                                                 <View style={{ width: '30%', justifyContent: 'center', flexDirection: 'row', }}>
                                                                     <View style={{ width: '22%' }}>
                                                                         <Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 24, fontWeight: '200' }}>
@@ -887,23 +887,23 @@ export default function TestScreen({ data, isPrint, onPrint }) {
                                                                         </Text>
                                                                     </View>
                                                                     <View style={{ width: '78%', paddingLeft: 2 }}>
-                                                                        <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 24, fontWeight: '200' }}>
+                                                                        <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 24, fontWeight: '200', fontFamily: 'Poppins-Thin', }}>
                                                                             3D
                                                                         </Text>
                                                                     </View>
                                                                 </View>
                                                                 <View style={{ width: '20%', justifyContent: 'center', }}>
-                                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 38, fontWeight: '200' }}>
+                                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 38, fontWeight: '200', fontFamily: 'Poppins-Thin', }}>
                                                                         {item?.combination}
                                                                     </Text>
                                                                 </View>
                                                                 <View style={{ width: '34%', justifyContent: 'center', }}>
-                                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 38, fontWeight: '200' }}>
+                                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 38, fontWeight: '200', fontFamily: 'Poppins-Thin', }}>
                                                                         {item?.amount}
                                                                     </Text>
                                                                 </View>
                                                                 <View style={{ width: '16%', justifyContent: 'center', }}>
-                                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 38, fontWeight: '200' }}>
+                                                                    <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 38, fontWeight: '200', fontFamily: 'Poppins-Thin', }}>
                                                                         {item?.betType}
                                                                     </Text>
                                                                 </View>
@@ -915,24 +915,24 @@ export default function TestScreen({ data, isPrint, onPrint }) {
                                         </View>
                                         <View style={{ width: '100%', alignItems: 'flex-start', justifyContent: 'flex-start', flexDirection: 'column' }}>
                                             <View style={{ width: '100%', flexDirection: 'row' }}>
-                                                <View style={{ width: '28%' }}>
+                                                <View style={{ width: '24%' }}>
                                                     <Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 38, fontWeight: '200' }}>
                                                         Total:
                                                     </Text>
                                                 </View>
-                                                <View style={{ width: '72%', paddingLeft: 10 }}>
+                                                <View style={{ width: '76%', paddingLeft: 10 }}>
                                                     <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 38, fontWeight: '200' }}>
                                                         P {formatNumber(betTotal)}
                                                     </Text>
                                                 </View>
                                             </View>
                                             <View style={{ width: '100%', flexDirection: 'row' }}>
-                                                <View style={{ width: '28%' }}>
+                                                <View style={{ width: '24%' }}>
                                                     <Text style={{ ...styles.fontStyles2, textAlign: 'right', fontSize: 30, fontWeight: '200' }}>
                                                         Printed:
                                                     </Text>
                                                 </View>
-                                                <View style={{ width: '72%', paddingLeft: 10 }}>
+                                                <View style={{ width: '76%', paddingLeft: 10 }}>
                                                     <Text style={{ ...styles.fontStyles2, textAlign: 'left', fontSize: 30, fontWeight: '200' }}>
                                                         {moment(heritageRefNo).format('MMM DD, YYYY HH:MM:SS')}
                                                     </Text>

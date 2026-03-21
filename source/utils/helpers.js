@@ -6,7 +6,11 @@ import { Alert, Dimensions, Platform, PermissionsAndroid } from 'react-native';
 import { useEffect, useState } from 'react';
 import 'react-native-get-random-values'; // polyfill for crypto.getRandomValues
 import { ObjectId } from 'bson';
-import Geolocation from 'react-native-geolocation-service';
+// import Geolocation from 'react-native-geolocation-service';
+import Geolocation from '@react-native-community/geolocation';
+import { updateUser } from '../redux/actions/user.actions';
+import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
+
 
 // import { Combinations } from '../Models';
 
@@ -91,13 +95,13 @@ export const updateDateTimeIfGreater = async () => {
       await AsyncStorage.setItem('dateTimeNumber', currentDateTime);
       console.log('DateTime updated to:', currentDateTime);
       return true; // Successfully updated
-    } else if(existingValue === null){
-    
-    if (currentTimezone !== 'Asia/Manila') {
-      console.log('Timezone is not set to Asia/Manila.', currentTimezone);
-      return false; // Return false if the timezone is not Asia/Manila
-    }
-    
+    } else if (existingValue === null) {
+
+      if (currentTimezone !== 'Asia/Manila') {
+        console.log('Timezone is not set to Asia/Manila.', currentTimezone);
+        return false; // Return false if the timezone is not Asia/Manila
+      }
+
     } else {
       console.log('Current dateTime is not greater than the existing one.');
       return false; // No update needed
@@ -120,9 +124,9 @@ export const fixDateTimezone = (date) => {
 // Function to get external storage directory
 export const getExternalStoragePath = () => {
   if (Platform.OS === 'android') {
-    return `${RNFS.ExternalStorageDirectoryPath}/MyAppFiles`; 
+    return `${RNFS.ExternalStorageDirectoryPath}/MyAppFiles`;
   } else {
-    return `${RNFS.DocumentDirectoryPath}/MyAppFiles`; 
+    return `${RNFS.DocumentDirectoryPath}/MyAppFiles`;
   }
 };
 
@@ -140,7 +144,7 @@ export const readFileFromExternalStorage = async () => {
 export function getDayRange(date, end) {
   const d = new Date(date);
   const e = new Date(end || date)
-  
+
   // Start of the day (00:00:00.000)
   const start_of_day = new Date(
     d.getFullYear(),
@@ -150,6 +154,29 @@ export function getDayRange(date, end) {
   ).toISOString();
 
   // End of the day (23:59:59.999)
+  const end_of_day = new Date(
+    e.getFullYear(),
+    e.getMonth(),
+    e.getDate(),
+    23, 59, 59, 999
+  ).toISOString();
+
+  return { start_of_day, end_of_day };
+}
+
+export function getTransactionDayRange(date, end) {
+  const d = new Date(date);
+  const e = new Date(end || date);
+
+  // Start of day (LOCAL → then converted safely to ISO)
+  const start_of_day = new Date(
+    d.getFullYear(),
+    d.getMonth(),
+    d.getDate(),
+    0, 0, 0, 0
+  ).toISOString();
+
+  // End of day
   const end_of_day = new Date(
     e.getFullYear(),
     e.getMonth(),
@@ -201,7 +228,7 @@ export const getDeviceDetails = async () => {
   let deviceId = DeviceInfo.getDeviceId();
   console.log(mac, "THE MAC")
   return { mac, deviceId };
-  
+
 };
 
 export const useScreenSize = () => {
@@ -260,7 +287,7 @@ export const checkSoldOutParts = ({
 };
 
 export function isDateGreater(date1, date2) {
-    return new Date(date1) > new Date(date2);
+  return new Date(date1) > new Date(date2);
 }
 
 export const checkSoldOut = ({ comb, combination, amountTarget, amountRamble }) => {
@@ -340,19 +367,23 @@ export const useDeviceCheck = () => {
   return deviceId;
 };
 
-  // ✅ Request permission (Android)
-  export const requestLocationPermission = async () => {
-    if (Platform.OS === "android") {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
-      );
+// ✅ Request permission (Android)
+export const requestLocationPermission = async () => {
+const result = await check(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION);
 
-      console.log(granted, "THE GRANT")
-      
-      return granted === PermissionsAndroid.RESULTS.GRANTED;
+  if (result === RESULTS.DENIED) {
+    const requestResult = await request(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION);
+    if (requestResult === RESULTS.GRANTED) {
+      console.log('Location granted!');
+      return requestResult;
     }
-    return true;
-  };
+  } else if (result === RESULTS.GRANTED) {
+    console.log('Location already granted!');
+  } else if (result === RESULTS.BLOCKED) {
+    console.log('Permission blocked, open settings');
+  }
+  return result;
+};
 
 // Function to get current location
 export const getCurrentLocation = async () => {
@@ -378,32 +409,32 @@ export const getCurrentLocation = async () => {
   });
 };
 
-export const downloadAndReplaceImage = async (url, filename) => {
-  try {
-    const savePath = `${RNFS.DocumentDirectoryPath}/${filename}`;
+// export const downloadAndReplaceImage = async (url, filename) => {
+//   try {
+//     const savePath = `${RNFS.DocumentDirectoryPath}/${filename}`;
 
-    const exists = await RNFS.exists(savePath);
-    if (exists) {
-      console.log("File exists — deleting:", savePath);
-      await RNFS.unlink(savePath);
-    }
+//     const exists = await RNFS.exists(savePath);
+//     if (exists) {
+//       console.log("File exists — deleting:", savePath);
+//       await RNFS.unlink(savePath);
+//     }
 
-    const result = await RNFS.downloadFile({
-      fromUrl: url,
-      toFile: savePath,
-    }).promise;
+//     const result = await RNFS.downloadFile({
+//       fromUrl: url,
+//       toFile: savePath,
+//     }).promise;
 
-    if (result.statusCode === 200) {
-      console.log("Image downloaded:", savePath);
-      return savePath;
-    } else {
-      throw new Error("Failed download: " + result.statusCode);
-    }
-  } catch (err) {
-    console.error("Error downloading image:", err);
-    return null;
-  }
-};
+//     if (result.statusCode === 200) {
+//       console.log("Image downloaded:", savePath);
+//       return savePath;
+//     } else {
+//       throw new Error("Failed download: " + result.statusCode);
+//     }
+//   } catch (err) {
+//     console.error("Error downloading image:", err);
+//     return null;
+//   }
+// };
 
 export const getAllowedDevicesCount = (configurations = []) => {
   const allowed = configurations.find(
@@ -418,3 +449,91 @@ export const normalizeDevices = (devices) => {
   if (!Array.isArray(devices)) return [];
   return devices.filter(d => d && d.is_deleted !== true);
 };
+
+export const downloadAndReplaceImage = async (
+  url: string,
+  filename: string
+): Promise<string | null> => {
+  try {
+    const localPath = `${RNFS.DocumentDirectoryPath}/${filename}`;
+
+    // Check if file already exists
+    const fileExists = await RNFS.exists(localPath);
+
+    if (fileExists) {
+      console.log(`File already exists: ${localPath}`);
+      return localPath;
+    }
+
+    console.log("Downloading:", url);
+
+    const downloadResult = await RNFS.downloadFile({
+      fromUrl: url,
+      toFile: localPath,
+      background: true,
+    }).promise;
+
+    if (downloadResult.statusCode === 200) {
+      console.log("Download success:", localPath);
+      return localPath;
+    } else {
+      console.log("Download failed:", downloadResult.statusCode);
+      return null;
+    }
+  } catch (error) {
+    console.log("Download error:", error);
+    return null;
+  }
+};
+
+export const checkAndRequestLocation = async () => {
+  const result = await check(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION);
+
+  if (result === RESULTS.DENIED) {
+    const requestResult = await request(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION);
+    if (requestResult === RESULTS.GRANTED) {
+      console.log('Location granted!');
+    }
+  } else if (result === RESULTS.GRANTED) {
+    console.log('Location already granted!');
+    return true;
+  } else if (result === RESULTS.BLOCKED) {
+    console.log('Permission blocked, open settings');
+    return false;
+  }
+};
+
+
+export const getCurrentGeolocation = async () => {
+  try {
+        const hasPermission = await checkAndRequestLocation();
+        if (!hasPermission) {
+            Alert.alert('Permission denied');
+            return;
+        }
+
+        Geolocation.getCurrentPosition(
+            async position => {
+                const coords = {
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                };
+
+
+                console.log(coords, "THE COORDS LAGE ADI")
+
+
+                // setLocation(coords);
+                return coords;
+            },
+            error => Alert.alert('Location Error', error.message),
+            { enableHighAccuracy: true }
+        );
+        return true;
+  }
+    catch (error) {
+        console.log("Error getting location:", error);
+        return false;
+    }
+    };
+

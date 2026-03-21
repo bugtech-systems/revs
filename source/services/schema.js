@@ -2,6 +2,7 @@
 export const schema = {
   users: {
     id: "text",
+    uid: "uuid",
     first_name: "text",
     last_name: "text",
     role: "text",
@@ -166,6 +167,7 @@ CREATE TABLE IF NOT EXISTS ${SYNC_TABLES.SYNC_QUEUE} (
 -- Users table with sync columns
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
+  uid TEXT UNIQUE,
   first_name TEXT,
   last_name TEXT,
   role TEXT,

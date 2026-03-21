@@ -1288,7 +1288,7 @@ export const fetchUsers = async ( filter, is_online = false) => {
 };
 
 
-export async function fetchBettings({ includeAll, date, userNow, user }) {
+export async function fetchBettings({ includeAll, date, userNow, user, gameTime }) {
   // Convert to Philippine timezone (always consistent with app)
   const startOfDay = moment(date).tz("Asia/Manila").startOf("day").toISOString();
   const endOfDay = moment(date).tz("Asia/Manila").endOf("day").toISOString();
@@ -1304,6 +1304,7 @@ export async function fetchBettings({ includeAll, date, userNow, user }) {
 
   // Filters
   const filters = {
+    game_time: gameTime,
     is_deleted: false,
     input_type: "normal",
     timestamp: { op: "between", from:  adjustedStart, to: adjustedEnd }

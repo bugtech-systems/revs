@@ -128,6 +128,15 @@ let filters = {
 
       let localBettings = await dispatch(fetchBettings({...filters, input_type: 'normal'}));
   
+
+	// let newBets = localBettings.filter(data => {
+    //        return data.uplines.some(upline => [user?.id].includes(upline))
+    //   })
+	  
+
+	//         console.log(JSON.stringify(localBettings[0]), "TAYA 1")
+    //   console.log(localBettings[1], "TAYA 2")
+	  
       setBettings(localBettings);
   }
   

@@ -13,9 +13,12 @@ import axios from 'axios';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { SET_LOADING, STOP_LOADING } from '../redux/actions/types';
 import { useOffline } from '../context/OfflineProvider';
+import { api } from '../utils/offlineSync';
+import supabase from '../utils/supabaseClient';
+
 
 const Messenger = ({ route, navigation }) => {
-    const { api, dataVersion } = useOffline()
+    // const { api, dataVersion } = useOffline()
     const { user } = useSelector(({ user }) => user);
     const dispatch = useDispatch();
     const flatListRef = useRef(null);
@@ -29,6 +32,8 @@ const Messenger = ({ route, navigation }) => {
     const [selectedImage, setSelectedImage] = useState(null);
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [messages, setMessages] = useState();
+    const [onlineUsers,setOnlineUsers] = useState([])
+
 
 
 
@@ -39,6 +44,77 @@ const Messenger = ({ route, navigation }) => {
 
     //     return message.filtered(`isDeleted == false && _id == $0`, BSON.ObjectId(messageId))
     // }, [realm, user])[0]
+    useEffect(() => {
+
+  const channel = supabase
+    .channel('messages-realtime')
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'messages',
+      },
+      (payload) => {
+
+        const newMessage = payload.new
+
+        if (
+          newMessage.created_by === user.id ||
+          newMessage.recepient === user.id
+        ) {
+          setMessages(newMessage)
+        }
+
+      }
+    )
+    .subscribe()
+
+  return () => {
+    supabase.removeChannel(channel)
+  }
+
+}, [])
+    
+
+useEffect(()=>{
+
+ const channel = supabase.channel('online-users', {
+   config: {
+     presence: {
+       key: user.id,
+     },
+   },
+ })
+
+ channel.on('presence', { event: 'sync' }, () => {
+
+   const state = channel.presenceState()
+
+   const online = Object.keys(state)
+
+   setOnlineUsers(online)
+
+ })
+
+ channel.subscribe(async status => {
+
+   if (status === 'SUBSCRIBED') {
+
+     await channel.track({
+       user_id: user.id,
+       online_at: new Date().toISOString()
+     })
+
+   }
+
+ })
+
+ return ()=> {
+   supabase.removeChannel(channel)
+ }
+
+},[])
 
     useEffect(() => {
         async function load() {
@@ -207,6 +283,9 @@ const Messenger = ({ route, navigation }) => {
     console.log(senderName, "THE DISPLAYED NAME")
 
     const renderHeader = () => {
+        const isRecipientOnline =
+  onlineUsers.includes(messages?.recepient)
+        
         return (
             // <View style={{ paddingVertical: 8, backgroundColor: '#fffff1', width: '100%', elevation: 2, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'flex-start'}}>
             <View style={styles.header}>
@@ -229,10 +308,13 @@ const Messenger = ({ route, navigation }) => {
                         {String(messages?.created_by == String(user?.id) ? messages?.recepient_name : displayName).toUpperCase()}
                     </Text>
                     <Text style={{ color: COLORS.darkGray2, fontSize: 14}}>
-                        {String(senderName.address)}
+                        {String(senderName?.address)}
                     </Text>
                     {/* <Text style={{ color: COLORS.black, fontSize: 10, }}>{isTyping ? "Typing ..." : null}</Text> */}
                 </View>
+                <Text style={{ color: COLORS.darkGray2, fontSize: 14}}>
+  {isRecipientOnline ? "Online" : "Away"}
+</Text>
                 <View style={{ alignItems: 'flex-end', width: '40%', justifyContent: 'flex-end' }}>
                     {/* <SyncComponent /> */}
                 </View>
@@ -312,40 +394,72 @@ const Messenger = ({ route, navigation }) => {
 
 
 
+    // const sendMessage = async () => {
+    //     let messageArray = messages?.conversations;
+    //     let newMessageObj = {
+    //         owner_id: String(user?.id),
+    //         message: textInput,
+    //         imageUrl: imageUrl,
+    //         isViewed: false,
+    //         created_at: moment(today).toDate()
+    //     }
+    //     if (!messages) {
+    //         // realm.write(async () => {
+    //         //     let newConversation = new Messages(realm, {
+    //         //         createdBy: String(user?._id),
+    //         //         recepient: String(messageId),
+    //         //         recepientName: String(displayName),
+    //         //         conversations: [newMessageObj],
+    //         //         isDeleted: false,
+    //         //         created_at: moment(today).toDate(),
+    //         //         updatedAt: moment(today).toDate(),
+    //         //     })
+    //         //     navigation.replace('Messenger', JSON.stringify(newConversation._id))
+    //         // })
+
+    //     } else {
+    //         // realm.write(() => {
+    //         //     messageArray.push(newMessageObj)
+    //         //     messages.updatedAt = moment(today).toDate();
+    //         // })
+    //     }
+    //     setImageUrl(null);
+    //     setTextInput("");
+    //     setRnd(Math.random())
+    // };
+
     const sendMessage = async () => {
-        let messageArray = messages?.conversations;
-        let newMessageObj = {
-            owner_id: String(user?.id),
-            message: textInput,
-            imageUrl: imageUrl,
-            isViewed: false,
-            created_at: moment(today).toDate()
-        }
-        if (!messages) {
-            // realm.write(async () => {
-            //     let newConversation = new Messages(realm, {
-            //         createdBy: String(user?._id),
-            //         recepient: String(messageId),
-            //         recepientName: String(displayName),
-            //         conversations: [newMessageObj],
-            //         isDeleted: false,
-            //         created_at: moment(today).toDate(),
-            //         updatedAt: moment(today).toDate(),
-            //     })
-            //     navigation.replace('Messenger', JSON.stringify(newConversation._id))
-            // })
 
-        } else {
-            // realm.write(() => {
-            //     messageArray.push(newMessageObj)
-            //     messages.updatedAt = moment(today).toDate();
-            // })
-        }
-        setImageUrl(null);
-        setTextInput("");
-        setRnd(Math.random())
-    };
+  if(!textInput && !imageUrl) return
 
+  const newMessage = {
+    created_by: user.id,
+    recepient: messageId,
+    recepient_name: displayName,
+    conversations: [{
+      owner_id: user.id,
+      message: textInput,
+      imageUrl: imageUrl,
+      created_at: new Date()
+    }]
+  }
+
+  const { data, error } = await supabase
+    .from('messages')
+    .insert(newMessage)
+
+    console.log(data, "THE DATA WEW")
+
+  if (error) {
+    console.log(error)
+    return
+  }
+
+  setTextInput("")
+  setImageUrl(null)
+
+}
+    
     const handleMessages = async () => {
         if (messages?.conversations?.length > 0) {
             let conversationArray = messages?.conversations;

@@ -10,6 +10,9 @@ import {
 
 import MapView, { Marker } from 'react-native-maps';
 import Geolocation from 'react-native-geolocation-service';
+// Import icon sets
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { COLORS, icons, SIZES } from '../constants';
 import { fetchUsers } from '../utils/offlineSync';
@@ -42,7 +45,7 @@ const MapScreen = ({ navigation, route }) => {
     let mapUsers = await fetchUsers({
       coordinates: { op: '!=', value: null },
     });
-    console.log("Fetched map users:", mapUsers);
+    // console.log("Fetched map users:", mapUsers);
 
     let validateCoordinates = mapUsers.filter(u => 
       typeof u.coordinates === "string" && u.coordinates.includes("|")
@@ -162,6 +165,45 @@ const MapScreen = ({ navigation, route }) => {
             right: SIZES.padding
           }}
         >
+
+          <View
+            style={{
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              flexDirection: 'column',
+              alignItems: 'center',
+              height: 210
+            }}
+          >
+
+           <TouchableOpacity
+            onPress={() => fetching()}
+            style={{
+               borderColor: COLORS.secondary,
+                backgroundColor: COLORS.white,
+                borderRadius: 6,
+                                width: 40,
+                height: 40,
+                alignItems: 'center',
+                justifyContent: 'center',
+            }}
+            // style={{ marginTop: SIZES.radius }}
+          >
+            {/* <Image
+              source={icons.reactivate_account}
+              style={{
+                width: 40,
+                height: 40,
+                borderWidth: 1,
+                borderColor: COLORS.secondary,
+                backgroundColor: COLORS.white,
+                borderRadius: 6,
+              }}
+            /> */}
+                    <MaterialIcons name="refresh" size={28} color="#007AFF" />
+
+          </TouchableOpacity>
+          
           <TouchableOpacity onPress={() => setMapType('satellite')}>
             <Image
               source={icons.mapSatellite}
@@ -177,7 +219,7 @@ const MapScreen = ({ navigation, route }) => {
 
           <TouchableOpacity
             onPress={() => setMapType('terrain')}
-            style={{ marginTop: SIZES.radius }}
+            // style={{ marginTop: SIZES.radius }}
           >
             <Image
               source={icons.mapTerrain}
@@ -194,7 +236,7 @@ const MapScreen = ({ navigation, route }) => {
 
           <TouchableOpacity
             onPress={() => setMapType('standard')}
-            style={{ marginTop: SIZES.radius }}
+            // style={{ marginTop: SIZES.radius }}
           >
             <Image
               source={icons.mapStandard}
@@ -208,6 +250,8 @@ const MapScreen = ({ navigation, route }) => {
               }}
             />
           </TouchableOpacity>
+          </View>
+          
         </View>
       </>
     );

@@ -1,15 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { View, Image, ToastAndroid, TouchableOpacity, StyleSheet, Dimensions, Text, Linking, Platform } from 'react-native';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
-import axios from 'axios';
-import { file_server_token, file_server_url, file_download_url, file_upload_url } from '../../commonData.json';
 import { useSelector } from 'react-redux';
 import { Users, Draws } from '../Models';
 import moment from 'moment-timezone';
 import { COLORS, icons, SIZES } from '../constants';
-import Config from 'react-native-config';
 import { getConfiguration, getDayRange } from '../utils/helpers';
 import { api, nowISO } from '../utils/offlineSync';
+import Config from 'react-native-config';
 
 
 
@@ -109,7 +107,82 @@ const TipScreen = ({ navigation, route }) => {
 //   }
 // };
 
+// const uploadImageToEdge = async (image: any, fileName: string) => {
+//   try {
+//     const formData = new FormData();
+//     formData.append("file", {
+//       uri: Platform.OS === "android" && !image.uri.startsWith("file://")
+//         ? "file://" + image.uri
+//         : image.uri,
+//       name: fileName,
+//       type: image.type || "image/jpeg",
+//     });
 
+//     const response = await fetch(
+//       `${Config.SUPABASE_URL}/upload-image`,
+//       {
+//         method: "POST",
+//         headers: {
+//           Authorization: `Bearer ${Config.SUPABASE_ANON_KEY}`, // important!
+//           "Content-Type": "multipart/form-data",
+//         },
+//         body: formData,
+//       }
+//     );
+
+//     const result = await response.json();
+
+//     if (!response.ok) {
+//       console.error("Edge response not OK:", result);
+//       throw new Error(result.message || "Upload failed");
+//     }
+
+//     return result.url;
+//   } catch (error) {
+//     console.error("Edge Upload Error:", error);
+//     throw error;
+//   }
+// };
+
+const uploadImageToEdge = async (image: any, fileName: string) => {
+  try {
+    const formData = new FormData();
+    formData.append("file", {
+      uri: Platform.OS === "android" && !image.uri.startsWith("file://")
+        ? "file://" + image.uri
+        : image.uri,
+      name: fileName, // already formatted as MM_DD_YYYY_tip.jpg
+      type: image.type || "image/jpeg",
+    });
+
+    const response = await fetch(
+      `${Config.SUPABASE_URL}/functions/v1/upload-image`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${Config.SUPABASE_ANON_KEY}`,
+          "Content-Type": "multipart/form-data",
+        },
+        body: formData,
+      }
+    );
+
+    const result = await response.json();
+
+
+    console.log(response, 'THE RESULT IN UPLOAD TO EDGE FUNC')
+
+    if (!response.ok) {
+      console.error("Edge response not OK:", result);
+      throw new Error(result.error || result.message || "Upload failed");
+    }
+
+    return result.url;
+  } catch (error) {
+    console.error("Edge Upload Error:", error);
+    throw error;
+  }
+};
 
 const handleDownloadTipImg = async () => {
   const raw = selectedImage?.uri;
@@ -184,48 +257,80 @@ const handleDownloadTipImg = async () => {
   }
 };
 
-  const handleImageUpload = async () => {
-    try {
-      const imagePick = await pickImage();
-      const image = imagePick.assets[0];
-      const formData = new FormData();
-      const fileExtension = String(image.fileName).split('.')
+// const handleImageUpload = async () => {
+//   try {
+//     const imagePick = await pickImage();
+//     const image = imagePick.assets[0];
 
-      const dateName = moment(resultDate ? resultDate : draws[0].draw_date).tz('Asia/Manila').format('MM_DD_YYYY')
+//     if (!image.uri) return;
+
+//     // Generate file name the same way as your old code
+//     const dateName = moment(resultDate || draws[0]?.draw_date)
+//       .tz("Asia/Manila")
+//       .format("MM_DD_YYYY");
+
+//     const fileExt = image.fileName?.split(".").pop() || "jpg";
+//     const fileName = `${dateName}_tip.${fileExt}`;
+
+//     // Upload via Edge Function
+//     const uploadedUrl = await uploadImageToEdge(image, fileName);
+
+//     setSelectedImage({ uri: uploadedUrl });
+
+//     // Update the Draw record
+//     if (draws[0]) {
+//       await api.updateDraw(draws[0].id, {
+//         tip_url: uploadedUrl,
+//         updated_at: nowISO(),
+//       });
+//     }
+
+//     ToastAndroid.show("Upload successful!", ToastAndroid.SHORT);
+//   } catch (error) {
+//     console.error("Error uploading image:", error);
+//     ToastAndroid.show("Upload failed", ToastAndroid.SHORT);
+//   }
+// };
 
 
-      console.log(dateName)
-      formData.append('file', {
-        uri: image.uri,
-        type: image.type,
-        name: `${dateName}_tip.${fileExtension[fileExtension.length - 1]}`,
+const handleImageUpload = async () => {
+  try {
+    // Pick image from gallery
+    const imagePick = await pickImage();
+    const image = imagePick.assets[0];
+    if (!image?.uri) return;
+
+    // Generate filename: MM_DD_YYYY_tip.jpg
+    const dateName = moment(resultDate ? resultDate : draws[0]?.draw_date)
+      .tz('Asia/Manila')
+      .format('MM_DD_YYYY');
+    const fileExt = image.fileName?.split('.').pop() || 'jpg';
+    const fileName = `${dateName}_tip.${fileExt}`;
+
+    // Upload image to Supabase Edge Function
+    const publicUrl = await uploadImageToEdge(image, fileName);
+
+
+
+    console.log(publicUrl, "THE PUB URL")
+
+    // Update UI instantly
+    setSelectedImage({ uri: publicUrl });
+
+    // Update Draw record
+    if (draws[0]) {
+      await api.updateDraw(draws[0].id, {
+        tip_url: publicUrl,
+        updated_at: nowISO(),
       });
-
-      console.log('IMAGE DETAILS', image)
-
-      const response = await axios.post(`${Config.FILE_UPLOAD_URL}/apiv2/v1/auth/apk`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        },
-      });
-
-
-      console.log(response.data, 'UPLOAD RESPONSE', resultId, draws[0])
-       
-
-
-      setSelectedImage({ uri: `${Config.FILE_UPLOAD_URL}/apiv2/assets/${response.data.filename}` });
-      
-      
-      await api.updateDraw(draws[0].id, { tip_url:  `${Config.FILE_UPLOAD_URL}/apiv2/assets/${response.data.filename}`, updated_at: nowISO()})
-      
-      // await realm.write(async () => {
-      //   draws[0].tip_url = `${Config.FILE_UPLOAD_URL}/apiv2/assets/${response.data.filename}`;
-      // })
-    } catch (error) {
-      console.error('Error uploading image:', error);
     }
-  };
+
+    ToastAndroid.show('Upload successful!', ToastAndroid.SHORT);
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    ToastAndroid.show('Upload failed', ToastAndroid.SHORT);
+  }
+};
 
   const pickImage = async () => {
     return new Promise((resolve, reject) => {

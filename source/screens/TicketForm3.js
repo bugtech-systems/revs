@@ -76,7 +76,7 @@ let keyPad = [
 
 export default function TicketForm3({ navigation, route }) {
   const ticketDetails = JSON.parse(route.params);
-
+  const dispatch = useDispatch();
   const { user } = useSelector(({ user }) => user);
   const [amountVal, setAmountVal] = useState('')
   const [time, setSelectedTime] = useState(ticketDetails?.game_time || "2pm")
@@ -377,7 +377,7 @@ export default function TicketForm3({ navigation, route }) {
                         // winning: 0,
                         combinations: combinations,
                         commissions: newComms,
-                        // uplines: newUplines,
+                        uplines: newUplines,
                         is_validated: null,
                         updated_at: new Date().toISOString()
                     }
@@ -388,7 +388,7 @@ export default function TicketForm3({ navigation, route }) {
                     setBetting([]);
                     setDate(new Date());
                     console.log(updated, 'UPDATEDD')
-                    navigation.navigate('VoidScreen', JSON.stringify({...ticketDetails, ...updated}))
+                    navigation.navigate('VoidScreen', JSON.stringify({...ticketDetails, ...updated, navigate_screen: 'Transactions'}))
                 // })
             } else {
                 Alert.alert('No tickets to submit')
@@ -989,7 +989,14 @@ console.log(own_user, loading, 'statuss', ticketDetails, ticketDetails.timestamp
                   <Text style={{ fontWeight: 'bold', fontSize: 24, color: COLORS.black }}>
                     Total: {`${total}`}
                   </Text>
-                  <TouchableOpacity onPress={() => handleSubmit(arrayBetting)} disabled={arrayBetting.length == 0 || curDraw || loading} style={{ padding: 10, backgroundColor: (arrayBetting.length == 0 || loading) ? COLORS.gray600 : '#2761a2', width: '40%', height: 55, borderRadius: 24, justifyContent: 'center', alignItems: 'center', }}>
+                  <TouchableOpacity 
+                    onPress={() => {
+                      handleSubmit(arrayBetting)
+                      // navigation.navigate('VoidScreen', JSON.stringify({...ticketDetails, ...arrayBetting}))
+
+                    }} 
+                    disabled={arrayBetting.length == 0 || curDraw || loading} 
+                    style={{ padding: 10, backgroundColor: (arrayBetting.length == 0 || loading) ? COLORS.gray600 : '#2761a2', width: '40%', height: 55, borderRadius: 24, justifyContent: 'center', alignItems: 'center', }}>
                     <Text style={{ fontWeight: 'bold', fontSize: 22, color: COLORS.white }}>
                       UPDATE
                     </Text>

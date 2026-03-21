@@ -2,12 +2,13 @@ import DeviceInfo from "react-native-device-info";
 import { Alert, Platform } from "react-native";
 import { fetchUserByEmail, signOut, updateUser } from "../redux/actions/user.actions";
 import supabase from "./supabaseClient";
-import { getAllowedDevicesCount, getConfiguration } from "./helpers";
+import { getAllowedDevicesCount, getConfiguration, requestLocationPermission } from "./helpers";
 
 const getCurrentDevicePayload = async () => ({
   id: await DeviceInfo.getUniqueId(),
   device_name: await DeviceInfo.getDeviceName(),
   device_os: Platform.OS,
+  location_enabled: await DeviceInfo.isLocationEnabled(),
   os_version: DeviceInfo.getSystemVersion(),
   device_model: DeviceInfo.getModel(),
   device_brand: DeviceInfo.getBrand(),
@@ -113,7 +114,7 @@ const normalizeDevices = (login_devices) => {
   return [];
 };
 
-export const verifyDeviceForUser = async (dispatch, loggedUser) => {
+export const verifyDeviceForUser = async (dispatch, loggedUser, navigation) => {
   try {
     if (!loggedUser?.email) return false;
 
@@ -160,9 +161,11 @@ export const verifyDeviceForUser = async (dispatch, loggedUser) => {
         },
       ];
 
+      let { uplines, ...cleanObject } = fresh;
+      
       await dispatch(
         updateUser(fresh.id, {
-          ...fresh,
+          ...cleanObject,
           login_devices: updatedDevices,
         })
       );
@@ -241,4 +244,23 @@ export const subscribeToUserRealtime = (userId, dispatch) => {
     .subscribe();
 
   return channel;
+};
+
+export const verifyRequiredPermissions = async () => {
+  try {
+    // 2️⃣ Get current device
+    const localDevice = await getCurrentDevicePayload();
+
+    if (!localDevice.location_enabled) {
+      console.log('Location is off')
+
+      requestLocationPermission()
+    }
+    
+    
+      return localDevice;
+    } catch (error) {
+      console.log(error, "Something wen't wrong!")
+      return null;
+    }
 };

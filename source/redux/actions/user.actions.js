@@ -378,7 +378,7 @@ export const signIn = (email, password) => async (dispatch) => {
         .from('users')
         .select('*')
         .eq('email', data.user.email)
-        .single();
+        .maybeSingle();
 
       if (profileError) {
         console.error('Profile fetch error:', profileError);

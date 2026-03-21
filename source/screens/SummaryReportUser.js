@@ -13,6 +13,7 @@ import { api, fetchUser } from '../utils/offlineSync';
 
 const SummaryReportUser = ({ route, navigation }) => {
   const dispatch = useDispatch();
+    const { user } = useSelector(({ user }) => user);
     const {collector} = JSON.parse(route.params); // data passed from WinningScreen
   const [includeAll, setIncludeAll] = useState(true);
   const [startDate, setStartDate] = useState(new Date());
@@ -42,6 +43,8 @@ const SummaryReportUser = ({ route, navigation }) => {
     
   console.log(start_of_day, end_of_day, 'date range')
     
+  console.log(item, "TJE ID IN SUMM REPORT OF USERSSSSSSSSSSS")
+  
     let filters = {
     	is_deleted: false,
 	    input_type: "normal"
@@ -56,12 +59,13 @@ const SummaryReportUser = ({ route, navigation }) => {
 } else {
   filters = {
     ...filters,
-    owner_id: item?.id,
+    owner_id: item?.id ,
+        // uplines: { op: "contains", value: [item?.id] },
     timestamp: { op: "between", from: start_of_day, to: end_of_day },
   };
 }
 
-console.log(filters, 'FILTERSS', item)
+// console.log(filters, 'FILTERSS')
 
 
       let localBettings = await api.listBettings({
@@ -69,6 +73,10 @@ console.log(filters, 'FILTERSS', item)
         orderBy: 'created_at DESC',
         // limit: 20,
       });
+
+      //       let newBets = localBettings.filter(data => {
+      //      return data.uplines.some(upline => [user?.id].includes(upline))
+      // })
 
     
       setItems(localBettings);
@@ -144,7 +152,9 @@ console.log(filters, 'FILTERSS', item)
   }, [collector, startDate, endDate]);
   
   
-  console.log(startDate, endDate, 'DATING RANNGGE')
+  // console.log(startDate, endDate, 'DATING RANNGGE')
+
+  console.log(includeAll, "collectorcollectorcollectorcollectorcollector")
   
 
   return (

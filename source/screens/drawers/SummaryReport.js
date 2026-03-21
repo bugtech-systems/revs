@@ -61,8 +61,18 @@ const SummaryReport = ({ navigation }) => {
         orderBy: 'created_at DESC',
         // limit: 20,
       });
-
+      
+      // let newBets = localBettings.filter(data => {
+      //      return data.uplines.some(upline => [user?.id].includes(upline))
+      // })
     
+      // // console.log(newBets, "THE MEW BETS")
+      
+      // console.log(localBettings[0], 'DADETA1')
+      // console.log(localBettings[1], 'DADETA2')
+
+      
+      
       setItems(localBettings);
       // setLoading(false);
       setShowDate(null);

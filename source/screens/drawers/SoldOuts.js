@@ -12,6 +12,8 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import SelectDropdown from 'react-native-select-dropdown'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { api } from '../../utils/offlineSync';
+import Config from 'react-native-config';
+import { manualSync } from '../../redux/actions/syncActions';
 
 
 const drawTimes = [
@@ -168,7 +170,12 @@ console.log(gameTime, 'GME')
 
     try {
     
-      const res = await axios.get(`https://sharewin.pro/apiv2/v1/bettingsv2/soldout?gameTime=${gameTime}&email=${email}`);
+      const res = await axios.get(`${Config.SUPABASE_URL}/functions/v1/generate-soldout?gameTime=${gameTime}&email=${email}`, {
+        headers: {
+          apikey: Config.SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${Config.SUPABASE_ANON_KEY}`,
+        },
+      });
       setRnd(Math.random());
       await manualSync();
       if (!res.data.success) Alert.alert('No Sold-out Available');
@@ -321,7 +328,7 @@ console.log(gameTime, 'GME')
           </View>
           <View style={{ flex: 1, flexDirection: 'column', width: '40%', alignItems: 'flex-start' }}>
             <Text style={styles.fontsHeader}>Total Hits</Text>
-            <Text style={{ fontWeight: 'bold', color: COLORS.black, fontSize: 16 }}>{Number(totalWins).toFixed(2)}</Text>
+            <Text style={{ fontWeight: 'bold', color: COLORS.black, fontSize: 16 }}>{ totalWins > 0 ? Number(totalWins).toFixed(2) : '0.00' }</Text>
           </View>
         </View>
 
