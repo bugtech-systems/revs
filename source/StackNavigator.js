@@ -54,6 +54,9 @@ import UsersTree from './screens/UsersTree';
 import FormSheet from './screens/FormSheet';
 import { useNavigation } from '@react-navigation/native';
 import { PermissionsAndroid } from 'react-native';
+import ChatListScreen from './screens/drawers/ChatListScreen';
+import ChatThreadScreen from './screens/ChatThreadScreen';
+import NewChatScreen from './screens/NewChatScreen';
 
 
 
@@ -204,6 +207,13 @@ const DrawerNavigation = () => {
   return (
     <Drawer.Navigator screenOptions={{ drawerType: 'slide', overlayColor: 'rgba(138, 133, 133, 0.59)', swipeEdgeWidth: 100 }}>
       <Drawer.Screen name="Dashboard" component={Dashboard} options={({ navigation }) => generateDrawerScreenOptions('Dashboard', icons.dashboard, 'Dashboard', navigation)} />
+
+        {
+       (getConfiguration(curUser, 'flashSms')?.isCheck) && (
+        <Drawer.Screen name="Messages" component={ChatListScreen} options={({ navigation }) => generateDrawerScreenOptions('Messages', icons.send_message, 'Messages', navigation)} />
+       )  
+        }
+      {/* <Drawer.Screen name="Messages" component={ChatListScreen} options={({ navigation }) => generateDrawerScreenOptions('Messages', icons.dashboard, 'Messages', navigation)} /> */}
       {(getConfiguration(curUser, 'ticketForm')?.isCheck) ? (
         <>
           <Drawer.Screen name="Play" component={TicketForm} options={({ navigation }) => generateDrawerScreenOptions('Play', icons.play, 'Play', navigation)} />
@@ -350,6 +360,33 @@ const StackNavigates = () => {
             })}
           />
 
+          <Stack.Screen
+            name="NewChat"
+            component={NewChatScreen}
+            options={({ navigation, route }) => ({
+              headerTitle: '',
+              headerTitleStyle: { color: COLORS.white },
+              headerStyle: { backgroundColor: COLORS.secondary },
+              headerShown: true,
+              headerLeft: () => (
+                <CustomDrawerIcon route={route} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'New Chat'} />
+              ),
+            })}
+          />
+
+                    <Stack.Screen
+            name="ChatThread"
+            component={ChatThreadScreen}
+            options={({ navigation, route }) => ({
+              headerTitle: '',
+              headerTitleStyle: { color: COLORS.white },
+              headerStyle: { backgroundColor: COLORS.secondary },
+              headerShown: true,
+              headerLeft: () => (
+                <CustomDrawerIcon route={route} navigation={navigation} navType={'screen'} selectedUser={selectedUser} headerTitle={'Conversation'} />
+              ),
+            })}
+          />
           <Stack.Screen
         name="form-sheet"
         component={FormSheet}
@@ -630,30 +667,26 @@ export const StackNavigator = (navigation) => {
   }, [session]);
 
 
-
    // 🔥 DEVICE CHECK BEFORE ANYTHING LOADS
   useEffect(() => {
     const runDeviceCheck = async () => {
+    const ok = await verifyDeviceForUser(dispatch, user, navigation);
       if (!isAuthenticated || !user) {
         setDeviceValidated(true);
         return;
       }
 
-
-      const ok = await verifyDeviceForUser(dispatch, user, navigation);
-
-      if (ok) setDeviceValidated(true);
+      await requestLocationPermission();
       // if not ok → signOut already handled
+      if (ok) setDeviceValidated(true);
     };
 
     runDeviceCheck();
-    requestLocationPermission();
+
   }, [isAuthenticated, user]);
 
   // 🔒 Prevent UI from rendering before device check is done
-  if (!deviceValidated) return null; 
-
-
+  if (!deviceValidated) return null;
 
   return (
     <SafeAreaProvider>

@@ -652,7 +652,7 @@
             }
             <View style={{ flex: 1, justifyContent: 'flex-end' }}>
 
-              {selUser?.is_admin && ableToViewMap ?
+              {(selUser?.role === 'coordinator' && ableToViewMap) ?
                 <>
                   <Text style={{ padding: 6, color: COLORS.primary, fontSize: 12, fontWeight: '500', marginTop: 10 }}>
                     Preferences

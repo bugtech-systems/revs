@@ -45,17 +45,17 @@ const TellersScreen = ({ navigation }) => {
   };
 
   // 🔹 Handle messaging
-  const handleMessageNavigation = async (recepientId) => {
+  const handleMessageNavigation = async (recipientId) => {
     // try {
-    //   const message = await getFirstMessage(recepientId, user?._id);
-    //   navigation.navigate('Messenger', JSON.stringify(message?._id || recepientId));
+    //   const message = await getFirstMessage(recipientId, user?._id);
+    //   navigation.navigate('Messenger', JSON.stringify(message?._id || recipientId));
     // } catch (err) {
     //   console.error('Error navigating to messages:', err);
     // }
     try {
     
          let data = await api.listMessages({
-          filters: {is_deleted: false, recepient: recepientId, created_by: userNow.id}
+          filters: {is_deleted: false, recipient: recipientId, created_by: userNow.id}
        })
 
 
@@ -63,7 +63,7 @@ const TellersScreen = ({ navigation }) => {
       if (data && data.length > 0) {
         navigation.navigate('Messenger', JSON.stringify(data[0].id));
       } else {
-        navigation.navigate('Messenger', JSON.stringify(recepientId));
+        navigation.navigate('Messenger', JSON.stringify(recipientId));
       }
     } catch (err) {
       console.error("Error navigating to Messenger:", err);

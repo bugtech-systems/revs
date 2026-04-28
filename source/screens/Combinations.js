@@ -120,12 +120,6 @@ const CombinationsScreen = () => {
       const permutations = await dispatch(fetchMasterCombinations());
       const drawsData = await dispatch(fetchDraws());
       
-      const bettingsData = await await dispatch(fetchBettings({input_type: 'normal'}));
-
-
-
-      console.log(bettingsData, "BETTINGS ARRAY IS HERE!")
-
       setMasterCombinations(permutations || []);
       setDraws(drawsData || []);
     } catch (err) {
@@ -500,14 +494,14 @@ const CombinationsScreen = () => {
                     <View style={styles.modalContainer}>
                       <View style={styles.modalContent}>
                         <View style={{ alignItems: 'flex-start', justifyContent: 'space-between', flexDirection: 'row', width: '100%' }}>
-                          <Text style={{ ...styles.modalTitle, borderWidth: 1, }}>Edit Combination: {tempValues?.digit}</Text>
-                          <Switch
+                          <Text style={{ ...styles.modalTitle, }}>Edit Combination: {tempValues?.digit}</Text>
+                          {/* <Switch
                             trackColor={{ false: "#767577", true: COLORS.secondary }}
                             thumbColor={isEnabled ? COLORS.white : "#f4f3f4"}
                             ios_backgroundColor="#3e3e3e"
                             onValueChange={toggleSwitch}
                             value={isEnabled}
-                          />
+                          /> */}
 
                         </View>
                         {['straight_limit', 'ramble_limit', 'straight_max_limit', 'ramble_max_limit'].map((field) => (

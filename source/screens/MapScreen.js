@@ -168,14 +168,14 @@ const MapScreen = ({ navigation, route }) => {
 
           <View
             style={{
-              justifyContent: 'space-between',
+              justifyContent: 'space-around',
               alignItems: 'flex-start',
               flexDirection: 'column',
               alignItems: 'center',
               height: 210
             }}
           >
-
+{/* 
            <TouchableOpacity
             onPress={() => fetching()}
             style={{
@@ -187,9 +187,8 @@ const MapScreen = ({ navigation, route }) => {
                 alignItems: 'center',
                 justifyContent: 'center',
             }}
-            // style={{ marginTop: SIZES.radius }}
           >
-            {/* <Image
+            <Image
               source={icons.reactivate_account}
               style={{
                 width: 40,
@@ -199,11 +198,11 @@ const MapScreen = ({ navigation, route }) => {
                 backgroundColor: COLORS.white,
                 borderRadius: 6,
               }}
-            /> */}
+            />
                     <MaterialIcons name="refresh" size={28} color="#007AFF" />
 
           </TouchableOpacity>
-          
+           */}
           <TouchableOpacity onPress={() => setMapType('satellite')}>
             <Image
               source={icons.mapSatellite}

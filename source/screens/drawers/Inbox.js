@@ -30,7 +30,7 @@ const Inbox = ({ navigation }) => {
   //       `
   //       SELECT * FROM messages
   //       WHERE isDeleted = 0 
-  //       AND (createdBy = ? OR recepient = ?)
+  //       AND (createdBy = ? OR recipient = ?)
   //       ORDER BY updated_at DESC
   //       `,
   //       [String(user?.id), String(user?.id)],
@@ -53,10 +53,10 @@ const Inbox = ({ navigation }) => {
   //     const { data, error } = await supabase
   //       .from('messages')
   //       .select(`
-  //         id, createdBy, recepient, recepientName, updated_at, isDeleted,
+  //         id, createdBy, recipient, recipientName, updated_at, isDeleted,
   //         conversations (id, owner_id, message, created_at, isViewed)
   //       `)
-  //       .or(`createdBy.eq.${user?.id}, recepient.eq.${user?.id}`)
+  //       .or(`createdBy.eq.${user?.id}, recipient.eq.${user?.id}`)
   //       .order('updated_at', { ascending: false });
 
   //     if (error) throw error;
@@ -65,13 +65,13 @@ const Inbox = ({ navigation }) => {
   //       data.forEach(msg => {
   //         tx.executeSql(
   //           `INSERT OR REPLACE INTO messages 
-  //             (id, createdBy, recepient, recepientName, updated_at, isDeleted)
+  //             (id, createdBy, recipient, recipientName, updated_at, isDeleted)
   //            VALUES (?, ?, ?, ?, ?, ?)`,
   //           [
   //             msg.id,
   //             msg.createdBy,
-  //             msg.recepient,
-  //             msg.recepientName,
+  //             msg.recipient,
+  //             msg.recipientName,
   //             msg.updated_at,
   //             msg.isDeleted ? 1 : 0,
   //           ]
@@ -108,15 +108,15 @@ const Inbox = ({ navigation }) => {
   useEffect(() => {
     // fetchMessages();
     // syncWithSupabase();
-// isDeleted == false && createdBy == $0 || recepient == $0 && recepient == $1 || createdBy == $1
+// isDeleted == false && createdBy == $0 || recipient == $0 && recipient == $1 || createdBy == $1
     async function load() {
 
 
       const filters = {
       is_deleted: false,
       or: [
-        { created_by: user?.id, recepient: user?.id },
-        { created_by: user?.id, recepient: user?.id }
+        { created_by: user?.id, recipient: user?.id },
+        { created_by: user?.id, recipient: user?.id }
       ]
     };
 
@@ -151,7 +151,7 @@ const Inbox = ({ navigation }) => {
   let filteredMessages = messages;
   if (searchQuery) {
     filteredMessages = messages.filter(m =>
-      String(m.recepientName)
+      String(m.recipientName)
         .toLowerCase()
         .includes(searchQuery.toLowerCase())
     );
@@ -197,7 +197,7 @@ const Inbox = ({ navigation }) => {
           <View style={{ flexDirection: 'column', width: '70%' }}>
             <Text style={styles.username}>
               {String(item.createdBy) === String(user?.id)
-                ? item.recepientName?.toUpperCase()
+                ? item.recipientName?.toUpperCase()
                 : String(item.createdBy).toUpperCase()}
             </Text>
 

@@ -395,7 +395,7 @@ const signOut = useCallback(async () => {
         
         
         {/* Preferences */}
-         {(selUser?.role === 'coordinator' && selUser?.is_admin && ableToViewMap) ? (
+         {(selUser?.role === 'coordinator' && ableToViewMap) ? (
           <>
             <Text style={{ padding: 6, color: COLORS.primary, fontSize: 12, fontWeight: '500', marginTop: 10 }}>Preferences</Text>
             <TouchableOpacity onPress={() => navigation.navigate('MapScreen')}>

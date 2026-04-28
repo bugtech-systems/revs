@@ -52,6 +52,7 @@ class SyncManager {
     });
   }
 
+  
   setupAppStateListener() {
     this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange);
   }

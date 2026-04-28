@@ -6,13 +6,31 @@ import { Alert, Dimensions, Platform, PermissionsAndroid } from 'react-native';
 import { useEffect, useState } from 'react';
 import 'react-native-get-random-values'; // polyfill for crypto.getRandomValues
 import { ObjectId } from 'bson';
-// import Geolocation from 'react-native-geolocation-service';
 import Geolocation from '@react-native-community/geolocation';
-import { updateUser } from '../redux/actions/user.actions';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 
-
 // import { Combinations } from '../Models';
+
+export const AVATAR_COLORS = [
+  // "#FF6B6B",
+  // "#4ECDC4",
+  // "#45B7D1",
+  // "#F7B801",
+  // "#9B5DE5",
+  // "#00BBF9",
+  // "#00F5D4",
+  // "#F15BB5",
+    "#1E3A8A", // dark blue
+    "#7C2D12", // dark orange/brown
+    "#064E3B", // dark teal/green
+    "#4C1D95", // deep purple
+    "#7F1D1D", // dark red
+    "#0F172A", // almost black (slate)
+    "#14532D", // forest green
+    "#3F3F46", // dark gray
+    "#1F2937", // slate gray
+    "#831843", // deep pink
+];
 
 export const permuteDigits = (number) => {
   // Convert the number to a string to manipulate individual digits
@@ -369,7 +387,7 @@ export const useDeviceCheck = () => {
 
 // ✅ Request permission (Android)
 export const requestLocationPermission = async () => {
-const result = await check(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION);
+  const result = await check(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION);
 
   if (result === RESULTS.DENIED) {
     const requestResult = await request(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION);
@@ -506,34 +524,87 @@ export const checkAndRequestLocation = async () => {
 
 export const getCurrentGeolocation = async () => {
   try {
-        const hasPermission = await checkAndRequestLocation();
-        if (!hasPermission) {
-            Alert.alert('Permission denied');
-            return;
-        }
-
-        Geolocation.getCurrentPosition(
-            async position => {
-                const coords = {
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude,
-                };
-
-
-                console.log(coords, "THE COORDS LAGE ADI")
-
-
-                // setLocation(coords);
-                return coords;
-            },
-            error => Alert.alert('Location Error', error.message),
-            { enableHighAccuracy: true }
-        );
-        return true;
-  }
-    catch (error) {
-        console.log("Error getting location:", error);
-        return false;
+    const hasPermission = await checkAndRequestLocation();
+    if (!hasPermission) {
+      Alert.alert('Permission denied');
+      return;
     }
-    };
 
+    Geolocation.getCurrentPosition(
+      async position => {
+        const coords = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        };
+
+
+        console.log(coords, "THE COORDS LAGE ADI")
+
+
+        // setLocation(coords);
+        return coords;
+      },
+      error => Alert.alert('Location Error', error.message),
+      { enableHighAccuracy: true }
+    );
+    return true;
+  }
+  catch (error) {
+    console.log("Error getting location:", error);
+    return false;
+  }
+};
+
+
+
+export const formatMessageTime = (date) => {
+  const now = moment().tz("Asia/Manila");
+  const msg = moment(date).tz("Asia/Manila");
+  
+  
+  // Different year
+  if (!msg.isSame(now, "year")) {
+    return msg.format("MMMM D, YYYY, h:mm A");
+  }
+
+  // Today
+  if (msg.isSame(now, "day")) {
+    return msg.format("h:mm A");
+  }
+
+  // Yesterday
+  if (msg.isSame(now.clone().subtract(1, "day"), "day")) {
+    return "Yesterday " + msg.format("h:mm A");
+  }
+
+  // Same week
+  if (msg.isSame(now, "week")) {
+    return msg.format("dddd h:mm A");
+  }
+
+  // Different week or month (same year)
+  return msg.format("MMMM D, h:mm A");
+};
+
+
+export const getDateLabel = (date) => {
+  const now = moment().tz("Asia/Manila");
+  const msgDate = moment(date).tz("Asia/Manila");
+
+  if (msgDate.isSame(now, "day")) return "Today";
+  if (msgDate.isSame(now.clone().subtract(1, "day"), "day"))
+    return "Yesterday";
+
+  return msgDate.format("MMMM DD, YYYY");
+};
+
+export const getAvatarColor = (text: string) => {
+  let hash = 0;
+
+  for (let i = 0; i < text.length; i++) {
+    hash = text.charCodeAt(i) + ((hash << 5) - hash);
+  }
+
+  const index = Math.abs(hash) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[index];
+};

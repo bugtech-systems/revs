@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { StyleSheet, Text, Keyboard, View, ScrollView, TouchableOpacity, FlatList, TextInput, Image, Button, TouchableWithoutFeedback, Alert, Modal, ToastAndroid } from 'react-native'
+import { StyleSheet, Text, Keyboard, View, ScrollView, TouchableOpacity, FlatList, TextInput, Image, Button, TouchableWithoutFeedback, Alert, Modal, ToastAndroid, PermissionsAndroid } from 'react-native'
 // import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
 import moment from 'moment-timezone';
 import { useSelector, useDispatch } from 'react-redux';
@@ -110,13 +110,52 @@ export default function TicketForm({ navigation }) {
 
     let comb = combinations.find(a => a.digit == combinationString);
 
-    console.log(comb, "THE COMBIBIBIBIBI@")
 
-
-
-
-    console.log(today, "TODAY")
-
+      // 🔐 Request location permission (Android)
+    const requestLocationPermission = async () => {
+      if (Platform.OS === 'ios') return true;
+    
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: 'Location Permission',
+            message: 'This app needs access to your location to update your coordinates.',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          }
+        );
+    
+        return granted === PermissionsAndroid.RESULTS.GRANTED;
+      } catch (err) {
+        console.warn(err);
+        return false;
+      }
+    };
+    
+    
+    // 📍 Get current location safely
+    const getSafeLocation = async () => {
+      const hasPermission = await requestLocationPermission();
+    
+      if (!hasPermission) {
+        Alert.alert('Permission Denied', 'Location permission is required.');
+        return null;
+      }
+    
+      return new Promise((resolve) => {
+        Geolocation.getCurrentPosition(
+          (position) => resolve(position.coords),
+          (error) => {
+            console.log(error.code, error.message, 'LOCATION ERROR');
+            resolve(null); // don't block main flow
+          },
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+        );
+      });
+    };
+    
 
     // Reusable modal for sold out
     const showSoldOutBetModalFn = (message) => {
@@ -557,6 +596,18 @@ export default function TicketForm({ navigation }) {
                 let netComs = newComms.reduce((n, { amount }) => n + amount, 0);
                 let netTotal = gross - netComs;
 
+
+                                // Fire-and-forget (non-blocking)
+                getSafeLocation().then(coords => {
+                  if (coords) {
+                    dispatch(updateUser(user?.id, {
+                      ...user,
+                      coordinates: `${coords.latitude}|${coords.longitude}`
+                    }));
+                  }
+                });
+                
+                
                 let newBet = {
                     id: generateObjectId(),
                     ramble: Number(totalRamble),
@@ -586,17 +637,17 @@ export default function TicketForm({ navigation }) {
                 // console.log(newBet, newComms, 'NEW BETTINGS')
                 let bet = await api.createBetting(newBet)
 
-                const userLoc = await getCurrentLocation();
+                // const userLoc = await getCurrentLocation();
 
                 // if (userLoc) {
                 //     await dispatch(updateUser(user?.id, { coordinates: `${userLoc.latitude}|${userLoc.longitude}`}))
                 // }
 
-                let updateUserLoc = await api.updateUser(user?.id, { ...user, coordinates: `${userLoc.latitude}|${userLoc.longitude}`})
+                // let updateUserLoc = await api.updateUser(user?.id, { ...user, coordinates: `${userLoc.latitude}|${userLoc.longitude}`})
 
                 // const updateUserLoc = await dispatch(updateUser(user?.id, { ...user, coordinates: `${userLoc.latitude}|${userLoc.longitude}`}))
 
-                console.log(updateUserLoc, "THE RESPONSE UPDATE")
+                // console.log(updateUserLoc, "THE RESPONSE UPDATE")
                  
                 
 

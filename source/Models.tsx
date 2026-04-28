@@ -273,8 +273,8 @@ export class Conversation extends Realm.Object<Conversation> {
 export class Messages extends Realm.Object<Messages> {
   _id!: Realm.BSON.ObjectId;
   createdBy?: string;
-  recepient?: string;
-  recepientName?: string;
+  recipient?: string;
+  recipientName?: string;
   conversations?: Conversation[];
   isDeleted?: Boolean;
   createdAt?: Date;
@@ -287,8 +287,8 @@ export class Messages extends Realm.Object<Messages> {
     properties: {
       _id: { type: 'objectId', default: () => new Realm.BSON.ObjectId() },
       createdBy: 'string?',
-      recepient: 'string?',
-      recepientName: 'string?',
+      recipient: 'string?',
+      recipientName: 'string?',
       conversations: { type: 'list', objectType: 'conversation' },
       isDeleted: { type: 'bool', default: false },
       createdAt: { type: 'date', default: () => new Date() },

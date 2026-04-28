@@ -39,15 +39,15 @@ export const syncConfig = {
       softDelete: true,
       incrementalSync: true // Always do full sync for master data
     },
-    // messages: {
-    //   query: "",
-    //   maxAge: 720, // 30 days
-    //   maxRecords: 1000,
-    //   immediateSync: false,
-    //   cleanupStale: false,
-    //   softDelete: false,
-    //   incrementalSync: false // Always do full sync for master data
-    // },
+    messages: {
+      query: "",
+      maxAge: 720, // 30 days
+      maxRecords: 1000,
+      immediateSync: false,
+      cleanupStale: false,
+      softDelete: false,
+      incrementalSync: false // Always do full sync for master data
+    },
     // cashflow: {
     //   query: "",
     //   maxAge: 720, // 30 days

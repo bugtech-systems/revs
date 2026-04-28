@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { StyleSheet, Text, Keyboard, View, ScrollView, TouchableOpacity, FlatList, TextInput, Image, Button, TouchableWithoutFeedback, Alert, ActivityIndicator } from 'react-native'
+import { StyleSheet, Text, Keyboard, View, ScrollView, TouchableOpacity, FlatList, TextInput, Image, Button, TouchableWithoutFeedback, Alert, ActivityIndicator, PermissionsAndroid } from 'react-native'
 import moment, { tz } from 'moment-timezone';
 import { useSelector, useDispatch } from 'react-redux';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -224,7 +224,50 @@ export default function TicketForm3({ navigation, route }) {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
+  // 🔐 Request location permission (Android)
+const requestLocationPermission = async () => {
+  if (Platform.OS === 'ios') return true;
 
+  try {
+    const granted = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+      {
+        title: 'Location Permission',
+        message: 'This app needs access to your location to update your coordinates.',
+        buttonNeutral: 'Ask Me Later',
+        buttonNegative: 'Cancel',
+        buttonPositive: 'OK',
+      }
+    );
+
+    return granted === PermissionsAndroid.RESULTS.GRANTED;
+  } catch (err) {
+    console.warn(err);
+    return false;
+  }
+};
+
+
+// 📍 Get current location safely
+const getSafeLocation = async () => {
+  const hasPermission = await requestLocationPermission();
+
+  if (!hasPermission) {
+    Alert.alert('Permission Denied', 'Location permission is required.');
+    return null;
+  }
+
+  return new Promise((resolve) => {
+    Geolocation.getCurrentPosition(
+      (position) => resolve(position.coords),
+      (error) => {
+        console.log(error.code, error.message, 'LOCATION ERROR');
+        resolve(null); // don't block main flow
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+    );
+  });
+};
 
   // setLoading(false)
     const handleSubmit = async (data) => {
@@ -336,25 +379,34 @@ export default function TicketForm3({ navigation, route }) {
                         return;
                         } */
               //  if (collector == own_user?.email) {
-                    await Geolocation.getCurrentPosition(
-                       async (position) => {
-                            let { coords } = position;
-                            // setMarkerLocation({ ...position.coords });
-                            // realm.write(async () => {
-                            //     selectedUser.coordinates = `${coords.latitude}|${coords.longitude}`;
-                            // })
-                            await dispatch(updateUser(user?.id, { ...user,
-                                coordinates: `${coords.latitude}|${coords.longitude}`
-                            }))
-                        },
-                        error => {
-                            // See error code charts below.
-                            console.log(error.code, error.message, 'LOCATION ERROR');
-                        },
-                        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
-                    );
+                    // await Geolocation.getCurrentPosition(
+                    //    async (position) => {
+                    //         let { coords } = position;
+                    //         // setMarkerLocation({ ...position.coords });
+                    //         // realm.write(async () => {
+                    //         //     selectedUser.coordinates = `${coords.latitude}|${coords.longitude}`;
+                    //         // })
+                    //         await dispatch(updateUser(user?.id, { ...user,
+                    //             coordinates: `${coords.latitude}|${coords.longitude}`
+                    //         }))
+                    //     },
+                    //     error => {
+                    //         // See error code charts below.
+                    //         console.log(error.code, error.message, 'LOCATION ERROR');
+                    //     },
+                    //     { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
+                    // );
                 // }
               
+                // Fire-and-forget (non-blocking)
+getSafeLocation().then(coords => {
+  if (coords) {
+    dispatch(updateUser(user?.id, {
+      ...user,
+      coordinates: `${coords.latitude}|${coords.longitude}`
+    }));
+  }
+});
               
 
               

@@ -18,7 +18,7 @@ import { Switch } from 'react-native';
 import { api } from '../../utils/offlineSync';
 
 // Open SQLite database
-const db = SQLite.openDatabase({ name: 'local.db', location: 'default' });
+const db = SQLite.openDatabase({ name: 'app.db', location: 'default' });
 
 const drawTimes = [
   { id: 0, name: 'All Time' },

@@ -16,7 +16,7 @@ import { api, getDB } from "./offlineSync";
 // Initialize DB and create tables
 export const initDB = async () => {
   try {
-  let db = await SQLite.openDatabase({ name: "leo.db", location: "default" });
+  let db = await SQLite.openDatabase({ name: "app.db", location: "default" });
 
     await new Promise((resolve, reject) => {
       db.transaction(
@@ -244,9 +244,6 @@ export const get_local_draws = async ({ start_date, end_date }) => {
   });
 };
 
-
-
-
 // -------------------- USERS --------------------
 export const fetchUser = async (email) => {
   let db = await getDB();
@@ -323,7 +320,6 @@ export const fetchUser = async (email) => {
   }
 };
 
-
 // -------------------- DRAWS --------------------
 export const fetchDraws = async (date) => {
   let db = await getDB();
@@ -371,7 +367,6 @@ export const fetchDraws = async (date) => {
 // -------------------- PLACE BET (Offline-First) --------------------
 export const placeBet = async (bet) => {
   let db = await getDB();
-
 
 console.log(bet, 'PLACE BEET')
   return new Promise((resolve, reject) => {
@@ -472,7 +467,6 @@ console.log(bet, 'PLACE BEET')
   });
 };
 
-
 // -------------------- GET PENDING BETS --------------------
 export const getPendingBets = async () => {
     let db = await getDB();
@@ -490,7 +484,6 @@ export const getPendingBets = async () => {
     });
 };
 
-// -------------------- SYNC PENDING BETS --------------------
 // -------------------- SYNC PENDING BETS --------------------
 export const syncPendingBets = async () => {
   let db = await getDB();

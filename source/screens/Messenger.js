@@ -61,7 +61,7 @@ const Messenger = ({ route, navigation }) => {
 
         if (
           newMessage.created_by === user.id ||
-          newMessage.recepient === user.id
+          newMessage.recipient === user.id
         ) {
           setMessages(newMessage)
         }
@@ -284,7 +284,7 @@ useEffect(()=>{
 
     const renderHeader = () => {
         const isRecipientOnline =
-  onlineUsers.includes(messages?.recepient)
+  onlineUsers.includes(messages?.recipient)
         
         return (
             // <View style={{ paddingVertical: 8, backgroundColor: '#fffff1', width: '100%', elevation: 2, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'flex-start'}}>
@@ -305,7 +305,7 @@ useEffect(()=>{
                 </TouchableOpacity>
                 <View style={{ width: '50%', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'flex-end' }}>
                     <Text style={{ color: COLORS.black900, fontWeight: '500', fontSize: 20 }}>
-                        {String(messages?.created_by == String(user?.id) ? messages?.recepient_name : displayName).toUpperCase()}
+                        {String(messages?.created_by == String(user?.id) ? messages?.recipient_name : displayName).toUpperCase()}
                     </Text>
                     <Text style={{ color: COLORS.darkGray2, fontSize: 14}}>
                         {String(senderName?.address)}
@@ -407,8 +407,8 @@ useEffect(()=>{
     //         // realm.write(async () => {
     //         //     let newConversation = new Messages(realm, {
     //         //         createdBy: String(user?._id),
-    //         //         recepient: String(messageId),
-    //         //         recepientName: String(displayName),
+    //         //         recipient: String(messageId),
+    //         //         recipientName: String(displayName),
     //         //         conversations: [newMessageObj],
     //         //         isDeleted: false,
     //         //         created_at: moment(today).toDate(),
@@ -434,8 +434,8 @@ useEffect(()=>{
 
   const newMessage = {
     created_by: user.id,
-    recepient: messageId,
-    recepient_name: displayName,
+    recipient: messageId,
+    recipient_name: displayName,
     conversations: [{
       owner_id: user.id,
       message: textInput,

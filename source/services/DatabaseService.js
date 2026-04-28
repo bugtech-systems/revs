@@ -71,7 +71,7 @@ class DatabaseService {
       try {
         this.db = SQLite.openDatabase(
           {
-            name: 'lgm2.db',
+            name: 'app.db',
             location: 'default',
           },
           () => {

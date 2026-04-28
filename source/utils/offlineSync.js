@@ -25,8 +25,9 @@ export const TABLES = [
 'users', 
 'bettings', 
 'master_combinations',
-'draws'
-// 'messages', 'cashflow'
+'draws',
+'messages', 
+// 'cashflow'
 ];
 
 

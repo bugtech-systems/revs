@@ -55,6 +55,23 @@ const CustomDrawerIcon = ({ route, navigation, navType, headerTitle }) => {
 
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+      {
+        String(headerTitle).toLowerCase() === 'conversation' ?
+        <TouchableOpacity
+        onPress={() => (navigation.navigate('Messages'))}
+        style={{ marginLeft: 10, width: 30, alignItems: 'center', justifyContent: 'center' }}
+      >
+        <Image
+          source={navType === 'drawer' ? icons.drawer : icons.backHeader}
+          style={{
+            height: 25,
+            width: '100%',
+            tintColor: route ? COLORS.white : COLORS.black,
+          }}
+        />
+      </TouchableOpacity>
+        
+:      
       <TouchableOpacity
         onPress={() => (navType === 'drawer' ? navigation.openDrawer() : navigation.goBack())}
         style={{ marginLeft: 10, width: 30, alignItems: 'center', justifyContent: 'center' }}
@@ -68,7 +85,7 @@ const CustomDrawerIcon = ({ route, navigation, navType, headerTitle }) => {
           }}
         />
       </TouchableOpacity>
-
+}
       <View style={{ paddingHorizontal: 10, flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center' }}>
         <Text style={{ color: route ? COLORS.white : COLORS.black, fontSize: 20, fontWeight: '500' }}>
           {headerTitle}

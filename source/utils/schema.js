@@ -97,8 +97,11 @@ export const schema = {
   messages: {
     id: "text",
     created_by: "text",
-    recepient: "text",
-    recepient_name: "text",
+    message: "text",
+    status: "text",
+    recipient: "text",
+    is_flash: "boolean",
+    recipient_name: "text",
     conversations: "json",
     is_deleted: "boolean",
     created_at: "timestamp",

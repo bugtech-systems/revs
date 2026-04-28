@@ -96,16 +96,16 @@ const fetchCoordinators = async () => {
   };
 
   // 🔹 Navigate to Messenger (check if a conversation already exists)
-  const handleMessageNavigation = async (recepientId) => {
+  const handleMessageNavigation = async (recipientId) => {
     try {
     let data = await api.listMessages({
-          filters: {is_deleted: false, recepient: recepientId, created_by: userNow.id}
+          filters: {is_deleted: false, recipient: recipientId, created_by: userNow.id}
        })
 
       if (data && data.length > 0) {
         navigation.navigate('Messenger', JSON.stringify(data[0].id));
       } else {
-        navigation.navigate('Messenger', JSON.stringify(recepientId));
+        navigation.navigate('Messenger', JSON.stringify(recipientId));
       }
     } catch (err) {
       console.error("Error navigating to Messenger:", err);
